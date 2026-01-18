@@ -61,66 +61,46 @@ const initialData = {
 };
 
 // --- Gemini API Helpers ---
-// A centralized function to call the Gemini API with retry logic for rate limiting.
+// Calls backend API for Gemini chat (API key is secure on server)
 async function callGeminiAPI(payload, retries = 3, delay = 1000) {
-  const apiKey = ""; // This is injected in the execution environment.
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-  
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  const response = await fetch('/api/gemini/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-  if (!response.ok) {
-    if (response.status === 429 && retries > 0) {
-      await new Promise(res => setTimeout(res, delay));
-      return callGeminiAPI(payload, retries - 1, delay * 2);
-    }
-    const error = new Error(`HTTP error! status: ${response.status}`);
-    error.status = response.status;
-    throw error;
-  }
-  
-  const result = await response.json();
-  const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("No text content in Gemini response.");
-  }
-  return text;
+  if (!response.ok) {
+    if (response.status === 429 && retries > 0) {
+      await new Promise(res => setTimeout(res, delay));
+      return callGeminiAPI(payload, retries - 1, delay * 2);
+    }
+    const error = new Error(`HTTP error! status: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const result = await response.json();
+  return result.text;
 }
 
-// A function to call the Gemini Text-to-Speech (TTS) API.
-async function callGeminiTTS(fullPrompt, voiceName = "Charon") {
-  const apiKey = "";
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-  const payload = {
-    contents: [{ parts: [{ text: fullPrompt }] }],
-    generationConfig: {
-      responseModalities: ["AUDIO"],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
-    },
-    model: "gemini-2.5-flash-preview-tts"
-  };
-  try {
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    const result = await response.json();
-    const part = result?.candidates?.[0]?.content?.parts?.[0];
-    const audioData = part?.inlineData?.data;
-    const mimeType = part?.inlineData?.mimeType;
-    if (audioData && mimeType?.startsWith("audio/")) {
-      return { audioData, mimeType };
-    }
-    throw new Error("Invalid audio data received.");
-  } catch (error) {
-    console.error("Error with TTS API:", error);
-    return null;
-  }
+// Calls backend API for Gemini TTS
+async function callGeminiTTS(fullPrompt, voiceName = "Kore") {
+  try {
+    const response = await fetch('/api/gemini/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: fullPrompt, voice: voiceName })
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const result = await response.json();
+    if (result.audioData && result.mimeType) {
+      return { audioData: result.audioData, mimeType: result.mimeType };
+    }
+    throw new Error("Invalid audio data received.");
+  } catch (error) {
+    console.error("Error with TTS API:", error);
+    return null;
+  }
 }
 
 // --- Main App Component ---
