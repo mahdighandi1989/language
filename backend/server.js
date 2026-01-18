@@ -39,7 +39,7 @@ app.post('/api/gemini/chat', async (req, res) => {
       }));
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -156,7 +156,7 @@ app.get('/api/test-gemini', async (req, res) => {
       contents: [{ role: 'user', parts: [{ text: 'Say hello in Lebanese Arabic' }] }]
     };
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     console.log('Testing Gemini API with URL:', apiUrl.replace(GEMINI_API_KEY, 'HIDDEN'));
 
