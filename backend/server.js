@@ -28,6 +28,17 @@ app.post('/api/gemini/chat', async (req, res) => {
 
   try {
     const payload = req.body;
+
+    // Clean payload - remove extra fields that Gemini doesn't recognize
+    if (payload.contents) {
+      payload.contents = payload.contents.map(content => ({
+        role: content.role,
+        parts: content.parts.map(part => ({
+          text: part.text
+        }))
+      }));
+    }
+
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const response = await fetch(apiUrl, {
