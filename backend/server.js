@@ -122,6 +122,29 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// List available models
+app.get('/api/list-models', async (req, res) => {
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data, keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...' });
+    }
+
+    // Return just model names for easier reading
+    const modelNames = data.models?.map(m => m.name) || [];
+    res.json({ models: modelNames, count: modelNames.length, keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Test Gemini API directly
 app.get('/api/test-gemini', async (req, res) => {
   if (!GEMINI_API_KEY) {
