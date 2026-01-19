@@ -1192,33 +1192,49 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
     }
 
-    // Build contents for API, including audio if present
+    // Build contents for API - transcribe audio first if needed
     let contentsForApi = [];
     for (const m of newHistory) {
       if (m.parts[0].type === 'audio' && m.parts[0].audioUrl) {
-        // Convert audio blob URL to base64 for Gemini
+        // Transcribe audio to text first
         try {
           const response = await fetch(m.parts[0].audioUrl);
           const blob = await response.blob();
           const base64 = await new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onloadend = () => {
-              const base64data = reader.result.split(',')[1];
-              resolve(base64data);
-            };
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
             reader.readAsDataURL(blob);
           });
 
-          contentsForApi.push({
-            role: m.role,
-            parts: [
-              { text: "The user sent a voice message. Please listen and respond in Lebanese Arabic:" },
-              { inline_data: { mime_type: blob.type || 'audio/webm', data: base64 } }
-            ]
+          // Call Gemini to transcribe the audio
+          const transcribeResponse = await fetch('/api/gemini/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [
+                  { text: "Transcribe this audio exactly as spoken. If it's Arabic/Lebanese dialect, write it in Arabic script. If it's another language, write it in that language. Only output the transcription, nothing else:" },
+                  { inline_data: { mime_type: blob.type || 'audio/webm', data: base64 } }
+                ]
+              }],
+              includeAudio: true
+            })
           });
+
+          if (transcribeResponse.ok) {
+            const transcribeData = await transcribeResponse.json();
+            const transcribedText = transcribeData.candidates?.[0]?.content?.parts?.[0]?.text || '[پیام صوتی]';
+            // Update the message in history with transcribed text
+            m.parts[0].transcribedText = transcribedText;
+            // Update chat history to show transcription
+            setChatHistory([...newHistory]);
+            contentsForApi.push({ role: m.role, parts: [{ text: `[پیام صوتی کاربر]: ${transcribedText}` }] });
+          } else {
+            contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی - خطا در تبدیل]' }] });
+          }
         } catch (e) {
-          console.error('Error converting audio:', e);
-          // Fallback to text
+          console.error('Error transcribing audio:', e);
           if (m.parts[0].text?.trim()) {
             contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
           }
@@ -1552,6 +1568,11 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
             <div className="flex justify-end">
                 <div className="max-w-[80%] py-2 px-4 rounded-2xl bg-teal-500 text-white rounded-br-none">
                     <audio src={message.audioUrl} controls className="h-10" />
+                    {message.transcribedText && (
+                        <p className="text-sm mt-2 pt-2 border-t border-white/30 text-white/90">
+                            📝 {message.transcribedText}
+                        </p>
+                    )}
                 </div>
             </div>
         );
@@ -1678,6 +1699,7 @@ function LiveVoiceChat({
   const [transcript, setTranscript] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Charon');
   const [conversationHistory, setConversationHistory] = useState([]);
+  const [silenceDuration, setSilenceDuration] = useState(1500); // ms
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -1785,7 +1807,7 @@ function LiveVoiceChat({
 
       // Start Voice Activity Detection
       const SILENCE_THRESHOLD = 15; // Adjust based on testing
-      const SILENCE_DURATION = 1500; // 1.5 seconds of silence to stop
+      const SILENCE_DURATION = silenceDuration; // Use state value
 
       silenceTimeoutRef.current = setInterval(() => {
         if (!analyserRef.current || !mediaRecorderRef.current) return;
@@ -1964,9 +1986,9 @@ function LiveVoiceChat({
         </div>
       </div>
 
-      {/* Voice Selection */}
+      {/* Voice Selection & Settings */}
       {!isConnected && (
-        <div className="px-4 py-2">
+        <div className="px-4 py-2 space-y-3">
           <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
             <label className="block text-white/80 text-sm mb-2 text-center">انتخاب صدای استاد:</label>
             <select
@@ -1977,6 +1999,20 @@ function LiveVoiceChat({
               {Object.entries(availableVoices).map(([key, name]) => (
                 <option key={key} value={key} className="bg-purple-800 text-white">{name}</option>
               ))}
+            </select>
+          </div>
+          <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
+            <label className="block text-white/80 text-sm mb-2 text-center">زمان سکوت برای توقف خودکار:</label>
+            <select
+              value={silenceDuration}
+              onChange={(e) => setSilenceDuration(Number(e.target.value))}
+              className="w-full p-2 rounded-lg bg-white/20 text-white border border-white/30 text-center"
+            >
+              <option value={500} className="bg-purple-800 text-white">۰.۵ ثانیه (سریع)</option>
+              <option value={1000} className="bg-purple-800 text-white">۱ ثانیه</option>
+              <option value={1500} className="bg-purple-800 text-white">۱.۵ ثانیه (پیش‌فرض)</option>
+              <option value={2000} className="bg-purple-800 text-white">۲ ثانیه</option>
+              <option value={3000} className="bg-purple-800 text-white">۳ ثانیه (آهسته)</option>
             </select>
           </div>
         </div>
