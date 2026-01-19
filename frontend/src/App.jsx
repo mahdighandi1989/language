@@ -2188,6 +2188,26 @@ ${conversationSummary}
     }
 
     if (message.serverContent) {
+      // Handle output transcription (AI's speech to text)
+      if (message.serverContent.outputTranscription?.text) {
+        const transcriptText = message.serverContent.outputTranscription.text;
+        console.log('📝 AI transcript:', transcriptText);
+        currentAiTextRef.current += transcriptText;
+        setTranscript(prev => [...prev, { role: 'ai', text: transcriptText }]);
+      }
+
+      // Handle input transcription (User's speech to text)
+      if (message.serverContent.inputTranscription?.text) {
+        const userText = message.serverContent.inputTranscription.text;
+        console.log('🎤 User transcript:', userText);
+        // Update the last user message if exists, or add new one
+        const lastUserIndex = conversationRef.current.length - 1;
+        if (lastUserIndex >= 0 && conversationRef.current[lastUserIndex].role === 'user') {
+          conversationRef.current[lastUserIndex].text = userText;
+        }
+        setTranscript(prev => [...prev, { role: 'user', text: userText }]);
+      }
+
       const parts = message.serverContent.modelTurn?.parts || [];
       for (const part of parts) {
         if (part.inlineData?.mimeType?.startsWith('audio/')) {
