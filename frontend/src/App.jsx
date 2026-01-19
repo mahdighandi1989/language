@@ -1769,7 +1769,20 @@ function LiveVoiceChat({
   }, [isOpen]);
 
   const connect = () => {
+    // Reset state for new connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    conversationRef.current = [];
+    currentAiAudioChunksRef.current = [];
+    currentAiTextRef.current = '';
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
+
     setConnectionStatus('connecting');
+    setTranscript([]);
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/live`;
 
@@ -1783,12 +1796,17 @@ function LiveVoiceChat({
           console.error('Error parsing message:', error);
         }
       };
-      wsRef.current.onerror = () => setConnectionStatus('error');
-      wsRef.current.onclose = () => {
+      wsRef.current.onerror = (e) => {
+        console.error('WebSocket error:', e);
+        setConnectionStatus('error');
+      };
+      wsRef.current.onclose = (e) => {
+        console.log('WebSocket closed:', e.code, e.reason);
         setConnectionStatus('disconnected');
         stopListening();
       };
     } catch (error) {
+      console.error('Connection error:', error);
       setConnectionStatus('error');
     }
   };
@@ -1839,10 +1857,15 @@ function LiveVoiceChat({
         isVoiceCallHeader: true
       };
 
-      setChatHistory(prev => [...prev, callHeader, ...callMessages]);
-      saveChatHistory([...chatHistory, callHeader, ...callMessages]);
-      conversationRef.current = [];
+      const newHistory = [...chatHistory, callHeader, ...callMessages];
+      setChatHistory(newHistory);
+      saveChatHistory(context, newHistory);
     }
+
+    // Reset recording refs
+    conversationRef.current = [];
+    currentAiAudioChunksRef.current = [];
+    currentAiTextRef.current = '';
 
     disconnect();
     onClose();
