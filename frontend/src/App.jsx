@@ -1412,7 +1412,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             </div>
         )}
         <div ref={chatWindowRef} className="flex-1 overflow-y-auto p-2 space-y-4">
-          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text.slice(0, 10)}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} />))}
+          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
         {/* Voice Conversation Mode Indicator */}
@@ -1478,13 +1478,43 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   );
 }
 
-function ChatMessage({ message, role, onSave, voice, disableSave = false }) {
+function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType }) {
     const isError = message.isError;
     const [mainText, translation] = useMemo(() => {
         if (!message.text) return ['', ''];
         const parts = message.text.split('TRANSLATION:');
         return [parts[0].trim(), parts[1]?.trim()];
     }, [message.text]);
+
+    // Create audio URL for live audio messages
+    const liveAudioUrl = useMemo(() => {
+        if (msgType === 'live_audio' && audioData) {
+            try {
+                return getWavUrl(audioData, mimeType || 'audio/pcm;rate=24000');
+            } catch (e) {
+                console.error('Error creating audio URL:', e);
+                return null;
+            }
+        }
+        return null;
+    }, [msgType, audioData, mimeType]);
+
+    // Handle live audio messages (from Live Voice Chat)
+    if (msgType === 'live_audio' && audioData) {
+        return (
+            <div className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] py-2 px-4 rounded-2xl ${role === 'user' ? 'bg-teal-500 text-white rounded-br-none' : 'bg-white text-slate-800 rounded-bl-none shadow-sm'}`}>
+                    <div className="flex items-center gap-2">
+                        {role === 'user' ? <Mic size={16} /> : <Volume2 size={16} />}
+                        <span className="text-sm">{role === 'user' ? 'پیام صوتی شما' : 'پاسخ صوتی جاد'}</span>
+                    </div>
+                    {liveAudioUrl && (
+                        <audio src={liveAudioUrl} controls className="h-10 mt-2 w-full" />
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     if (message.type === 'audio' && role === 'user') {
         return (
