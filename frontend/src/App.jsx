@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Translate, Archive } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -1071,6 +1071,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const [attachedFile, setAttachedFile] = useState(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const [voiceConversationMode, setVoiceConversationMode] = useState(false);
+  const currentAudioRef = useRef(null);
   
   const [selectedTopics, setSelectedTopics] = useState(['general']);
   const [writingStyle, setWritingStyle] = useState(defaultChatSettings.writingStyle);
@@ -1185,19 +1187,129 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     try {
         const aiResponseText = await callGeminiAPI(payload);
         let ttsPrompt = `Say in a clear, ${accentMode === 'standard' ? 'standard' : 'authentic, colloquial Beirut'} Lebanese accent: ${aiResponseText.split('TRANSLATION:')[0]}`;
-        const audioPromise = (aiResponseType === 'audio') ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
+        const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
         const audioResult = await audioPromise;
         const audioUrl = audioResult ? getWavUrl(audioResult.audioData, audioResult.mimeType) : null;
         const newAiMessage = { role: 'model', parts: [{ text: aiResponseText, type: 'text', audioUrl }] };
         newHistory = [...newHistory, newAiMessage];
         setChatHistory(newHistory);
         saveChatHistory(context, newHistory);
-        if (aiResponseType === 'audio' && audioUrl) new Audio(audioUrl).play();
+
+        // Play audio and handle voice conversation mode
+        if ((aiResponseType === 'audio' || voiceConversationMode) && audioUrl) {
+            const audio = new Audio(audioUrl);
+            currentAudioRef.current = audio;
+
+            audio.onended = () => {
+                currentAudioRef.current = null;
+                // Auto-start recording if voice conversation mode is active
+                if (voiceConversationMode) {
+                    setTimeout(() => startVoiceRecording(), 500);
+                }
+            };
+
+            audio.play().catch(err => {
+                console.error('Audio playback error:', err);
+                // Still try to start recording if in voice conversation mode
+                if (voiceConversationMode) {
+                    setTimeout(() => startVoiceRecording(), 500);
+                }
+            });
+        }
     } catch(error) {
         const errorAiMessage = { role: 'model', parts: [{ text: "متاسفانه مشکلی پیش آمد.", type: 'text', isError: true }] };
         setChatHistory(prev => [...prev, errorAiMessage]);
+        // Stop voice conversation mode on error
+        if (voiceConversationMode) {
+            setVoiceConversationMode(false);
+        }
     } finally {
         setIsLoading(false);
+    }
+  };
+
+  // Start voice recording function (used by both manual click and voice conversation mode)
+  const startVoiceRecording = async () => {
+    if (isRecording || isLoading) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = event => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+
+        if (audioChunksRef.current.length === 0) {
+          if (!voiceConversationMode) {
+            setModalConfig({ title: "خطا", message: "صدایی ضبط نشد. لطفا دوباره تلاش کنید." });
+          }
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationMode) {
+          try {
+            recognitionRef.current.start();
+          } catch (err) {
+            handleSend("[پیام صوتی]", audioUrl);
+          }
+        } else {
+          handleSend("[پیام صوتی]", audioUrl);
+        }
+      };
+
+      mediaRecorderRef.current.onerror = (err) => {
+        console.error('MediaRecorder error:', err);
+        stream.getTracks().forEach(track => track.stop());
+        setIsRecording(false);
+        if (voiceConversationMode) {
+          setVoiceConversationMode(false);
+        }
+        setModalConfig({ title: "خطای ضبط", message: "مشکلی در ضبط صدا پیش آمد." });
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Microphone error:', err);
+      if (voiceConversationMode) {
+        setVoiceConversationMode(false);
+      }
+      setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست. لطفا دسترسی را در تنظیمات مرورگر فعال کنید." });
+    }
+  };
+
+  // Stop voice recording
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // Toggle voice conversation mode
+  const toggleVoiceConversationMode = () => {
+    if (voiceConversationMode) {
+      // Turning off - stop any ongoing audio/recording
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      stopVoiceRecording();
+      setVoiceConversationMode(false);
+    } else {
+      // Turning on - start voice conversation mode and begin recording
+      setVoiceConversationMode(true);
+      startVoiceRecording();
     }
   };
 
@@ -1205,63 +1317,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     e.preventDefault();
 
     if (isRecording) {
-      // Stop recording
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      setIsRecording(false);
+      stopVoiceRecording();
     } else {
-      // Start recording
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorderRef.current = new MediaRecorder(stream);
-        audioChunksRef.current = [];
-
-        mediaRecorderRef.current.ondataavailable = event => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
-          }
-        };
-
-        mediaRecorderRef.current.onstop = () => {
-          // Clean up stream
-          stream.getTracks().forEach(track => track.stop());
-
-          if (audioChunksRef.current.length === 0) {
-            setModalConfig({ title: "خطا", message: "صدایی ضبط نشد. لطفا دوباره تلاش کنید." });
-            return;
-          }
-
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(audioBlob);
-
-          if (sendVoiceAs === 'text' && recognitionRef.current) {
-            // Use speech recognition to convert to text
-            try {
-              recognitionRef.current.start();
-            } catch (err) {
-              // Recognition might already be running
-              handleSend("[پیام صوتی]", audioUrl);
-            }
-          } else {
-            // Send as audio
-            handleSend("[پیام صوتی]", audioUrl);
-          }
-        };
-
-        mediaRecorderRef.current.onerror = (err) => {
-          console.error('MediaRecorder error:', err);
-          stream.getTracks().forEach(track => track.stop());
-          setIsRecording(false);
-          setModalConfig({ title: "خطای ضبط", message: "مشکلی در ضبط صدا پیش آمد." });
-        };
-
-        mediaRecorderRef.current.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error('Microphone error:', err);
-        setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست. لطفا دسترسی را در تنظیمات مرورگر فعال کنید." });
-      }
+      startVoiceRecording();
     }
   };
 
@@ -1314,17 +1372,39 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text.slice(0, 10)}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
+        {/* Voice Conversation Mode Indicator */}
+        {voiceConversationMode && (
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-xl mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone size={20} className="animate-pulse" />
+              <span className="font-bold">حالت مکالمه صوتی فعال</span>
+              {isRecording && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال گوش دادن...</span>}
+              {isLoading && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال پاسخگویی...</span>}
+            </div>
+            <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg">
+              <PhoneOff size={18} />
+            </button>
+          </div>
+        )}
+
         <div className="pt-2 flex-shrink-0 space-y-2">
           <div className="flex items-center gap-2">
-            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 p-3 border rounded-xl text-base bg-white" placeholder="پیام خود را بنویسید..." disabled={isLoading} />
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 p-3 border rounded-xl text-base bg-white" placeholder="پیام خود را بنویسید..." disabled={isLoading || voiceConversationMode} />
           </div>
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-2">
-              <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200"><Paperclip size={20}/></button>
+              <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200" disabled={voiceConversationMode}><Paperclip size={20}/></button>
               <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-              <button onClick={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`}><Mic size={20}/></button>
+              <button onClick={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`} disabled={voiceConversationMode}><Mic size={20}/></button>
+              <button
+                onClick={toggleVoiceConversationMode}
+                className={`p-2 border rounded-xl flex items-center gap-1 ${voiceConversationMode ? 'bg-purple-500 text-white' : 'hover:bg-purple-100 text-purple-600 border-purple-300'}`}
+                title="حالت مکالمه صوتی"
+              >
+                <Phone size={20}/>
+              </button>
             </div>
-            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold" disabled={isLoading}>{isLoading ? '...' : 'ارسال'}</button>
+            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
           </div>
         </div>
       </div>
