@@ -34,6 +34,7 @@ const initialData = {
     pronouns: [],
     adjectives: []
   },
+  pronunciationCorrections: [], // Store pronunciation mistakes and corrections
   journal: [
     { id: Date.now(), date: new Date().toISOString(), entry: "برنامه برای اولین بار راه اندازی شد." }
   ],
@@ -306,6 +307,21 @@ export default function App() {
     setData(prev => ({ ...prev, journal: [newEntry, ...prev.journal] }));
   };
 
+  const addPronunciationCorrection = (wrong, correct) => {
+    const newCorrection = { id: Date.now(), wrong, correct, date: new Date().toISOString() };
+    setData(prev => ({
+      ...prev,
+      pronunciationCorrections: [...(prev.pronunciationCorrections || []), newCorrection]
+    }));
+  };
+
+  const removePronunciationCorrection = (id) => {
+    setData(prev => ({
+      ...prev,
+      pronunciationCorrections: (prev.pronunciationCorrections || []).filter(c => c.id !== id)
+    }));
+  };
+
   const exportData = () => {
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data))}`;
     const link = document.createElement("a");
@@ -374,7 +390,7 @@ export default function App() {
     if (!isAuthReady) {
         return <div className="w-full h-full flex items-center justify-center"><Loader size={48} className="animate-spin text-teal-500" /></div>;
     }
-    const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData };
+    const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection, addPronunciationCorrection };
     switch (activeView) {
       case 'dashboard': return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
       case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} />;
@@ -472,7 +488,9 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
     );
 }
 
-function SettingsPage({ data, setData, setModalConfig }) {
+function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection }) {
+    const pronunciationCorrections = data.pronunciationCorrections || [];
+
     const handleSettingChange = (key, value) => {
         setData(prev => ({
             ...prev,
@@ -495,6 +513,44 @@ function SettingsPage({ data, setData, setModalConfig }) {
                     <div className="border-t pt-3"><label className="font-bold">سبک نوشتار:</label><select value={defaultChatSettings.writingStyle} onChange={e => handleSettingChange('writingStyle', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="simple_arabic">عربی ساده</option><option value="finglish">فینگلیش (Arabizi)</option><option value="tashkeel">عربی با اعراب</option></select></div>
                     <div className="border-t pt-3"><label className="font-bold">نمایش ترجمه:</label><select value={defaultChatSettings.translationLanguage} onChange={e => handleSettingChange('translationLanguage', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="none">بدون ترجمه</option><option value="persian">فارسی</option><option value="english">انگلیسی</option></select></div>
                     <div className="border-t pt-3"><label className="font-bold">پاسخ استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="receiveAs" value="audio" checked={defaultChatSettings.aiResponseType === 'audio'} onChange={() => handleSettingChange('aiResponseType', 'audio')} /> صدا</label><label><input type="radio" name="receiveAs" value="text" checked={defaultChatSettings.aiResponseType === 'text'} onChange={() => handleSettingChange('aiResponseType', 'text')} /> فقط متن</label></div></div>
+                </div>
+            </Card>
+
+            <Card title="📝 اصلاحات تلفظی یادگرفته شده">
+                <div className="space-y-3">
+                    <p className="text-sm text-slate-600">
+                        این اصلاحات از آنالیز تماس‌های قبلی استخراج شدن و در تماس‌های بعدی به Live API ارسال میشن.
+                    </p>
+                    {pronunciationCorrections.length === 0 ? (
+                        <p className="text-center text-slate-400 py-4">هنوز اصلاحی ثبت نشده. بعد از هر تماس، سیستم خودکار آنالیز میکنه.</p>
+                    ) : (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {pronunciationCorrections.map((c, i) => (
+                                <div key={c.id || i} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-red-500 line-through">{c.wrong}</span>
+                                            <span className="text-slate-400">←</span>
+                                            <span className="text-green-600 font-bold">{c.correct}</span>
+                                        </div>
+                                        {c.date && <p className="text-xs text-slate-400 mt-1">{new Date(c.date).toLocaleDateString('fa-IR')}</p>}
+                                    </div>
+                                    <button
+                                        onClick={() => removePronunciationCorrection && removePronunciationCorrection(c.id)}
+                                        className="text-red-400 hover:text-red-600 p-1"
+                                        title="حذف"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="border-t pt-3 mt-3">
+                        <p className="text-xs text-slate-500">
+                            💡 <strong>نحوه کار:</strong> وقتی تماس تموم میشه → آنالیز خودکار → اصلاحات ذخیره میشن → در تماس بعدی به Live API گفته میشه
+                        </p>
+                    </div>
                 </div>
             </Card>
         </div>
@@ -583,7 +639,7 @@ function CustomVoiceCreator({ customVoices, setCustomVoices, setModalConfig }) {
     );
 }
 
-function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, knowledgeBase, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, data, setData }) {
+function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, knowledgeBase, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, data, setData, addPronunciationCorrection }) {
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const handleAddLesson = () => {
     if (newLessonTitle.trim()) {
@@ -615,7 +671,7 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
             <ul className="space-y-3">{lessons.slice(-3).reverse().map(lesson => (<li key={lesson.id} className="p-4 bg-slate-50 rounded-xl hover:bg-teal-50 cursor-pointer transition-colors" onClick={() => navigateTo('lesson', lesson)}>{lesson.title}</li>))}</ul>
           </Card>
         </div>
-        <div><Card title="✨ تمرین با استاد هوش مصنوعی"><ChatInterface data={data} setData={setData} context="global" addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories.global} setModalConfig={setModalConfig} /></Card></div>
+        <div><Card title="✨ تمرین با استاد هوش مصنوعی"><ChatInterface data={data} setData={setData} context="global" addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories.global} setModalConfig={setModalConfig} addPronunciationCorrection={addPronunciationCorrection} /></Card></div>
       </div>
     </div>
   );
@@ -687,7 +743,7 @@ function LessonListItem({ lesson, navigateTo, deleteLesson, editLesson }) {
     );
 }
 
-function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, knowledgeBase, data, setData }) {
+function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, knowledgeBase, data, setData, addPronunciationCorrection }) {
   const [pastedText, setPastedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashcards, setFlashcards] = useState([]);
@@ -825,7 +881,7 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
             {flashcards.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 gap-4">{flashcards.map((card, index) => <Flashcard key={index} term={card.term} definition={card.definition} />)}</div>) : <p className="text-slate-500 text-center py-4">برای ایجاد فلش‌کارت، ابتدا باید نکاتی به درس اضافه کنید.</p>}
           </Card>
         </div>
-        <div><Card title="✨ تمرین مکالمه"><ChatInterface data={data} setData={setData} context={`lesson-${lesson.id}`} lessonTitle={lesson.title} lessonNotes={lesson.archivedNotes} addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories[`lesson-${lesson.id}`] || []} setModalConfig={setModalConfig} /></Card></div>
+        <div><Card title="✨ تمرین مکالمه"><ChatInterface data={data} setData={setData} context={`lesson-${lesson.id}`} lessonTitle={lesson.title} lessonNotes={lesson.archivedNotes} addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories[`lesson-${lesson.id}`] || []} setModalConfig={setModalConfig} addPronunciationCorrection={addPronunciationCorrection} /></Card></div>
       </div>
     </div>
   );
@@ -1063,7 +1119,7 @@ function StatsReport({ journal, knowledgeBase }) {
 }
 function Journal({ entries }) { return (<Card title="ژورنال فعالیت‌ها"><div className="space-y-4 max-h-[600px] overflow-y-auto">{entries.map(entry => (<div key={entry.id} className="p-4 bg-slate-50 border-r-4 border-teal-500 rounded-r-lg"><p className="text-sm text-slate-500 mb-1">{new Date(entry.date).toLocaleString('fa-IR')}</p><p>{entry.entry}</p></div>))}</div></Card>); }
 
-function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJournalEntry, updateKnowledgeBase, knowledgeBase, saveChatHistory, initialHistory, setModalConfig }) {
+function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJournalEntry, updateKnowledgeBase, knowledgeBase, saveChatHistory, initialHistory, setModalConfig, addPronunciationCorrection }) {
   const { defaultChatSettings = initialData.defaultChatSettings, archivedConversations = [] } = data;
   const [chatHistory, setChatHistory] = useState(initialHistory || []);
   const [input, setInput] = useState('');
@@ -1520,6 +1576,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         accentMode={accentMode}
         addJournalEntry={addJournalEntry}
         knowledgeBase={knowledgeBase}
+        pronunciationCorrections={data.pronunciationCorrections || []}
+        addPronunciationCorrection={addPronunciationCorrection}
       />
     </>
   );
@@ -1723,13 +1781,18 @@ function LiveVoiceChat({
   aiVoice,
   accentMode,
   addJournalEntry,
-  knowledgeBase
+  knowledgeBase,
+  pronunciationCorrections = [],
+  addPronunciationCorrection
 }) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Aoede');
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionWrong, setCorrectionWrong] = useState('');
+  const [correctionCorrect, setCorrectionCorrect] = useState('');
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -1769,7 +1832,20 @@ function LiveVoiceChat({
   }, [isOpen]);
 
   const connect = () => {
+    // Reset state for new connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    conversationRef.current = [];
+    currentAiAudioChunksRef.current = [];
+    currentAiTextRef.current = '';
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
+
     setConnectionStatus('connecting');
+    setTranscript([]);
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/live`;
 
@@ -1783,12 +1859,17 @@ function LiveVoiceChat({
           console.error('Error parsing message:', error);
         }
       };
-      wsRef.current.onerror = () => setConnectionStatus('error');
-      wsRef.current.onclose = () => {
+      wsRef.current.onerror = (e) => {
+        console.error('WebSocket error:', e);
+        setConnectionStatus('error');
+      };
+      wsRef.current.onclose = (e) => {
+        console.log('WebSocket closed:', e.code, e.reason);
         setConnectionStatus('disconnected');
         stopListening();
       };
     } catch (error) {
+      console.error('Connection error:', error);
       setConnectionStatus('error');
     }
   };
@@ -1800,14 +1881,40 @@ function LiveVoiceChat({
 
     // Combine base64 PCM chunks
     const mimeType = chunks[0].mimeType;
-    const allBytes = [];
+
+    // Collect all binary strings
+    const binaryStrings = [];
     for (const chunk of chunks) {
-      const binary = atob(chunk.data);
-      for (let i = 0; i < binary.length; i++) {
-        allBytes.push(binary.charCodeAt(i));
+      try {
+        binaryStrings.push(atob(chunk.data));
+      } catch (e) {
+        console.warn('Invalid base64 chunk, skipping');
       }
     }
-    const combined = btoa(String.fromCharCode(...allBytes));
+
+    // Calculate total length
+    let totalLength = 0;
+    for (const str of binaryStrings) {
+      totalLength += str.length;
+    }
+
+    // Create Uint8Array and fill it
+    const allBytes = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const str of binaryStrings) {
+      for (let i = 0; i < str.length; i++) {
+        allBytes[offset++] = str.charCodeAt(i);
+      }
+    }
+
+    // Convert to base64 in chunks to avoid stack overflow
+    const CHUNK_SIZE = 0x8000; // 32KB chunks
+    let result = '';
+    for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
+      const chunk = allBytes.subarray(i, Math.min(i + CHUNK_SIZE, allBytes.length));
+      result += String.fromCharCode.apply(null, chunk);
+    }
+    const combined = btoa(result);
     return { data: combined, mimeType };
   };
 
@@ -1821,9 +1928,116 @@ function LiveVoiceChat({
     setTranscript([]);
   };
 
-  const handleClose = () => {
+  const analyzeCallForDialect = async (conversationTexts) => {
+    // Build the conversation text for analysis
+    const conversationSummary = conversationTexts
+      .filter(c => c.text && c.text !== '🎤 پیام صوتی' && c.text !== '🔊 پاسخ صوتی')
+      .map(c => `${c.role === 'ai' ? 'جاد' : 'کاربر'}: ${c.text}`)
+      .join('\n');
+
+    if (!conversationSummary.trim()) return null;
+
+    const analysisPrompt = `انت خبير باللهجة اللبنانية البيروتية وبتفهم كتير منيح كيف اللبنانية لازم تنلفظ.
+
+راجع كلام جاد (المعلم) بهيدي المحادثة:
+
+المحادثة:
+${conversationSummary}
+
+=== مهمتك الأساسية ===
+
+1. تحليل التلفظ والحركات:
+   - شوف إذا الكلمات لازم تنكتب بحركات مختلفة للتلفظ اللبناني الصحيح
+   - مثلاً: "كَيفَك" مش "كَيْفُك"، "شو بَدَّك" مش "شو بِدُّك"
+   - اللبناني بيحذف حركات كتير وبيسكّن أواخر الكلمات
+
+2. تحليل اختيار الكلمات:
+   - شوف إذا استخدم كلمات فصحى بدل اللبنانية
+   - مثلاً: "ماذا" بدل "شو"، "الآن" بدل "هلأ"
+
+3. تحليل طريقة النطق:
+   - القاف لازم تكون همزة: قلب ← ألب
+   - الثاء لازم تكون ت: ثلاثة ← تلاتة
+   - الذال لازم تكون د: هذا ← هيدا
+
+=== فورمات الجواب ===
+
+---تحليل---
+[ملاحظاتك العامة]
+
+---اصلاحات-تلفظ---
+غلط: [الكلمة كما قيلت]
+صح: [الكلمة بالحركات الصحيحة للتلفظ اللبناني - استخدم الحركات: َ ِ ُ ْ ّ]
+شرح: [كيف لازم تنلفظ]
+
+---اصلاحات-كلمات---
+غلط: [الكلمة الفصحى]
+صح: [البديل اللبناني]
+
+---نهاية---
+
+مهم: اكتب الكلمات الصحيحة بالحركات الكاملة حتى تنقرأ صح!
+إذا ما في أخطاء، اكتب "اللهجة ممتازة!" بس.`;
+
+    try {
+      const response = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.text || data.candidates?.[0]?.content?.parts?.[0]?.text;
+      }
+    } catch (error) {
+      console.error('Error analyzing call:', error);
+    }
+    return null;
+  };
+
+  const parseCorrectionsFromAnalysis = (analysisText) => {
+    if (!analysisText) return [];
+    const corrections = [];
+    const lines = analysisText.split('\n');
+
+    let currentWrong = null;
+    for (const line of lines) {
+      const wrongMatch = line.match(/غلط:\s*(.+)/);
+      const correctMatch = line.match(/صح:\s*(.+)/);
+
+      if (wrongMatch) {
+        currentWrong = wrongMatch[1].trim();
+      } else if (correctMatch && currentWrong) {
+        corrections.push({
+          wrong: currentWrong,
+          correct: correctMatch[1].trim()
+        });
+        currentWrong = null;
+      }
+    }
+    return corrections;
+  };
+
+  const handleClose = async () => {
+    // First, save any remaining unsaved audio chunks
+    if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
+      const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
+      conversationRef.current.push({
+        role: 'ai',
+        text: currentAiTextRef.current || '🔊 پاسخ صوتی',
+        audioData: combinedAudio.data,
+        mimeType: combinedAudio.mimeType
+      });
+      currentAiAudioChunksRef.current = [];
+      currentAiTextRef.current = '';
+    }
+
     // Save conversation to chat history before closing
     if (conversationRef.current.length > 0) {
+      console.log('Saving conversation with', conversationRef.current.length, 'messages');
       const callMessages = conversationRef.current.map(msg => ({
         role: msg.role === 'ai' ? 'model' : 'user',
         parts: [{ text: msg.text }],
@@ -1839,10 +2053,73 @@ function LiveVoiceChat({
         isVoiceCallHeader: true
       };
 
-      setChatHistory(prev => [...prev, callHeader, ...callMessages]);
-      saveChatHistory([...chatHistory, callHeader, ...callMessages]);
-      conversationRef.current = [];
+      let newHistory = [...chatHistory, callHeader, ...callMessages];
+
+      // Analyze the call for dialect issues
+      const conversationTexts = conversationRef.current.filter(c => c.text);
+      if (conversationTexts.length > 0) {
+        // Add analyzing message
+        const analyzingMsg = {
+          role: 'model',
+          parts: [{ text: '🔍 در حال تحلیل مکالمه برای بررسی لهجه...' }],
+          isAnalyzing: true
+        };
+        newHistory = [...newHistory, analyzingMsg];
+        setChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
+
+        // Perform analysis with timeout
+        let analysis = null;
+        try {
+          const analysisPromise = analyzeCallForDialect(conversationTexts);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 15000)
+          );
+          analysis = await Promise.race([analysisPromise, timeoutPromise]);
+        } catch (err) {
+          console.error('Analysis failed or timed out:', err);
+        }
+
+        // Always remove analyzing message
+        newHistory = newHistory.filter(m => !m.isAnalyzing);
+
+        if (analysis) {
+          const analysisMessage = {
+            role: 'model',
+            parts: [{ text: `📝 تحلیل لهجه تماس:\n\n${analysis}` }],
+            isCallAnalysis: true
+          };
+          newHistory = [...newHistory, analysisMessage];
+
+          // Parse and save corrections automatically
+          const foundCorrections = parseCorrectionsFromAnalysis(analysis);
+          if (foundCorrections.length > 0 && addPronunciationCorrection) {
+            for (const corr of foundCorrections) {
+              addPronunciationCorrection(corr.wrong, corr.correct);
+            }
+            // Add message about saved corrections
+            const savedMsg = {
+              role: 'model',
+              parts: [{ text: `✅ ${foundCorrections.length} اصلاح تلفظی ذخیره شد و در تماس‌های بعدی اعمال خواهد شد.` }]
+            };
+            newHistory = [...newHistory, savedMsg];
+          }
+        } else {
+          // Analysis failed - add failure message
+          const failMsg = {
+            role: 'model',
+            parts: [{ text: '⚠️ تحلیل لهجه انجام نشد. تماس ذخیره شد.' }]
+          };
+          newHistory = [...newHistory, failMsg];
+        }
+      }
+
+      setChatHistory(newHistory);
+      saveChatHistory(context, newHistory);
     }
+
+    // Reset recording refs
+    conversationRef.current = [];
 
     disconnect();
     onClose();
@@ -1857,18 +2134,41 @@ function LiveVoiceChat({
         contextInfo = `سيناريو: "${customScenarioName}". `;
       }
 
+      // Build corrections string for system prompt
+      let correctionsInfo = '';
+      if (pronunciationCorrections && pronunciationCorrections.length > 0) {
+        correctionsInfo = '\n\n=== تصحيحات التلفظ - مهم جداً! ===\n' +
+          'هيدي الكلمات لازم تلفظها بالضبط متل ما مكتوبة بالحركات:\n' +
+          pronunciationCorrections.map(c => `- بدل "${c.wrong}" قول بالضبط: "${c.correct}"`).join('\n') +
+          '\n\nانتبه للحركات (فتحة، ضمة، كسرة، سكون) وقولها بالضبط!';
+      }
+
       wsRef.current?.send(JSON.stringify({
         type: 'setup',
         voice: selectedVoice,
-        context: contextInfo
+        context: contextInfo,
+        corrections: correctionsInfo
       }));
-      setTranscript([{ role: 'system', text: 'در حال اتصال...' }]);
+
+      // Show what corrections are being applied
+      if (pronunciationCorrections && pronunciationCorrections.length > 0) {
+        setTranscript([
+          { role: 'system', text: 'در حال اتصال...' },
+          { role: 'system', text: `📚 ${pronunciationCorrections.length} اصلاح تلفظی در حال اعمال...` }
+        ]);
+        console.log('Applying corrections to Live API:', pronunciationCorrections);
+      } else {
+        setTranscript([{ role: 'system', text: 'در حال اتصال...' }]);
+      }
       return;
     }
 
     if (message.type === 'connected') {
       setConnectionStatus('connected');
-      setTranscript([{ role: 'system', text: 'متصل شدم! دکمه رو نگه دارید و صحبت کنید' }]);
+      const connectMsg = pronunciationCorrections && pronunciationCorrections.length > 0
+        ? `متصل شدم! ${pronunciationCorrections.length} اصلاح تلفظی اعمال شد. دکمه رو نگه دارید.`
+        : 'متصل شدم! دکمه رو نگه دارید و صحبت کنید';
+      setTranscript(prev => [...prev.filter(p => !p.text.includes('در حال')), { role: 'system', text: connectMsg }]);
       return;
     }
 
@@ -1895,7 +2195,13 @@ function LiveVoiceChat({
           setTranscript(prev => [...prev, { role: 'ai', text: part.text }]);
         }
       }
-      if (message.serverContent.turnComplete) {
+
+      // Save on turnComplete OR when we have audio and turn is ending
+      const shouldSave = message.serverContent.turnComplete ||
+                         message.serverContent.interrupted ||
+                         (parts.length === 0 && currentAiAudioChunksRef.current.length > 0);
+
+      if (shouldSave || message.serverContent.turnComplete) {
         setIsSpeaking(false);
         // Save completed AI response to conversation
         if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
@@ -1906,6 +2212,7 @@ function LiveVoiceChat({
             audioData: combinedAudio.data,
             mimeType: combinedAudio.mimeType
           });
+          console.log('Saved AI response, total:', conversationRef.current.length);
           currentAiAudioChunksRef.current = [];
           currentAiTextRef.current = '';
         }
@@ -2000,6 +2307,28 @@ function LiveVoiceChat({
       processorRef.current.audioContext.close();
       processorRef.current = null;
     }
+
+    // When user stops talking, save any pending AI response and mark user turn
+    if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
+      const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
+      conversationRef.current.push({
+        role: 'ai',
+        text: currentAiTextRef.current || '🔊 پاسخ صوتی',
+        audioData: combinedAudio.data,
+        mimeType: combinedAudio.mimeType
+      });
+      currentAiAudioChunksRef.current = [];
+      currentAiTextRef.current = '';
+    }
+
+    // Mark that user spoke (without audio data since we can't record user's voice easily)
+    conversationRef.current.push({
+      role: 'user',
+      text: '🎤 پیام صوتی',
+      audioData: null,
+      mimeType: null
+    });
+
     setIsListening(false);
   };
 
@@ -2094,7 +2423,90 @@ function LiveVoiceChat({
           {connectionStatus === 'connected' ? (isListening ? 'رها کنید تا جاد جواب بده' : 'نگه دارید و صحبت کنید') :
            connectionStatus === 'connecting' ? 'صبر کنید...' : 'شروع کنید'}
         </p>
+
+        {/* Button to report pronunciation issues */}
+        {connectionStatus === 'disconnected' && (
+          <button
+            onClick={() => setShowCorrectionModal(true)}
+            className="mt-2 text-white/70 text-xs underline hover:text-white"
+          >
+            ✏️ گزارش اشتباه تلفظی
+          </button>
+        )}
       </div>
+
+      {/* Pronunciation Correction Modal */}
+      {showCorrectionModal && (
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-60 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-slate-800 mb-4">گزارش اشتباه تلفظی</h3>
+            <p className="text-sm text-slate-600 mb-4">اگر جاد کلمه‌ای رو اشتباه تلفظ کرد، اینجا بنویسید تا در تماس‌های بعدی درست بگه.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">تلفظ اشتباه:</label>
+                <input
+                  type="text"
+                  value={correctionWrong}
+                  onChange={(e) => setCorrectionWrong(e.target.value)}
+                  className="w-full p-2 border rounded-lg text-right"
+                  placeholder="مثلا: قهوة"
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">تلفظ درست:</label>
+                <input
+                  type="text"
+                  value={correctionCorrect}
+                  onChange={(e) => setCorrectionCorrect(e.target.value)}
+                  className="w-full p-2 border rounded-lg text-right"
+                  placeholder="مثلا: أهوة"
+                  dir="rtl"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => {
+                  if (correctionWrong && correctionCorrect && addPronunciationCorrection) {
+                    addPronunciationCorrection(correctionWrong, correctionCorrect);
+                    setCorrectionWrong('');
+                    setCorrectionCorrect('');
+                    setShowCorrectionModal(false);
+                  }
+                }}
+                className="flex-1 bg-teal-500 text-white py-2 rounded-lg hover:bg-teal-600"
+              >
+                ذخیره
+              </button>
+              <button
+                onClick={() => {
+                  setCorrectionWrong('');
+                  setCorrectionCorrect('');
+                  setShowCorrectionModal(false);
+                }}
+                className="flex-1 bg-slate-200 text-slate-700 py-2 rounded-lg hover:bg-slate-300"
+              >
+                لغو
+              </button>
+            </div>
+
+            {/* Show existing corrections */}
+            {pronunciationCorrections && pronunciationCorrections.length > 0 && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-slate-600 mb-2">تصحیحات قبلی:</p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {pronunciationCorrections.map((c, i) => (
+                    <div key={i} className="text-xs bg-slate-100 p-2 rounded flex justify-between items-center">
+                      <span>"{c.wrong}" → "{c.correct}"</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

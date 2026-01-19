@@ -244,7 +244,7 @@ wss.on('connection', (clientWs) => {
     return;
   }
 
-  const sendSetupMessage = (voiceName = 'Charon', context = '', accentMode = 'authentic') => {
+  const sendSetupMessage = (voiceName = 'Charon', context = '', accentMode = 'authentic', corrections = '') => {
     if (isSetupSent) return;
     isSetupSent = true;
 
@@ -254,13 +254,19 @@ wss.on('connection', (clientWs) => {
       contextPart = `\n\nسياق المحادثة الحالية:\n${context}\nركز على هيدا الموضوع بالمحادثة.\n`;
     }
 
+    // Add pronunciation corrections if any
+    let correctionsPart = '';
+    if (corrections) {
+      correctionsPart = `\n\n${corrections}\n`;
+    }
+
     // Adjust instruction based on accent mode
     const accentInstruction = accentMode === 'simplified'
       ? 'حاول تحكي ببطء وبوضوح حتى الطالب يفهم. '
       : 'احكي بطريقة طبيعية متل شب لبناني حقيقي. ';
 
     const systemText = `انت جاد، شب لبناني من بيروت عمرك 28 سنة. انت معلم لهجة لبنانية لطالب أجنبي.
-${contextPart}
+${contextPart}${correctionsPart}
 مهم كتير كتير: لازم تحكي باللهجة اللبنانية البيروتية بس! ممنوع الفصحى نهائياً!
 ${accentInstruction}
 
@@ -347,6 +353,13 @@ ${accentInstruction}
 - اضحك وامزح أحياناً
 - استخدم التعابير العامية كثيراً
 
+=== قواعد مهمة جداً ===
+
+- ممنوع تقول "خلصنا" أو "كفاية لليوم" أو "تعبت" - استمر بالمحادثة دائماً!
+- ممنوع تنهي المحادثة من عندك - الطالب هو يلي بيقرر متى يخلص
+- دائماً اسأل سؤال جديد أو كمّل الحديث
+- لا تفترض إنو الطالب تعبان أو بدو يوقف
+
 تذكر: انت شب لبناني حقيقي من بيروت. احكي متل ما بتحكي مع رفقاتك. خليك طبيعي ودافئ. كل كلمة لازم تكون لبنانية 100% - ممنوع الفصحى!`;
 
     const setupMessage = {
@@ -420,8 +433,8 @@ ${accentInstruction}
 
       // Handle setup request with voice selection and context
       if (message.type === 'setup') {
-        console.log('Client requested setup with voice:', message.voice, 'context:', message.context || 'none');
-        sendSetupMessage(message.voice || 'Charon', message.context || '', message.accentMode || 'authentic');
+        console.log('Client requested setup with voice:', message.voice, 'context:', message.context || 'none', 'corrections:', message.corrections ? 'yes' : 'no');
+        sendSetupMessage(message.voice || 'Charon', message.context || '', message.accentMode || 'authentic', message.corrections || '');
         return;
       }
 
