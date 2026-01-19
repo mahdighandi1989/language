@@ -1201,30 +1201,66 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     }
   };
 
-  const handleMicClick = async () => {
+  const handleMicClick = async (e) => {
+    e.preventDefault();
+
     if (isRecording) {
-      mediaRecorderRef.current.stop();
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
     } else {
+      // Start recording
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorderRef.current = new MediaRecorder(stream);
         audioChunksRef.current = [];
-        mediaRecorderRef.current.ondataavailable = event => audioChunksRef.current.push(event.data);
-        mediaRecorderRef.current.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          if (sendVoiceAs === 'text' && recognitionRef.current) {
-            recognitionRef.current.start();
-          } else {
-            handleSend("[کاربر یک پیام صوتی فرستاد]", audioUrl);
+
+        mediaRecorderRef.current.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
           }
-          stream.getTracks().forEach(track => track.stop());
         };
+
+        mediaRecorderRef.current.onstop = () => {
+          // Clean up stream
+          stream.getTracks().forEach(track => track.stop());
+
+          if (audioChunksRef.current.length === 0) {
+            setModalConfig({ title: "خطا", message: "صدایی ضبط نشد. لطفا دوباره تلاش کنید." });
+            return;
+          }
+
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+
+          if (sendVoiceAs === 'text' && recognitionRef.current) {
+            // Use speech recognition to convert to text
+            try {
+              recognitionRef.current.start();
+            } catch (err) {
+              // Recognition might already be running
+              handleSend("[پیام صوتی]", audioUrl);
+            }
+          } else {
+            // Send as audio
+            handleSend("[پیام صوتی]", audioUrl);
+          }
+        };
+
+        mediaRecorderRef.current.onerror = (err) => {
+          console.error('MediaRecorder error:', err);
+          stream.getTracks().forEach(track => track.stop());
+          setIsRecording(false);
+          setModalConfig({ title: "خطای ضبط", message: "مشکلی در ضبط صدا پیش آمد." });
+        };
+
         mediaRecorderRef.current.start();
         setIsRecording(true);
       } catch (err) {
-        setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست." });
+        console.error('Microphone error:', err);
+        setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست. لطفا دسترسی را در تنظیمات مرورگر فعال کنید." });
       }
     }
   };
@@ -1286,7 +1322,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             <div className="flex gap-2">
               <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200"><Paperclip size={20}/></button>
               <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-              <button onTouchStart={handleMicClick} onTouchEnd={handleMicClick} onMouseDown={handleMicClick} onMouseUp={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-slate-200'}`}><Mic size={20}/></button>
+              <button onClick={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`}><Mic size={20}/></button>
             </div>
             <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold" disabled={isLoading}>{isLoading ? '...' : 'ارسال'}</button>
           </div>
