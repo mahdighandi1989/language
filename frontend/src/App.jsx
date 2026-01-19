@@ -2068,12 +2068,22 @@ ${conversationSummary}
         setChatHistory(newHistory);
         saveChatHistory(context, newHistory);
 
-        // Perform analysis
-        const analysis = await analyzeCallForDialect(conversationTexts);
-        if (analysis) {
-          // Remove analyzing message, add analysis result
-          newHistory = newHistory.filter(m => !m.isAnalyzing);
+        // Perform analysis with timeout
+        let analysis = null;
+        try {
+          const analysisPromise = analyzeCallForDialect(conversationTexts);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 15000)
+          );
+          analysis = await Promise.race([analysisPromise, timeoutPromise]);
+        } catch (err) {
+          console.error('Analysis failed or timed out:', err);
+        }
 
+        // Always remove analyzing message
+        newHistory = newHistory.filter(m => !m.isAnalyzing);
+
+        if (analysis) {
           const analysisMessage = {
             role: 'model',
             parts: [{ text: `📝 تحلیل لهجه تماس:\n\n${analysis}` }],
@@ -2094,6 +2104,13 @@ ${conversationSummary}
             };
             newHistory = [...newHistory, savedMsg];
           }
+        } else {
+          // Analysis failed - add failure message
+          const failMsg = {
+            role: 'model',
+            parts: [{ text: '⚠️ تحلیل لهجه انجام نشد. تماس ذخیره شد.' }]
+          };
+          newHistory = [...newHistory, failMsg];
         }
       }
 
