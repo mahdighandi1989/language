@@ -3,6 +3,8 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 
 dotenv.config();
 
@@ -11,6 +13,12 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Create HTTP server
+const server = createServer(app);
+
+// Create WebSocket server
+const wss = new WebSocketServer({ server, path: '/ws/live' });
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -198,6 +206,112 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../frontend/dist/index.html'));
 });
 
-app.listen(PORT, () => {
+// ============================================
+// GEMINI LIVE API WEBSOCKET PROXY
+// ============================================
+
+const GEMINI_LIVE_MODEL = 'gemini-2.0-flash-live-001';
+const GEMINI_LIVE_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent`;
+
+wss.on('connection', (clientWs) => {
+  console.log('Client connected to Live API proxy');
+  let geminiWs = null;
+
+  // Connect to Gemini Live API
+  const geminiUrl = `${GEMINI_LIVE_WS_URL}?key=${GEMINI_API_KEY}`;
+
+  try {
+    geminiWs = new WebSocket(geminiUrl);
+  } catch (error) {
+    console.error('Failed to create Gemini WebSocket:', error);
+    clientWs.send(JSON.stringify({ error: 'Failed to connect to Gemini Live API' }));
+    clientWs.close();
+    return;
+  }
+
+  geminiWs.on('open', () => {
+    console.log('Connected to Gemini Live API');
+
+    // Send setup message to Gemini
+    const setupMessage = {
+      setup: {
+        model: `models/${GEMINI_LIVE_MODEL}`,
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: 'Charon'
+              }
+            }
+          }
+        },
+        systemInstruction: {
+          parts: [{
+            text: `You are "Jad", a friendly Lebanese Arabic tutor for a Persian beginner.
+            Speak in simple Lebanese Arabic dialect. Be patient, encouraging, and helpful.
+            Keep your responses concise and conversational.
+            When the user speaks in Persian or English, respond in Lebanese Arabic but keep it simple.`
+          }]
+        }
+      }
+    };
+
+    geminiWs.send(JSON.stringify(setupMessage));
+    clientWs.send(JSON.stringify({ type: 'connected', message: 'Connected to Gemini Live API' }));
+  });
+
+  geminiWs.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      // Forward Gemini response to client
+      clientWs.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('Error parsing Gemini message:', error);
+    }
+  });
+
+  geminiWs.on('error', (error) => {
+    console.error('Gemini WebSocket error:', error);
+    clientWs.send(JSON.stringify({ error: 'Gemini Live API error', details: error.message }));
+  });
+
+  geminiWs.on('close', (code, reason) => {
+    console.log('Gemini connection closed:', code, reason.toString());
+    clientWs.send(JSON.stringify({ type: 'disconnected', code, reason: reason.toString() }));
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.close();
+    }
+  });
+
+  // Handle messages from client
+  clientWs.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+
+      // Forward to Gemini
+      if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+        geminiWs.send(JSON.stringify(message));
+      }
+    } catch (error) {
+      console.error('Error handling client message:', error);
+    }
+  });
+
+  clientWs.on('close', () => {
+    console.log('Client disconnected');
+    if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+      geminiWs.close();
+    }
+  });
+
+  clientWs.on('error', (error) => {
+    console.error('Client WebSocket error:', error);
+  });
+});
+
+// Use server.listen instead of app.listen for WebSocket support
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`WebSocket Live API available at ws://localhost:${PORT}/ws/live`);
 });
