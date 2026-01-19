@@ -36,19 +36,29 @@ app.post('/api/gemini/chat', async (req, res) => {
 
   try {
     const payload = req.body;
+    const includeAudio = payload.includeAudio;
+    delete payload.includeAudio;
 
-    // Clean payload - remove extra fields that Gemini doesn't recognize
+    // Clean payload - preserve audio data if includeAudio flag is set
     if (payload.contents) {
       payload.contents = payload.contents.map(content => ({
         role: content.role,
-        parts: content.parts.map(part => ({
-          text: part.text
-        }))
+        parts: content.parts.map(part => {
+          // Keep inline_data (audio) if present
+          if (part.inline_data && includeAudio) {
+            return { inline_data: part.inline_data };
+          }
+          // Keep text if present
+          if (part.text !== undefined) {
+            return { text: part.text };
+          }
+          return null;
+        }).filter(p => p !== null)
       }));
     }
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-    
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -62,13 +72,17 @@ app.post('/api/gemini/chat', async (req, res) => {
     }
 
     const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) {
-      return res.status(500).json({ error: 'No text in response' });
-    }
 
-    res.json({ text });
+    // Return full result for audio requests, just text otherwise
+    if (includeAudio) {
+      res.json(result);
+    } else {
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        return res.status(500).json({ error: 'No text in response' });
+      }
+      res.json({ text });
+    }
   } catch (error) {
     console.error('Chat API error:', error);
     res.status(500).json({ error: error.message });
