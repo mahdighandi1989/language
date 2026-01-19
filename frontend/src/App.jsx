@@ -150,7 +150,6 @@ export default function App() {
 
   useEffect(() => {
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
     // If no Firebase config, use localStorage
@@ -163,51 +162,61 @@ export default function App() {
         return;
     }
 
-    // Firebase setup
+    // Firebase setup with SHARED user ID for cross-device sync
+    // Using a fixed user ID so all devices share the same data
+    const SHARED_USER_ID = 'shared-user-mahdi';
+
     setLogLevel('debug');
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
     setFirebaseServices({ auth, db });
 
-    const authObserver = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserId(user.uid);
-        const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/data/main`);
+    // Sign in anonymously (required for Firestore access) but use shared user ID for data
+    const setupFirestore = async () => {
+      try {
+        await signInAnonymously(auth);
+        console.log("Signed in anonymously, using shared user ID for data sync");
+
+        setUserId(SHARED_USER_ID);
+        const userDocRef = doc(db, `/artifacts/${appId}/users/${SHARED_USER_ID}/data/main`);
+
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
+            console.log("Data loaded from Firestore (shared)");
             setData(prevData => ({...initialData, ...docSnap.data()}));
           } else {
+            console.log("Creating initial document in Firestore");
             setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
             setData(initialData);
           }
           setIsAuthReady(true);
         }, (error) => {
             console.error("Error listening to document:", error);
+            // Fallback to localStorage if Firestore fails
+            const savedData = loadFromLocalStorage();
+            setData(savedData);
+            setUserId('local-user');
             setIsAuthReady(true);
         });
-        return () => unsubscribe();
-      } else {
-        setUserId(null);
+
+        return unsubscribe;
+      } catch (error) {
+        console.error("Authentication failed:", error);
+        // Fallback to localStorage
+        const savedData = loadFromLocalStorage();
+        setData(savedData);
+        setUserId('local-user');
         setIsAuthReady(true);
       }
-    });
-
-    const signIn = async () => {
-        try {
-            if (initialAuthToken) {
-                await signInWithCustomToken(auth, initialAuthToken);
-            } else {
-                await signInAnonymously(auth);
-            }
-        } catch (error) {
-            console.error("Authentication failed:", error);
-            setIsAuthReady(true);
-        }
     };
-    
-    signIn();
-    return () => authObserver();
+
+    let unsubscribe = null;
+    setupFirestore().then(unsub => { unsubscribe = unsub; });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -1183,8 +1192,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
     }
 
-    const payload = { contents: newHistory.filter(m => m.parts[0].type !== 'audio'), systemInstruction: { parts: [{ text: systemPrompt }] } };
-    
+    // Filter out audio-only messages but keep the text content
+    const contentsForApi = newHistory.map(m => ({
+      role: m.role,
+      parts: [{ text: m.parts[0].text }]
+    })).filter(m => m.parts[0].text && m.parts[0].text.trim());
+
+    const payload = { contents: contentsForApi, systemInstruction: { parts: [{ text: systemPrompt }] } };
+
     try {
         const aiResponseText = await callGeminiAPI(payload);
         let ttsPrompt = `Say in a clear, ${accentMode === 'standard' ? 'standard' : 'authentic, colloquial Beirut'} Lebanese accent: ${aiResponseText.split('TRANSLATION:')[0]}`;
@@ -1233,9 +1248,21 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const startVoiceRecording = async () => {
     if (isRecording || isLoading) return;
 
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setModalConfig({ title: "خطا", message: "مرورگر شما از ضبط صدا پشتیبانی نمی‌کند. لطفاً از مرورگر دیگری استفاده کنید." });
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
+
+      // Check supported mimeTypes
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                       MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' :
+                       MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg' : '';
+
+      mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       audioChunksRef.current = [];
 
       mediaRecorderRef.current.ondataavailable = event => {
@@ -1285,7 +1312,22 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       if (voiceConversationMode) {
         setVoiceConversationMode(false);
       }
-      setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست. لطفا دسترسی را در تنظیمات مرورگر فعال کنید." });
+
+      // Provide specific error messages
+      let errorMessage = "دسترسی به میکروفون امکان‌پذیر نیست.";
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = "دسترسی به میکروفون رد شد. لطفاً در تنظیمات مرورگر اجازه دسترسی بدهید.";
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = "میکروفونی یافت نشد. لطفاً میکروفون را وصل کنید.";
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = "میکروفون در حال استفاده توسط برنامه دیگری است.";
+      } else if (err.name === 'OverconstrainedError') {
+        errorMessage = "تنظیمات میکروفون پشتیبانی نمی‌شود.";
+      } else if (err.name === 'TypeError') {
+        errorMessage = "خطای فنی در دسترسی به میکروفون.";
+      }
+
+      setModalConfig({ title: "خطای میکروفون", message: errorMessage });
     }
   };
 
@@ -1417,7 +1459,21 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           </div>
         </div>
       </div>
-      <LiveVoiceChat isOpen={isLiveChatOpen} onClose={() => setIsLiveChatOpen(false)} />
+      <LiveVoiceChat
+        isOpen={isLiveChatOpen}
+        onClose={() => setIsLiveChatOpen(false)}
+        chatHistory={chatHistory}
+        setChatHistory={setChatHistory}
+        saveChatHistory={() => saveChatHistory(context, chatHistory)}
+        context={context}
+        lessonTitle={lessonTitle}
+        selectedTopics={selectedTopics}
+        customScenarioName={customScenarioName}
+        customScenarioDetails={customScenarioDetails}
+        aiVoice={aiVoice}
+        accentMode={accentMode}
+        addJournalEntry={addJournalEntry}
+      />
     </>
   );
 }
@@ -1538,12 +1594,27 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
 }
 
 // --- Gemini Live API Real-time Voice Chat ---
-function LiveVoiceChat({ isOpen, onClose }) {
+function LiveVoiceChat({
+  isOpen,
+  onClose,
+  chatHistory,
+  setChatHistory,
+  saveChatHistory,
+  context,
+  lessonTitle,
+  selectedTopics,
+  customScenarioName,
+  customScenarioDetails,
+  aiVoice,
+  accentMode,
+  addJournalEntry
+}) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState('Charon');
+  const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Charon');
+  const [audioMessages, setAudioMessages] = useState([]); // Store audio blobs
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -1551,6 +1622,8 @@ function LiveVoiceChat({ isOpen, onClose }) {
   const processorRef = useRef(null);
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
+  const userAudioChunksRef = useRef([]); // Collect user audio chunks
+  const aiAudioChunksRef = useRef([]); // Collect AI audio chunks
 
   // Available voices for Live API
   const availableVoices = {
@@ -1560,6 +1633,40 @@ function LiveVoiceChat({ isOpen, onClose }) {
     'Puck': 'مرد - شاد',
     'Leda': 'زن - جوان',
     'Fenrir': 'مرد - هیجان‌زده'
+  };
+
+  // Update voice when parent changes
+  useEffect(() => {
+    if (aiVoice) setSelectedVoice(aiVoice);
+  }, [aiVoice]);
+
+  // Save audio messages to parent chat history
+  const saveAudioToChat = () => {
+    if (!setChatHistory || audioMessages.length === 0) return;
+
+    console.log('Saving audio to chat, messages:', audioMessages.length);
+
+    // Add all audio messages to chat history
+    setChatHistory(prev => [...prev, ...audioMessages]);
+
+    // Save chat history
+    if (saveChatHistory) {
+      setTimeout(() => saveChatHistory(), 500);
+    }
+
+    if (addJournalEntry) {
+      addJournalEntry(`مکالمه زنده با جاد انجام شد (${audioMessages.length} پیام صوتی)`);
+    }
+  };
+
+  // Handle close with save option
+  const handleClose = () => {
+    // Save audio messages to chat history
+    if (audioMessages.length > 0) {
+      saveAudioToChat();
+    }
+    disconnect();
+    onClose();
   };
 
   // Clean up on unmount or close
@@ -1624,13 +1731,32 @@ function LiveVoiceChat({ isOpen, onClose }) {
     }
     setConnectionStatus('disconnected');
     setTranscript([]);
+    // Clear audio chunks refs
+    userAudioChunksRef.current = [];
+    aiAudioChunksRef.current = [];
   };
 
   const handleGeminiMessage = (message) => {
-    // Handle WebSocket ready - send setup with voice
+    // Handle WebSocket ready - send setup with voice and context
     if (message.type === 'ws_ready') {
       console.log('WebSocket ready, sending setup with voice:', selectedVoice);
-      wsRef.current?.send(JSON.stringify({ type: 'setup', voice: selectedVoice }));
+
+      // Build context string for system instruction
+      let contextInfo = '';
+      if (context?.startsWith('lesson') && lessonTitle) {
+        contextInfo = `الموضوع الحالي: درس "${lessonTitle}". `;
+      } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
+        contextInfo = `سيناريو: "${customScenarioName}". التفاصيل: "${customScenarioDetails}". `;
+      } else if (selectedTopics && !selectedTopics.includes('general')) {
+        contextInfo = `موضوع المحادثة: ${selectedTopics.join(', ')}. `;
+      }
+
+      wsRef.current?.send(JSON.stringify({
+        type: 'setup',
+        voice: selectedVoice,
+        context: contextInfo,
+        accentMode: accentMode || 'authentic'
+      }));
       setTranscript(prev => [...prev, { role: 'system', text: 'در حال راه‌اندازی...' }]);
       return;
     }
@@ -1669,12 +1795,15 @@ function LiveVoiceChat({ isOpen, onClose }) {
       const parts = message.serverContent.modelTurn?.parts || [];
 
       for (const part of parts) {
-        // Handle audio data
+        // Handle audio data - collect and play
         if (part.inlineData?.mimeType?.startsWith('audio/')) {
           const audioData = part.inlineData.data;
           const mimeType = part.inlineData.mimeType;
           playAudioChunk(audioData, mimeType);
           setIsSpeaking(true);
+
+          // Collect AI audio chunk
+          aiAudioChunksRef.current.push({ data: audioData, mimeType });
         }
 
         // Handle text transcript
@@ -1683,9 +1812,49 @@ function LiveVoiceChat({ isOpen, onClose }) {
         }
       }
 
-      // Check if turn is complete
+      // Check if turn is complete - save audio messages
       if (message.serverContent.turnComplete) {
         setIsSpeaking(false);
+
+        // Create audio messages from collected chunks
+        if (userAudioChunksRef.current.length > 0 || aiAudioChunksRef.current.length > 0) {
+          const timestamp = new Date().toISOString();
+
+          // Create user audio message if we have user chunks
+          if (userAudioChunksRef.current.length > 0) {
+            // Combine all user audio chunks into one
+            const userAudioData = userAudioChunksRef.current.map(c => c.data).join('');
+            const userMessage = {
+              role: 'user',
+              parts: [{ text: '🎤 پیام صوتی' }],
+              type: 'live_audio',
+              audioData: userAudioData,
+              mimeType: 'audio/pcm;rate=16000',
+              timestamp
+            };
+            setAudioMessages(prev => [...prev, userMessage]);
+          }
+
+          // Create AI audio message if we have AI chunks
+          if (aiAudioChunksRef.current.length > 0) {
+            // Combine all AI audio chunks into one
+            const aiAudioData = aiAudioChunksRef.current.map(c => c.data).join('');
+            const aiMimeType = aiAudioChunksRef.current[0]?.mimeType || 'audio/pcm;rate=24000';
+            const aiMessage = {
+              role: 'model',
+              parts: [{ text: '🔊 پاسخ صوتی جاد' }],
+              type: 'live_audio',
+              audioData: aiAudioData,
+              mimeType: aiMimeType,
+              timestamp
+            };
+            setAudioMessages(prev => [...prev, aiMessage]);
+          }
+
+          // Clear chunks for next exchange
+          userAudioChunksRef.current = [];
+          aiAudioChunksRef.current = [];
+        }
       }
     }
   };
@@ -1791,6 +1960,9 @@ function LiveVoiceChat({ isOpen, onClose }) {
           }
           const base64Audio = btoa(binary);
 
+          // Collect user audio chunk for saving
+          userAudioChunksRef.current.push({ data: base64Audio, mimeType: 'audio/pcm;rate=16000' });
+
           // Send to Gemini via WebSocket
           const message = {
             realtimeInput: {
@@ -1849,12 +2021,21 @@ function LiveVoiceChat({ isOpen, onClose }) {
           <Phone size={24} />
           مکالمه زنده با جاد
         </h2>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-white/20 rounded-full transition-colors"
-        >
-          <X size={24} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Audio messages count indicator */}
+          {audioMessages.length > 0 && (
+            <div className="bg-green-500/30 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+              <Mic size={14} />
+              {audioMessages.length} پیام صوتی
+            </div>
+          )}
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
       </div>
 
       {/* Voice Selection - only show when disconnected */}
