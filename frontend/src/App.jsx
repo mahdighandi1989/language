@@ -1459,7 +1459,21 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           </div>
         </div>
       </div>
-      <LiveVoiceChat isOpen={isLiveChatOpen} onClose={() => setIsLiveChatOpen(false)} data={data} setData={setData} addJournalEntry={addJournalEntry} />
+      <LiveVoiceChat
+        isOpen={isLiveChatOpen}
+        onClose={() => setIsLiveChatOpen(false)}
+        chatHistory={chatHistory}
+        setChatHistory={setChatHistory}
+        saveChatHistory={() => saveChatHistory(context, chatHistory)}
+        context={context}
+        lessonTitle={lessonTitle}
+        selectedTopics={selectedTopics}
+        customScenarioName={customScenarioName}
+        customScenarioDetails={customScenarioDetails}
+        aiVoice={aiVoice}
+        accentMode={accentMode}
+        addJournalEntry={addJournalEntry}
+      />
     </>
   );
 }
@@ -1580,13 +1594,27 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
 }
 
 // --- Gemini Live API Real-time Voice Chat ---
-function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
+function LiveVoiceChat({
+  isOpen,
+  onClose,
+  chatHistory,
+  setChatHistory,
+  saveChatHistory,
+  context,
+  lessonTitle,
+  selectedTopics,
+  customScenarioName,
+  customScenarioDetails,
+  aiVoice,
+  accentMode,
+  addJournalEntry
+}) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState('Charon');
-  const [conversationSaved, setConversationSaved] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Charon');
+  const [audioMessages, setAudioMessages] = useState([]); // Store audio blobs
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -1594,6 +1622,8 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
   const processorRef = useRef(null);
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
+  const userAudioChunksRef = useRef([]); // Collect user audio chunks
+  const aiAudioChunksRef = useRef([]); // Collect AI audio chunks
 
   // Available voices for Live API
   const availableVoices = {
@@ -1605,62 +1635,35 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
     'Fenrir': 'مرد - هیجان‌زده'
   };
 
-  // Save conversation to archived conversations
-  const saveConversation = () => {
-    console.log('Save conversation called, transcript:', transcript);
+  // Update voice when parent changes
+  useEffect(() => {
+    if (aiVoice) setSelectedVoice(aiVoice);
+  }, [aiVoice]);
 
-    if (!setData) {
-      console.error('setData is not available');
-      return;
+  // Save audio messages to parent chat history
+  const saveAudioToChat = () => {
+    if (!setChatHistory || audioMessages.length === 0) return;
+
+    console.log('Saving audio to chat, messages:', audioMessages.length);
+
+    // Add all audio messages to chat history
+    setChatHistory(prev => [...prev, ...audioMessages]);
+
+    // Save chat history
+    if (saveChatHistory) {
+      setTimeout(() => saveChatHistory(), 500);
     }
 
-    // Save if there are any meaningful messages (not just initial system message)
-    const meaningfulMessages = transcript.filter(t =>
-      t.role === 'ai' || t.role === 'user' ||
-      (t.role === 'system' && !t.text.includes('متصل شدم') && !t.text.includes('راه‌اندازی'))
-    );
-    console.log('Meaningful messages:', meaningfulMessages);
-
-    if (meaningfulMessages.length === 0) {
-      console.log('No meaningful messages to save');
-      return;
-    }
-
-    const title = `مکالمه زنده - ${new Date().toLocaleDateString('fa-IR')} ${new Date().toLocaleTimeString('fa-IR')}`;
-    const newConversation = {
-      id: Date.now(),
-      title,
-      date: new Date().toISOString(),
-      type: 'live',
-      voice: selectedVoice,
-      messages: transcript.map(t => ({
-        role: t.role,
-        text: t.text,
-        timestamp: new Date().toISOString()
-      }))
-    };
-
-    try {
-      setData(prev => ({
-        ...prev,
-        archivedConversations: [...(prev.archivedConversations || []), newConversation]
-      }));
-
-      if (addJournalEntry) {
-        addJournalEntry(`مکالمه زنده با جاد ذخیره شد (${conversationMessages.length} پیام)`);
-      }
-
-      setConversationSaved(true);
-      console.log('Conversation saved successfully');
-    } catch (error) {
-      console.error('Error saving conversation:', error);
+    if (addJournalEntry) {
+      addJournalEntry(`مکالمه زنده با جاد انجام شد (${audioMessages.length} پیام صوتی)`);
     }
   };
 
   // Handle close with save option
   const handleClose = () => {
-    if (transcript.some(t => t.role === 'ai') && !conversationSaved) {
-      saveConversation();
+    // Save audio messages to chat history
+    if (audioMessages.length > 0) {
+      saveAudioToChat();
     }
     disconnect();
     onClose();
@@ -1728,14 +1731,32 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
     }
     setConnectionStatus('disconnected');
     setTranscript([]);
-    setConversationSaved(false);
+    // Clear audio chunks refs
+    userAudioChunksRef.current = [];
+    aiAudioChunksRef.current = [];
   };
 
   const handleGeminiMessage = (message) => {
-    // Handle WebSocket ready - send setup with voice
+    // Handle WebSocket ready - send setup with voice and context
     if (message.type === 'ws_ready') {
       console.log('WebSocket ready, sending setup with voice:', selectedVoice);
-      wsRef.current?.send(JSON.stringify({ type: 'setup', voice: selectedVoice }));
+
+      // Build context string for system instruction
+      let contextInfo = '';
+      if (context?.startsWith('lesson') && lessonTitle) {
+        contextInfo = `الموضوع الحالي: درس "${lessonTitle}". `;
+      } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
+        contextInfo = `سيناريو: "${customScenarioName}". التفاصيل: "${customScenarioDetails}". `;
+      } else if (selectedTopics && !selectedTopics.includes('general')) {
+        contextInfo = `موضوع المحادثة: ${selectedTopics.join(', ')}. `;
+      }
+
+      wsRef.current?.send(JSON.stringify({
+        type: 'setup',
+        voice: selectedVoice,
+        context: contextInfo,
+        accentMode: accentMode || 'authentic'
+      }));
       setTranscript(prev => [...prev, { role: 'system', text: 'در حال راه‌اندازی...' }]);
       return;
     }
@@ -1774,12 +1795,15 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
       const parts = message.serverContent.modelTurn?.parts || [];
 
       for (const part of parts) {
-        // Handle audio data
+        // Handle audio data - collect and play
         if (part.inlineData?.mimeType?.startsWith('audio/')) {
           const audioData = part.inlineData.data;
           const mimeType = part.inlineData.mimeType;
           playAudioChunk(audioData, mimeType);
           setIsSpeaking(true);
+
+          // Collect AI audio chunk
+          aiAudioChunksRef.current.push({ data: audioData, mimeType });
         }
 
         // Handle text transcript
@@ -1788,9 +1812,49 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
         }
       }
 
-      // Check if turn is complete
+      // Check if turn is complete - save audio messages
       if (message.serverContent.turnComplete) {
         setIsSpeaking(false);
+
+        // Create audio messages from collected chunks
+        if (userAudioChunksRef.current.length > 0 || aiAudioChunksRef.current.length > 0) {
+          const timestamp = new Date().toISOString();
+
+          // Create user audio message if we have user chunks
+          if (userAudioChunksRef.current.length > 0) {
+            // Combine all user audio chunks into one
+            const userAudioData = userAudioChunksRef.current.map(c => c.data).join('');
+            const userMessage = {
+              role: 'user',
+              parts: [{ text: '🎤 پیام صوتی' }],
+              type: 'live_audio',
+              audioData: userAudioData,
+              mimeType: 'audio/pcm;rate=16000',
+              timestamp
+            };
+            setAudioMessages(prev => [...prev, userMessage]);
+          }
+
+          // Create AI audio message if we have AI chunks
+          if (aiAudioChunksRef.current.length > 0) {
+            // Combine all AI audio chunks into one
+            const aiAudioData = aiAudioChunksRef.current.map(c => c.data).join('');
+            const aiMimeType = aiAudioChunksRef.current[0]?.mimeType || 'audio/pcm;rate=24000';
+            const aiMessage = {
+              role: 'model',
+              parts: [{ text: '🔊 پاسخ صوتی جاد' }],
+              type: 'live_audio',
+              audioData: aiAudioData,
+              mimeType: aiMimeType,
+              timestamp
+            };
+            setAudioMessages(prev => [...prev, aiMessage]);
+          }
+
+          // Clear chunks for next exchange
+          userAudioChunksRef.current = [];
+          aiAudioChunksRef.current = [];
+        }
       }
     }
   };
@@ -1896,6 +1960,9 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
           }
           const base64Audio = btoa(binary);
 
+          // Collect user audio chunk for saving
+          userAudioChunksRef.current.push({ data: base64Audio, mimeType: 'audio/pcm;rate=16000' });
+
           // Send to Gemini via WebSocket
           const message = {
             realtimeInput: {
@@ -1955,16 +2022,12 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
           مکالمه زنده با جاد
         </h2>
         <div className="flex items-center gap-2">
-          {/* Save button */}
-          {transcript.some(t => t.role === 'ai') && (
-            <button
-              onClick={saveConversation}
-              disabled={conversationSaved}
-              className={`p-2 rounded-full transition-colors ${conversationSaved ? 'bg-green-500/50 text-white' : 'hover:bg-white/20'}`}
-              title={conversationSaved ? 'ذخیره شد' : 'ذخیره مکالمه'}
-            >
-              {conversationSaved ? <CheckCircle size={24} /> : <Archive size={24} />}
-            </button>
+          {/* Audio messages count indicator */}
+          {audioMessages.length > 0 && (
+            <div className="bg-green-500/30 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+              <Mic size={14} />
+              {audioMessages.length} پیام صوتی
+            </div>
           )}
           <button
             onClick={handleClose}
