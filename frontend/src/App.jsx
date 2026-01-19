@@ -1242,9 +1242,21 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const startVoiceRecording = async () => {
     if (isRecording || isLoading) return;
 
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setModalConfig({ title: "خطا", message: "مرورگر شما از ضبط صدا پشتیبانی نمی‌کند. لطفاً از مرورگر دیگری استفاده کنید." });
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
+
+      // Check supported mimeTypes
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                       MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' :
+                       MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg' : '';
+
+      mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       audioChunksRef.current = [];
 
       mediaRecorderRef.current.ondataavailable = event => {
@@ -1294,7 +1306,22 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       if (voiceConversationMode) {
         setVoiceConversationMode(false);
       }
-      setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست. لطفا دسترسی را در تنظیمات مرورگر فعال کنید." });
+
+      // Provide specific error messages
+      let errorMessage = "دسترسی به میکروفون امکان‌پذیر نیست.";
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = "دسترسی به میکروفون رد شد. لطفاً در تنظیمات مرورگر اجازه دسترسی بدهید.";
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = "میکروفونی یافت نشد. لطفاً میکروفون را وصل کنید.";
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = "میکروفون در حال استفاده توسط برنامه دیگری است.";
+      } else if (err.name === 'OverconstrainedError') {
+        errorMessage = "تنظیمات میکروفون پشتیبانی نمی‌شود.";
+      } else if (err.name === 'TypeError') {
+        errorMessage = "خطای فنی در دسترسی به میکروفون.";
+      }
+
+      setModalConfig({ title: "خطای میکروفون", message: errorMessage });
     }
   };
 
@@ -1426,7 +1453,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           </div>
         </div>
       </div>
-      <LiveVoiceChat isOpen={isLiveChatOpen} onClose={() => setIsLiveChatOpen(false)} />
+      <LiveVoiceChat isOpen={isLiveChatOpen} onClose={() => setIsLiveChatOpen(false)} data={data} setData={setData} addJournalEntry={addJournalEntry} />
     </>
   );
 }
@@ -1547,12 +1574,13 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
 }
 
 // --- Gemini Live API Real-time Voice Chat ---
-function LiveVoiceChat({ isOpen, onClose }) {
+function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState('Charon');
+  const [conversationSaved, setConversationSaved] = useState(false);
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -1569,6 +1597,48 @@ function LiveVoiceChat({ isOpen, onClose }) {
     'Puck': 'مرد - شاد',
     'Leda': 'زن - جوان',
     'Fenrir': 'مرد - هیجان‌زده'
+  };
+
+  // Save conversation to archived conversations
+  const saveConversation = () => {
+    if (transcript.length <= 1) return; // Don't save if only system messages
+
+    const conversationMessages = transcript.filter(t => t.role === 'ai' || t.role === 'user');
+    if (conversationMessages.length === 0) return;
+
+    const title = `مکالمه زنده - ${new Date().toLocaleDateString('fa-IR')} ${new Date().toLocaleTimeString('fa-IR')}`;
+    const newConversation = {
+      id: Date.now(),
+      title,
+      date: new Date().toISOString(),
+      type: 'live',
+      voice: selectedVoice,
+      messages: transcript.map(t => ({
+        role: t.role,
+        text: t.text,
+        timestamp: new Date().toISOString()
+      }))
+    };
+
+    setData(prev => ({
+      ...prev,
+      archivedConversations: [...(prev.archivedConversations || []), newConversation]
+    }));
+
+    if (addJournalEntry) {
+      addJournalEntry(`مکالمه زنده با جاد ذخیره شد (${conversationMessages.length} پیام)`);
+    }
+
+    setConversationSaved(true);
+  };
+
+  // Handle close with save option
+  const handleClose = () => {
+    if (transcript.length > 1 && !conversationSaved) {
+      saveConversation();
+    }
+    disconnect();
+    onClose();
   };
 
   // Clean up on unmount or close
@@ -1633,6 +1703,7 @@ function LiveVoiceChat({ isOpen, onClose }) {
     }
     setConnectionStatus('disconnected');
     setTranscript([]);
+    setConversationSaved(false);
   };
 
   const handleGeminiMessage = (message) => {
@@ -1858,12 +1929,25 @@ function LiveVoiceChat({ isOpen, onClose }) {
           <Phone size={24} />
           مکالمه زنده با جاد
         </h2>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-white/20 rounded-full transition-colors"
-        >
-          <X size={24} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Save button */}
+          {transcript.length > 1 && (
+            <button
+              onClick={saveConversation}
+              disabled={conversationSaved}
+              className={`p-2 rounded-full transition-colors ${conversationSaved ? 'bg-green-500/50 text-white' : 'hover:bg-white/20'}`}
+              title={conversationSaved ? 'ذخیره شد' : 'ذخیره مکالمه'}
+            >
+              {conversationSaved ? <CheckCircle size={24} /> : <Archive size={24} />}
+            </button>
+          )}
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
       </div>
 
       {/* Voice Selection - only show when disconnected */}
