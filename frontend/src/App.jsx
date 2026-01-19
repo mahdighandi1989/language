@@ -1683,6 +1683,10 @@ function LiveVoiceChat({
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
   const currentAudioRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const silenceStartRef = useRef(null);
 
   const availableVoices = {
     'Charon': 'مرد - استاندارد',
@@ -1740,6 +1744,14 @@ function LiveVoiceChat({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
+      // Set up audio analysis for Voice Activity Detection
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      analyserRef.current.fftSize = 512;
+      silenceStartRef.current = null;
+
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
                        MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
 
@@ -1751,6 +1763,15 @@ function LiveVoiceChat({
       };
 
       mediaRecorderRef.current.onstop = async () => {
+        // Clean up VAD
+        if (silenceTimeoutRef.current) {
+          clearInterval(silenceTimeoutRef.current);
+          silenceTimeoutRef.current = null;
+        }
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+          audioContextRef.current = null;
+        }
         stream.getTracks().forEach(track => track.stop());
         if (audioChunksRef.current.length === 0) return;
 
@@ -1758,9 +1779,36 @@ function LiveVoiceChat({
         await processAudioAndRespond(audioBlob);
       };
 
-      mediaRecorderRef.current.start();
+      mediaRecorderRef.current.start(100); // Record in 100ms chunks for better VAD
       setIsRecording(true);
-      setTranscript(prev => [...prev, { role: 'system', text: 'در حال گوش دادن...' }]);
+      setTranscript(prev => [...prev, { role: 'system', text: 'صحبت کنید... (خودکار متوقف میشه)' }]);
+
+      // Start Voice Activity Detection
+      const SILENCE_THRESHOLD = 15; // Adjust based on testing
+      const SILENCE_DURATION = 1500; // 1.5 seconds of silence to stop
+
+      silenceTimeoutRef.current = setInterval(() => {
+        if (!analyserRef.current || !mediaRecorderRef.current) return;
+
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+        if (average < SILENCE_THRESHOLD) {
+          // Silence detected
+          if (!silenceStartRef.current) {
+            silenceStartRef.current = Date.now();
+          } else if (Date.now() - silenceStartRef.current > SILENCE_DURATION) {
+            // Silence lasted long enough - stop recording
+            if (audioChunksRef.current.length > 0) {
+              stopRecording();
+            }
+          }
+        } else {
+          // Sound detected - reset silence timer
+          silenceStartRef.current = null;
+        }
+      }, 100);
     } catch (err) {
       console.error('Microphone error:', err);
       setTranscript(prev => [...prev, { role: 'error', text: 'خطا در دسترسی به میکروفون' }]);
@@ -1768,6 +1816,11 @@ function LiveVoiceChat({
   };
 
   const stopRecording = () => {
+    // Clean up VAD
+    if (silenceTimeoutRef.current) {
+      clearInterval(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
