@@ -390,7 +390,7 @@ export default function App() {
     if (!isAuthReady) {
         return <div className="w-full h-full flex items-center justify-center"><Loader size={48} className="animate-spin text-teal-500" /></div>;
     }
-    const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection };
+    const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection, addPronunciationCorrection };
     switch (activeView) {
       case 'dashboard': return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
       case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} />;
@@ -639,7 +639,7 @@ function CustomVoiceCreator({ customVoices, setCustomVoices, setModalConfig }) {
     );
 }
 
-function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, knowledgeBase, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, data, setData }) {
+function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, knowledgeBase, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, data, setData, addPronunciationCorrection }) {
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const handleAddLesson = () => {
     if (newLessonTitle.trim()) {
@@ -671,7 +671,7 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
             <ul className="space-y-3">{lessons.slice(-3).reverse().map(lesson => (<li key={lesson.id} className="p-4 bg-slate-50 rounded-xl hover:bg-teal-50 cursor-pointer transition-colors" onClick={() => navigateTo('lesson', lesson)}>{lesson.title}</li>))}</ul>
           </Card>
         </div>
-        <div><Card title="✨ تمرین با استاد هوش مصنوعی"><ChatInterface data={data} setData={setData} context="global" addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories.global} setModalConfig={setModalConfig} /></Card></div>
+        <div><Card title="✨ تمرین با استاد هوش مصنوعی"><ChatInterface data={data} setData={setData} context="global" addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories.global} setModalConfig={setModalConfig} addPronunciationCorrection={addPronunciationCorrection} /></Card></div>
       </div>
     </div>
   );
@@ -743,7 +743,7 @@ function LessonListItem({ lesson, navigateTo, deleteLesson, editLesson }) {
     );
 }
 
-function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, knowledgeBase, data, setData }) {
+function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBase, saveChatHistory, chatHistories, setModalConfig, knowledgeBase, data, setData, addPronunciationCorrection }) {
   const [pastedText, setPastedText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashcards, setFlashcards] = useState([]);
@@ -881,7 +881,7 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
             {flashcards.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 gap-4">{flashcards.map((card, index) => <Flashcard key={index} term={card.term} definition={card.definition} />)}</div>) : <p className="text-slate-500 text-center py-4">برای ایجاد فلش‌کارت، ابتدا باید نکاتی به درس اضافه کنید.</p>}
           </Card>
         </div>
-        <div><Card title="✨ تمرین مکالمه"><ChatInterface data={data} setData={setData} context={`lesson-${lesson.id}`} lessonTitle={lesson.title} lessonNotes={lesson.archivedNotes} addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories[`lesson-${lesson.id}`] || []} setModalConfig={setModalConfig} /></Card></div>
+        <div><Card title="✨ تمرین مکالمه"><ChatInterface data={data} setData={setData} context={`lesson-${lesson.id}`} lessonTitle={lesson.title} lessonNotes={lesson.archivedNotes} addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories[`lesson-${lesson.id}`] || []} setModalConfig={setModalConfig} addPronunciationCorrection={addPronunciationCorrection} /></Card></div>
       </div>
     </div>
   );
@@ -1119,7 +1119,7 @@ function StatsReport({ journal, knowledgeBase }) {
 }
 function Journal({ entries }) { return (<Card title="ژورنال فعالیت‌ها"><div className="space-y-4 max-h-[600px] overflow-y-auto">{entries.map(entry => (<div key={entry.id} className="p-4 bg-slate-50 border-r-4 border-teal-500 rounded-r-lg"><p className="text-sm text-slate-500 mb-1">{new Date(entry.date).toLocaleString('fa-IR')}</p><p>{entry.entry}</p></div>))}</div></Card>); }
 
-function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJournalEntry, updateKnowledgeBase, knowledgeBase, saveChatHistory, initialHistory, setModalConfig }) {
+function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJournalEntry, updateKnowledgeBase, knowledgeBase, saveChatHistory, initialHistory, setModalConfig, addPronunciationCorrection }) {
   const { defaultChatSettings = initialData.defaultChatSettings, archivedConversations = [] } = data;
   const [chatHistory, setChatHistory] = useState(initialHistory || []);
   const [input, setInput] = useState('');
