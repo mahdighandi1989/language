@@ -150,7 +150,6 @@ export default function App() {
 
   useEffect(() => {
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
     // If no Firebase config, use localStorage
@@ -163,51 +162,61 @@ export default function App() {
         return;
     }
 
-    // Firebase setup
+    // Firebase setup with SHARED user ID for cross-device sync
+    // Using a fixed user ID so all devices share the same data
+    const SHARED_USER_ID = 'shared-user-mahdi';
+
     setLogLevel('debug');
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
     setFirebaseServices({ auth, db });
 
-    const authObserver = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserId(user.uid);
-        const userDocRef = doc(db, `/artifacts/${appId}/users/${user.uid}/data/main`);
+    // Sign in anonymously (required for Firestore access) but use shared user ID for data
+    const setupFirestore = async () => {
+      try {
+        await signInAnonymously(auth);
+        console.log("Signed in anonymously, using shared user ID for data sync");
+
+        setUserId(SHARED_USER_ID);
+        const userDocRef = doc(db, `/artifacts/${appId}/users/${SHARED_USER_ID}/data/main`);
+
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
+            console.log("Data loaded from Firestore (shared)");
             setData(prevData => ({...initialData, ...docSnap.data()}));
           } else {
+            console.log("Creating initial document in Firestore");
             setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
             setData(initialData);
           }
           setIsAuthReady(true);
         }, (error) => {
             console.error("Error listening to document:", error);
+            // Fallback to localStorage if Firestore fails
+            const savedData = loadFromLocalStorage();
+            setData(savedData);
+            setUserId('local-user');
             setIsAuthReady(true);
         });
-        return () => unsubscribe();
-      } else {
-        setUserId(null);
+
+        return unsubscribe;
+      } catch (error) {
+        console.error("Authentication failed:", error);
+        // Fallback to localStorage
+        const savedData = loadFromLocalStorage();
+        setData(savedData);
+        setUserId('local-user');
         setIsAuthReady(true);
       }
-    });
-
-    const signIn = async () => {
-        try {
-            if (initialAuthToken) {
-                await signInWithCustomToken(auth, initialAuthToken);
-            } else {
-                await signInAnonymously(auth);
-            }
-        } catch (error) {
-            console.error("Authentication failed:", error);
-            setIsAuthReady(true);
-        }
     };
-    
-    signIn();
-    return () => authObserver();
+
+    let unsubscribe = null;
+    setupFirestore().then(unsub => { unsubscribe = unsub; });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
