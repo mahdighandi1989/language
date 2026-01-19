@@ -1458,7 +1458,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             </div>
         )}
         <div ref={chatWindowRef} className="flex-1 overflow-y-auto p-2 space-y-4">
-          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} />))}
+          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} isVoiceCall={msg.isVoiceCall} isVoiceCallHeader={msg.isVoiceCallHeader} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
         {/* Voice Conversation Mode Indicator */}
@@ -1525,7 +1525,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   );
 }
 
-function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType }) {
+function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType, isVoiceCall, isVoiceCallHeader }) {
     const isError = message.isError;
     const [mainText, translation] = useMemo(() => {
         if (!message.text) return ['', ''];
@@ -1533,9 +1533,9 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
         return [parts[0].trim(), parts[1]?.trim()];
     }, [message.text]);
 
-    // Create audio URL for live audio messages
+    // Create audio URL for live audio messages or voice calls
     const liveAudioUrl = useMemo(() => {
-        if (msgType === 'live_audio' && audioData) {
+        if ((msgType === 'live_audio' || isVoiceCall) && audioData) {
             try {
                 return getWavUrl(audioData, mimeType || 'audio/pcm;rate=24000');
             } catch (e) {
@@ -1544,7 +1544,40 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
             }
         }
         return null;
-    }, [msgType, audioData, mimeType]);
+    }, [msgType, audioData, mimeType, isVoiceCall]);
+
+    // Handle voice call header
+    if (isVoiceCallHeader) {
+        return (
+            <div className="flex justify-center my-4">
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 px-4 rounded-full text-sm font-medium">
+                    {mainText}
+                </div>
+            </div>
+        );
+    }
+
+    // Handle voice call messages
+    if (isVoiceCall) {
+        return (
+            <div className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] py-2 px-4 rounded-2xl ${
+                    role === 'user'
+                        ? 'bg-teal-500 text-white rounded-br-none'
+                        : 'bg-gradient-to-r from-purple-100 to-pink-100 text-slate-800 rounded-bl-none shadow-sm border border-purple-200'
+                }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Phone size={14} className={role === 'user' ? 'text-white' : 'text-purple-600'} />
+                        <span className="text-xs opacity-80">تماس صوتی</span>
+                    </div>
+                    {mainText && <p className="text-sm">{mainText}</p>}
+                    {liveAudioUrl && (
+                        <audio src={liveAudioUrl} controls className="h-8 mt-2 w-full" />
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     // Handle live audio messages (from Live Voice Chat)
     if (msgType === 'live_audio' && audioData) {
@@ -1705,6 +1738,11 @@ function LiveVoiceChat({
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
 
+  // Recording refs
+  const conversationRef = useRef([]); // Stores {role, text, audioData, mimeType}
+  const currentAiAudioChunksRef = useRef([]); // Collects audio chunks for current AI response
+  const currentAiTextRef = useRef(''); // Collects text for current AI response
+
   // Voices optimized for Arabic - Aoede and Charon seem better
   const availableVoices = {
     'Aoede': 'صدای ۱ (پیشنهادی)',
@@ -1755,6 +1793,24 @@ function LiveVoiceChat({
     }
   };
 
+  // Combine multiple audio chunks into one
+  const combineAudioChunks = (chunks) => {
+    if (!chunks || chunks.length === 0) return { data: null, mimeType: null };
+    if (chunks.length === 1) return { data: chunks[0].data, mimeType: chunks[0].mimeType };
+
+    // Combine base64 PCM chunks
+    const mimeType = chunks[0].mimeType;
+    const allBytes = [];
+    for (const chunk of chunks) {
+      const binary = atob(chunk.data);
+      for (let i = 0; i < binary.length; i++) {
+        allBytes.push(binary.charCodeAt(i));
+      }
+    }
+    const combined = btoa(String.fromCharCode(...allBytes));
+    return { data: combined, mimeType };
+  };
+
   const disconnect = () => {
     stopListening();
     if (wsRef.current) {
@@ -1766,6 +1822,28 @@ function LiveVoiceChat({
   };
 
   const handleClose = () => {
+    // Save conversation to chat history before closing
+    if (conversationRef.current.length > 0) {
+      const callMessages = conversationRef.current.map(msg => ({
+        role: msg.role === 'ai' ? 'model' : 'user',
+        parts: [{ text: msg.text }],
+        audioData: msg.audioData,
+        mimeType: msg.mimeType,
+        isVoiceCall: true
+      }));
+
+      // Add a header message for the call
+      const callHeader = {
+        role: 'model',
+        parts: [{ text: '📞 تماس صوتی ضبط شده:' }],
+        isVoiceCallHeader: true
+      };
+
+      setChatHistory(prev => [...prev, callHeader, ...callMessages]);
+      saveChatHistory([...chatHistory, callHeader, ...callMessages]);
+      conversationRef.current = [];
+    }
+
     disconnect();
     onClose();
   };
@@ -1805,14 +1883,32 @@ function LiveVoiceChat({
       for (const part of parts) {
         if (part.inlineData?.mimeType?.startsWith('audio/')) {
           playAudioChunk(part.inlineData.data, part.inlineData.mimeType);
+          // Store audio chunk for recording
+          currentAiAudioChunksRef.current.push({
+            data: part.inlineData.data,
+            mimeType: part.inlineData.mimeType
+          });
           setIsSpeaking(true);
         }
         if (part.text) {
+          currentAiTextRef.current += part.text;
           setTranscript(prev => [...prev, { role: 'ai', text: part.text }]);
         }
       }
       if (message.serverContent.turnComplete) {
         setIsSpeaking(false);
+        // Save completed AI response to conversation
+        if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
+          const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
+          conversationRef.current.push({
+            role: 'ai',
+            text: currentAiTextRef.current || '🔊 پاسخ صوتی',
+            audioData: combinedAudio.data,
+            mimeType: combinedAudio.mimeType
+          });
+          currentAiAudioChunksRef.current = [];
+          currentAiTextRef.current = '';
+        }
       }
     }
   };
