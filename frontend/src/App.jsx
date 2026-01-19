@@ -1862,7 +1862,83 @@ function LiveVoiceChat({
     setTranscript([]);
   };
 
-  const handleClose = () => {
+  const analyzeCallForDialect = async (conversationTexts) => {
+    // Build the conversation text for analysis
+    const conversationSummary = conversationTexts
+      .filter(c => c.text && c.text !== '🎤 پیام صوتی' && c.text !== '🔊 پاسخ صوتی')
+      .map(c => `${c.role === 'ai' ? 'جاد' : 'کاربر'}: ${c.text}`)
+      .join('\n');
+
+    if (!conversationSummary.trim()) return null;
+
+    const analysisPrompt = `انت خبير باللهجة اللبنانية البيروتية. راجع هيدي المحادثة وشوف إذا في أخطاء بلهجة جاد (المعلم).
+
+المحادثة:
+${conversationSummary}
+
+مهمتك:
+1. شوف إذا جاد استخدم كلمات فصحى بدل اللبنانية
+2. شوف إذا في تعابير مش لبنانية
+3. أعطي ملاحظات للتحسين
+
+جاوب بالفورمات هيدا بالضبط (بالعربي):
+---تحليل---
+[ملاحظاتك العامة عن جودة اللهجة]
+
+---اصلاحات---
+غلط: [الكلمة أو العبارة الغلط]
+صح: [الكلمة أو العبارة الصحيحة باللبناني]
+
+غلط: [كلمة تانية]
+صح: [تصحيحها]
+
+---نهاية---
+
+إذا ما في أخطاء، اكتب "اللهجة ممتازة!" بس.`;
+
+    try {
+      const response = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: analysisPrompt }] }]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.text || data.candidates?.[0]?.content?.parts?.[0]?.text;
+      }
+    } catch (error) {
+      console.error('Error analyzing call:', error);
+    }
+    return null;
+  };
+
+  const parseCorrectionsFromAnalysis = (analysisText) => {
+    if (!analysisText) return [];
+    const corrections = [];
+    const lines = analysisText.split('\n');
+
+    let currentWrong = null;
+    for (const line of lines) {
+      const wrongMatch = line.match(/غلط:\s*(.+)/);
+      const correctMatch = line.match(/صح:\s*(.+)/);
+
+      if (wrongMatch) {
+        currentWrong = wrongMatch[1].trim();
+      } else if (correctMatch && currentWrong) {
+        corrections.push({
+          wrong: currentWrong,
+          correct: correctMatch[1].trim()
+        });
+        currentWrong = null;
+      }
+    }
+    return corrections;
+  };
+
+  const handleClose = async () => {
     // First, save any remaining unsaved audio chunks
     if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
       const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
@@ -1894,7 +1970,50 @@ function LiveVoiceChat({
         isVoiceCallHeader: true
       };
 
-      const newHistory = [...chatHistory, callHeader, ...callMessages];
+      let newHistory = [...chatHistory, callHeader, ...callMessages];
+
+      // Analyze the call for dialect issues
+      const conversationTexts = conversationRef.current.filter(c => c.text);
+      if (conversationTexts.length > 0) {
+        // Add analyzing message
+        const analyzingMsg = {
+          role: 'model',
+          parts: [{ text: '🔍 در حال تحلیل مکالمه برای بررسی لهجه...' }],
+          isAnalyzing: true
+        };
+        newHistory = [...newHistory, analyzingMsg];
+        setChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
+
+        // Perform analysis
+        const analysis = await analyzeCallForDialect(conversationTexts);
+        if (analysis) {
+          // Remove analyzing message, add analysis result
+          newHistory = newHistory.filter(m => !m.isAnalyzing);
+
+          const analysisMessage = {
+            role: 'model',
+            parts: [{ text: `📝 تحلیل لهجه تماس:\n\n${analysis}` }],
+            isCallAnalysis: true
+          };
+          newHistory = [...newHistory, analysisMessage];
+
+          // Parse and save corrections automatically
+          const foundCorrections = parseCorrectionsFromAnalysis(analysis);
+          if (foundCorrections.length > 0 && addPronunciationCorrection) {
+            for (const corr of foundCorrections) {
+              addPronunciationCorrection(corr.wrong, corr.correct);
+            }
+            // Add message about saved corrections
+            const savedMsg = {
+              role: 'model',
+              parts: [{ text: `✅ ${foundCorrections.length} اصلاح تلفظی ذخیره شد و در تماس‌های بعدی اعمال خواهد شد.` }]
+            };
+            newHistory = [...newHistory, savedMsg];
+          }
+        }
+      }
+
       setChatHistory(newHistory);
       saveChatHistory(context, newHistory);
     }
