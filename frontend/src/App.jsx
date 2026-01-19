@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -1503,6 +1503,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         aiVoice={aiVoice}
         accentMode={accentMode}
         addJournalEntry={addJournalEntry}
+        knowledgeBase={knowledgeBase}
       />
     </>
   );
@@ -1653,7 +1654,7 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
     );
 }
 
-// --- Gemini Live API Real-time Voice Chat ---
+// --- Voice Call with TTS (Hybrid Mode) ---
 function LiveVoiceChat({
   isOpen,
   onClose,
@@ -1667,25 +1668,22 @@ function LiveVoiceChat({
   customScenarioDetails,
   aiVoice,
   accentMode,
-  addJournalEntry
+  addJournalEntry,
+  knowledgeBase
 }) {
-  const [connectionStatus, setConnectionStatus] = useState('disconnected');
-  const [isListening, setIsListening] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Charon');
-  const [audioMessages, setAudioMessages] = useState([]); // Store audio blobs
+  const [conversationHistory, setConversationHistory] = useState([]);
 
-  const wsRef = useRef(null);
-  const audioContextRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
-  const processorRef = useRef(null);
-  const audioQueueRef = useRef([]);
-  const isPlayingRef = useRef(false);
-  const userAudioChunksRef = useRef([]); // Collect user audio chunks
-  const aiAudioChunksRef = useRef([]); // Collect AI audio chunks
+  const currentAudioRef = useRef(null);
 
-  // Available voices for Live API
   const availableVoices = {
     'Charon': 'مرد - استاندارد',
     'Kore': 'زن - محکم',
@@ -1695,379 +1693,194 @@ function LiveVoiceChat({
     'Fenrir': 'مرد - هیجان‌زده'
   };
 
-  // Update voice when parent changes
   useEffect(() => {
     if (aiVoice) setSelectedVoice(aiVoice);
   }, [aiVoice]);
 
-  // Save audio messages to parent chat history
-  const saveAudioToChat = () => {
-    if (!setChatHistory || audioMessages.length === 0) return;
-
-    console.log('Saving audio to chat, messages:', audioMessages.length);
-
-    // Add all audio messages to chat history
-    setChatHistory(prev => [...prev, ...audioMessages]);
-
-    // Save chat history
-    if (saveChatHistory) {
-      setTimeout(() => saveChatHistory(), 500);
-    }
-
-    if (addJournalEntry) {
-      addJournalEntry(`مکالمه زنده با جاد انجام شد (${audioMessages.length} پیام صوتی)`);
-    }
-  };
-
-  // Handle close with save option
-  const handleClose = () => {
-    // Save audio messages to chat history
-    if (audioMessages.length > 0) {
-      saveAudioToChat();
-    }
-    disconnect();
-    onClose();
-  };
-
-  // Clean up on unmount or close
   useEffect(() => {
     return () => {
-      disconnect();
+      stopRecording();
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
     };
   }, []);
 
-  // Connect to WebSocket when opened
-  useEffect(() => {
-    if (isOpen && connectionStatus === 'disconnected') {
-      connect();
-    } else if (!isOpen && connectionStatus !== 'disconnected') {
-      disconnect();
+  const handleClose = () => {
+    stopRecording();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
     }
-  }, [isOpen]);
-
-  const connect = () => {
-    setConnectionStatus('connecting');
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/live`;
-
-    try {
-      wsRef.current = new WebSocket(wsUrl);
-
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected to backend');
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          handleGeminiMessage(message);
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setConnectionStatus('error');
-      };
-
-      wsRef.current.onclose = () => {
-        console.log('WebSocket closed');
-        setConnectionStatus('disconnected');
-        stopListening();
-      };
-    } catch (error) {
-      console.error('Failed to create WebSocket:', error);
-      setConnectionStatus('error');
+    // Save conversation to chat history
+    if (conversationHistory.length > 0 && setChatHistory) {
+      setChatHistory(prev => [...prev, ...conversationHistory]);
+      if (saveChatHistory) {
+        setTimeout(() => saveChatHistory(), 500);
+      }
+      if (addJournalEntry) {
+        addJournalEntry(`مکالمه صوتی با جاد انجام شد (${conversationHistory.length} پیام)`);
+      }
     }
-  };
-
-  const disconnect = () => {
-    stopListening();
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    setConnectionStatus('disconnected');
+    setIsConnected(false);
     setTranscript([]);
-    // Clear audio chunks refs
-    userAudioChunksRef.current = [];
-    aiAudioChunksRef.current = [];
+    setConversationHistory([]);
+    onClose();
   };
 
-  const handleGeminiMessage = (message) => {
-    // Handle WebSocket ready - send setup with voice and context
-    if (message.type === 'ws_ready') {
-      console.log('WebSocket ready, sending setup with voice:', selectedVoice);
-
-      // Build context string for system instruction
-      let contextInfo = '';
-      if (context?.startsWith('lesson') && lessonTitle) {
-        contextInfo = `الموضوع الحالي: درس "${lessonTitle}". `;
-      } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
-        contextInfo = `سيناريو: "${customScenarioName}". التفاصيل: "${customScenarioDetails}". `;
-      } else if (selectedTopics && !selectedTopics.includes('general')) {
-        contextInfo = `موضوع المحادثة: ${selectedTopics.join(', ')}. `;
-      }
-
-      wsRef.current?.send(JSON.stringify({
-        type: 'setup',
-        voice: selectedVoice,
-        context: contextInfo,
-        accentMode: accentMode || 'authentic'
-      }));
-      setTranscript(prev => [...prev, { role: 'system', text: 'در حال راه‌اندازی...' }]);
-      return;
-    }
-
-    // Handle setup complete
-    if (message.type === 'connected') {
-      setConnectionStatus('connected');
-      setTranscript(prev => [...prev, { role: 'system', text: `متصل شدم! با صدای ${availableVoices[selectedVoice]} صحبت می‌کنم. روی دکمه میکروفون بزنید...` }]);
-      return;
-    }
-
-    // Handle disconnection
-    if (message.type === 'disconnected') {
-      setConnectionStatus('disconnected');
-      if (message.error) {
-        setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
-      }
-      return;
-    }
-
-    // Handle error
-    if (message.error) {
-      setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
-      setConnectionStatus('error');
-      return;
-    }
-
-    // Handle setup complete from Gemini
-    if (message.setupComplete) {
-      console.log('Gemini setup complete');
-      return;
-    }
-
-    // Handle server content (audio response)
-    if (message.serverContent) {
-      const parts = message.serverContent.modelTurn?.parts || [];
-
-      for (const part of parts) {
-        // Handle audio data - collect and play
-        if (part.inlineData?.mimeType?.startsWith('audio/')) {
-          const audioData = part.inlineData.data;
-          const mimeType = part.inlineData.mimeType;
-          playAudioChunk(audioData, mimeType);
-          setIsSpeaking(true);
-
-          // Collect AI audio chunk
-          aiAudioChunksRef.current.push({ data: audioData, mimeType });
-        }
-
-        // Handle text transcript
-        if (part.text) {
-          setTranscript(prev => [...prev, { role: 'ai', text: part.text }]);
-        }
-      }
-
-      // Check if turn is complete - save audio messages
-      if (message.serverContent.turnComplete) {
-        setIsSpeaking(false);
-
-        // Create audio messages from collected chunks
-        if (userAudioChunksRef.current.length > 0 || aiAudioChunksRef.current.length > 0) {
-          const timestamp = new Date().toISOString();
-
-          // Create user audio message if we have user chunks
-          if (userAudioChunksRef.current.length > 0) {
-            // Combine all user audio chunks into one
-            const userAudioData = userAudioChunksRef.current.map(c => c.data).join('');
-            const userMessage = {
-              role: 'user',
-              parts: [{ text: '🎤 پیام صوتی' }],
-              type: 'live_audio',
-              audioData: userAudioData,
-              mimeType: 'audio/pcm;rate=16000',
-              timestamp
-            };
-            setAudioMessages(prev => [...prev, userMessage]);
-          }
-
-          // Create AI audio message if we have AI chunks
-          if (aiAudioChunksRef.current.length > 0) {
-            // Combine all AI audio chunks into one
-            const aiAudioData = aiAudioChunksRef.current.map(c => c.data).join('');
-            const aiMimeType = aiAudioChunksRef.current[0]?.mimeType || 'audio/pcm;rate=24000';
-            const aiMessage = {
-              role: 'model',
-              parts: [{ text: '🔊 پاسخ صوتی جاد' }],
-              type: 'live_audio',
-              audioData: aiAudioData,
-              mimeType: aiMimeType,
-              timestamp
-            };
-            setAudioMessages(prev => [...prev, aiMessage]);
-          }
-
-          // Clear chunks for next exchange
-          userAudioChunksRef.current = [];
-          aiAudioChunksRef.current = [];
-        }
-      }
-    }
+  const startCall = () => {
+    setIsConnected(true);
+    setTranscript([{ role: 'system', text: `متصل شدم! با صدای ${availableVoices[selectedVoice]} صحبت می‌کنم. روی دکمه میکروفون بزنید...` }]);
   };
 
-  const playAudioChunk = async (base64Data, mimeType) => {
-    try {
-      // Extract sample rate from mimeType (e.g., "audio/pcm;rate=24000")
-      const sampleRateMatch = mimeType.match(/rate=(\d+)/);
-      const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000;
-
-      // Decode base64 to ArrayBuffer
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      // Convert to Int16Array (PCM 16-bit)
-      const pcmData = new Int16Array(bytes.buffer);
-
-      // Convert Int16 to Float32 for Web Audio API
-      const floatData = new Float32Array(pcmData.length);
-      for (let i = 0; i < pcmData.length; i++) {
-        floatData[i] = pcmData[i] / 32768.0;
-      }
-
-      // Create AudioContext if needed
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      }
-
-      // Create audio buffer
-      const audioBuffer = audioContextRef.current.createBuffer(1, floatData.length, sampleRate);
-      audioBuffer.getChannelData(0).set(floatData);
-
-      // Queue the audio
-      audioQueueRef.current.push(audioBuffer);
-
-      // Play if not already playing
-      if (!isPlayingRef.current) {
-        playNextInQueue();
-      }
-    } catch (error) {
-      console.error('Error playing audio chunk:', error);
-    }
-  };
-
-  const playNextInQueue = () => {
-    if (audioQueueRef.current.length === 0) {
-      isPlayingRef.current = false;
-      return;
-    }
-
-    isPlayingRef.current = true;
-    const audioBuffer = audioQueueRef.current.shift();
-
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination);
-    source.onended = playNextInQueue;
-    source.start();
-  };
-
-  const startListening = async () => {
-    if (connectionStatus !== 'connected') return;
+  const startRecording = async () => {
+    if (isRecording || isProcessing || isSpeaking) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true
-        }
-      });
-
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // Create AudioContext for recording at 16kHz
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-      const source = audioContext.createMediaStreamSource(stream);
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+                       MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
 
-      // Use ScriptProcessorNode for capturing audio (deprecated but widely supported)
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = { audioContext, processor };
+      mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      audioChunksRef.current = [];
 
-      processor.onaudioprocess = (e) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-
-          // Convert Float32 to Int16 PCM
-          const pcmData = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            const s = Math.max(-1, Math.min(1, inputData[i]));
-            pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-          }
-
-          // Convert to base64
-          const bytes = new Uint8Array(pcmData.buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          const base64Audio = btoa(binary);
-
-          // Collect user audio chunk for saving
-          userAudioChunksRef.current.push({ data: base64Audio, mimeType: 'audio/pcm;rate=16000' });
-
-          // Send to Gemini via WebSocket
-          const message = {
-            realtimeInput: {
-              mediaChunks: [{
-                mimeType: 'audio/pcm;rate=16000',
-                data: base64Audio
-              }]
-            }
-          };
-
-          wsRef.current.send(JSON.stringify(message));
-        }
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      mediaRecorderRef.current.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        if (audioChunksRef.current.length === 0) return;
 
-      setIsListening(true);
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+        await processAudioAndRespond(audioBlob);
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
       setTranscript(prev => [...prev, { role: 'system', text: 'در حال گوش دادن...' }]);
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
+    } catch (err) {
+      console.error('Microphone error:', err);
       setTranscript(prev => [...prev, { role: 'error', text: 'خطا در دسترسی به میکروفون' }]);
     }
   };
 
-  const stopListening = () => {
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-
-    if (processorRef.current) {
-      processorRef.current.processor.disconnect();
-      processorRef.current.audioContext.close();
-      processorRef.current = null;
-    }
-
-    setIsListening(false);
+    setIsRecording(false);
   };
 
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
+  const processAudioAndRespond = async (audioBlob) => {
+    setIsProcessing(true);
+    setTranscript(prev => [...prev, { role: 'user', text: '🎤 پیام صوتی شما' }]);
+
+    try {
+      // Convert audio to base64
+      const base64Audio = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(audioBlob);
+      });
+
+      // Build system prompt
+      let systemPrompt = `You are "Jad", a friendly Lebanese Arabic tutor. Respond ONLY in Lebanese Arabic dialect. Keep responses short and conversational (1-2 sentences max).`;
+
+      if (context?.startsWith('lesson') && lessonTitle) {
+        systemPrompt += ` Current topic: lesson "${lessonTitle}".`;
+      } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
+        systemPrompt += ` Scenario: "${customScenarioName}". Details: "${customScenarioDetails}".`;
+      } else if (selectedTopics && !selectedTopics.includes('general') && knowledgeBase) {
+        const items = selectedTopics.flatMap(t => knowledgeBase[t]?.map(i => i.term) || []).slice(0, 5);
+        if (items.length) systemPrompt += ` Focus on: ${items.join(', ')}.`;
+      }
+
+      // Build conversation for API
+      const apiContents = [
+        ...conversationHistory.map(m => ({
+          role: m.role,
+          parts: [{ text: m.parts[0].text }]
+        })),
+        {
+          role: 'user',
+          parts: [
+            { text: "The user sent a voice message. Listen and respond briefly in Lebanese Arabic:" },
+            { inline_data: { mime_type: audioBlob.type || 'audio/webm', data: base64Audio } }
+          ]
+        }
+      ];
+
+      // Call Gemini API
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: apiContents,
+          systemInstruction: { parts: [{ text: systemPrompt }] }
+        })
+      });
+
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json();
+      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'ما فهمت، فيك تعيد؟';
+
+      // Add to conversation history
+      const userMsg = { role: 'user', parts: [{ text: '🎤 پیام صوتی' }] };
+      const aiMsg = { role: 'model', parts: [{ text: aiText }] };
+      setConversationHistory(prev => [...prev, userMsg, aiMsg]);
+      setTranscript(prev => [...prev, { role: 'ai', text: aiText }]);
+
+      // Generate TTS with good Lebanese accent
+      setIsSpeaking(true);
+      const ttsPrompt = `Say in authentic Lebanese Beirut accent: ${aiText}`;
+      const ttsResponse = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: ttsPrompt, voice: selectedVoice })
+      });
+
+      if (ttsResponse.ok) {
+        const ttsData = await ttsResponse.json();
+        if (ttsData.audioData) {
+          const audioUrl = getWavUrl(ttsData.audioData, ttsData.mimeType || 'audio/pcm;rate=24000');
+          const audio = new Audio(audioUrl);
+          currentAudioRef.current = audio;
+
+          audio.onended = () => {
+            setIsSpeaking(false);
+            currentAudioRef.current = null;
+            // Auto-start recording for continuous conversation
+            setTimeout(() => startRecording(), 500);
+          };
+          audio.onerror = () => setIsSpeaking(false);
+          await audio.play();
+        } else {
+          setIsSpeaking(false);
+        }
+      } else {
+        setIsSpeaking(false);
+      }
+    } catch (err) {
+      console.error('Error processing audio:', err);
+      setTranscript(prev => [...prev, { role: 'error', text: 'خطا در پردازش صدا' }]);
+      setIsSpeaking(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
     } else {
-      startListening();
+      startRecording();
     }
   };
 
@@ -2079,27 +1892,23 @@ function LiveVoiceChat({
       <div className="flex justify-between items-center p-4 text-white">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Phone size={24} />
-          مکالمه زنده با جاد
+          مکالمه صوتی با جاد
         </h2>
         <div className="flex items-center gap-2">
-          {/* Audio messages count indicator */}
-          {audioMessages.length > 0 && (
+          {conversationHistory.length > 0 && (
             <div className="bg-green-500/30 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-              <Mic size={14} />
-              {audioMessages.length} پیام صوتی
+              <MessageCircle size={14} />
+              {conversationHistory.length} پیام
             </div>
           )}
-          <button
-            onClick={handleClose}
-            className="p-2 hover:bg-white/20 rounded-full transition-colors"
-          >
+          <button onClick={handleClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
             <X size={24} />
           </button>
         </div>
       </div>
 
-      {/* Voice Selection - only show when disconnected */}
-      {connectionStatus === 'disconnected' && (
+      {/* Voice Selection */}
+      {!isConnected && (
         <div className="px-4 py-2">
           <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
             <label className="block text-white/80 text-sm mb-2 text-center">انتخاب صدای استاد:</label>
@@ -2118,10 +1927,11 @@ function LiveVoiceChat({
 
       {/* Status */}
       <div className="text-center text-white/80 text-sm py-2">
-        {connectionStatus === 'connecting' && 'در حال اتصال...'}
-        {connectionStatus === 'connected' && `متصل - صدای ${availableVoices[selectedVoice]}`}
-        {connectionStatus === 'disconnected' && 'صدا را انتخاب کنید و روی دکمه شروع بزنید'}
-        {connectionStatus === 'error' && 'خطا در اتصال'}
+        {!isConnected && 'صدا را انتخاب کنید و شروع کنید'}
+        {isConnected && !isRecording && !isProcessing && !isSpeaking && 'روی دکمه بزنید و صحبت کنید'}
+        {isRecording && 'در حال گوش دادن...'}
+        {isProcessing && 'در حال پردازش...'}
+        {isSpeaking && 'جاد در حال صحبت است...'}
       </div>
 
       {/* Transcript */}
@@ -2130,13 +1940,10 @@ function LiveVoiceChat({
           <div
             key={index}
             className={`p-3 rounded-xl max-w-[80%] ${
-              item.role === 'ai'
-                ? 'bg-white/20 text-white mr-auto'
-                : item.role === 'user'
-                  ? 'bg-teal-500 text-white ml-auto'
-                  : item.role === 'error'
-                    ? 'bg-red-500/50 text-white mx-auto'
-                    : 'bg-white/10 text-white/70 mx-auto text-center text-sm'
+              item.role === 'ai' ? 'bg-white/20 text-white mr-auto' :
+              item.role === 'user' ? 'bg-teal-500 text-white ml-auto' :
+              item.role === 'error' ? 'bg-red-500/50 text-white mx-auto' :
+              'bg-white/10 text-white/70 mx-auto text-center text-sm'
             }`}
           >
             {item.text}
@@ -2146,54 +1953,34 @@ function LiveVoiceChat({
 
       {/* Controls */}
       <div className="p-6 flex flex-col items-center gap-4">
-        {/* Start Call button when disconnected */}
-        {connectionStatus === 'disconnected' && (
+        {!isConnected ? (
           <button
-            onClick={connect}
+            onClick={startCall}
             className="w-24 h-24 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-400 shadow-lg shadow-green-500/50 transition-all duration-300"
           >
             <Phone size={40} className="text-white" />
           </button>
-        )}
-
-        {/* Connecting indicator */}
-        {connectionStatus === 'connecting' && (
-          <div className="w-24 h-24 rounded-full flex items-center justify-center bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50">
-            <Loader size={40} className="text-white animate-spin" />
-          </div>
-        )}
-
-        {/* Main microphone button when connected */}
-        {connectionStatus === 'connected' && (
+        ) : (
           <button
-            onClick={toggleListening}
+            onClick={toggleRecording}
+            disabled={isProcessing || isSpeaking}
             className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isListening
-                ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
-                : 'bg-teal-500 hover:bg-teal-400 shadow-lg shadow-teal-500/50'
+              isRecording ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50' :
+              isProcessing ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50' :
+              isSpeaking ? 'bg-purple-500 shadow-lg shadow-purple-500/50' :
+              'bg-teal-500 hover:bg-teal-400 shadow-lg shadow-teal-500/50'
             }`}
           >
-            {isListening ? (
-              <PhoneOff size={40} className="text-white" />
-            ) : (
-              <Mic size={40} className="text-white" />
-            )}
-          </button>
-        )}
-
-        {/* Error state */}
-        {connectionStatus === 'error' && (
-          <button
-            onClick={connect}
-            className="w-24 h-24 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-400 shadow-lg shadow-red-500/50 transition-all duration-300"
-          >
-            <Phone size={40} className="text-white" />
+            {isRecording ? <MicOff size={40} className="text-white" /> :
+             isProcessing ? <Loader size={40} className="text-white animate-spin" /> :
+             isSpeaking ? <Volume2 size={40} className="text-white animate-pulse" /> :
+             <Mic size={40} className="text-white" />}
           </button>
         )}
 
         {/* Status indicators */}
         <div className="flex gap-4 text-white/80 text-sm">
-          {isListening && (
+          {isRecording && (
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
               در حال ضبط
@@ -2207,18 +1994,12 @@ function LiveVoiceChat({
           )}
         </div>
 
-        {/* Instructions */}
         <p className="text-white/60 text-sm text-center">
-          {connectionStatus === 'disconnected'
-            ? 'صدای استاد را انتخاب کنید و شروع کنید'
-            : connectionStatus === 'connecting'
-              ? 'در حال برقراری ارتباط...'
-              : connectionStatus === 'error'
-                ? 'خطا! دوباره تلاش کنید'
-                : isListening
-                  ? 'صحبت کنید - جاد در حال گوش دادن است'
-                  : 'روی دکمه بزنید تا شروع به صحبت کنید'
-          }
+          {!isConnected ? 'صدای استاد را انتخاب کنید و شروع کنید' :
+           isRecording ? 'صحبت کنید - وقتی تمام شد روی دکمه بزنید' :
+           isSpeaking ? 'صبر کنید تا جاد صحبتش تمام شود' :
+           isProcessing ? 'در حال پردازش پیام شما...' :
+           'روی دکمه بزنید و صحبت کنید'}
         </p>
       </div>
     </div>
