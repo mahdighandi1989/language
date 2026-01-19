@@ -1818,16 +1818,20 @@ function LiveVoiceChat({
       ];
 
       // Call Gemini API
-      const response = await fetch('/api/gemini', {
+      const response = await fetch('/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: apiContents,
-          systemInstruction: { parts: [{ text: systemPrompt }] }
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          includeAudio: true  // Flag to preserve audio data
         })
       });
 
-      if (!response.ok) throw new Error('API error');
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API error: ${errText}`);
+      }
       const data = await response.json();
       const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'ما فهمت، فيك تعيد؟';
 
@@ -1840,10 +1844,10 @@ function LiveVoiceChat({
       // Generate TTS with good Lebanese accent
       setIsSpeaking(true);
       const ttsPrompt = `Say in authentic Lebanese Beirut accent: ${aiText}`;
-      const ttsResponse = await fetch('/api/tts', {
+      const ttsResponse = await fetch('/api/gemini/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: ttsPrompt, voice: selectedVoice })
+        body: JSON.stringify({ prompt: ttsPrompt, voice: selectedVoice })
       });
 
       if (ttsResponse.ok) {
@@ -1869,7 +1873,7 @@ function LiveVoiceChat({
       }
     } catch (err) {
       console.error('Error processing audio:', err);
-      setTranscript(prev => [...prev, { role: 'error', text: 'خطا در پردازش صدا' }]);
+      setTranscript(prev => [...prev, { role: 'error', text: `خطا: ${err.message}` }]);
       setIsSpeaking(false);
     } finally {
       setIsProcessing(false);
