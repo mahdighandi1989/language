@@ -1192,8 +1192,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
     }
 
-    const payload = { contents: newHistory.filter(m => m.parts[0].type !== 'audio'), systemInstruction: { parts: [{ text: systemPrompt }] } };
-    
+    // Filter out audio-only messages but keep the text content
+    const contentsForApi = newHistory.map(m => ({
+      role: m.role,
+      parts: [{ text: m.parts[0].text }]
+    })).filter(m => m.parts[0].text && m.parts[0].text.trim());
+
+    const payload = { contents: contentsForApi, systemInstruction: { parts: [{ text: systemPrompt }] } };
+
     try {
         const aiResponseText = await callGeminiAPI(payload);
         let ttsPrompt = `Say in a clear, ${accentMode === 'standard' ? 'standard' : 'authentic, colloquial Beirut'} Lebanese accent: ${aiResponseText.split('TRANSLATION:')[0]}`;
@@ -1601,10 +1607,24 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
 
   // Save conversation to archived conversations
   const saveConversation = () => {
-    if (transcript.length <= 1) return; // Don't save if only system messages
+    console.log('Save conversation called, transcript:', transcript);
 
-    const conversationMessages = transcript.filter(t => t.role === 'ai' || t.role === 'user');
-    if (conversationMessages.length === 0) return;
+    if (!setData) {
+      console.error('setData is not available');
+      return;
+    }
+
+    // Save if there are any meaningful messages (not just initial system message)
+    const meaningfulMessages = transcript.filter(t =>
+      t.role === 'ai' || t.role === 'user' ||
+      (t.role === 'system' && !t.text.includes('متصل شدم') && !t.text.includes('راه‌اندازی'))
+    );
+    console.log('Meaningful messages:', meaningfulMessages);
+
+    if (meaningfulMessages.length === 0) {
+      console.log('No meaningful messages to save');
+      return;
+    }
 
     const title = `مکالمه زنده - ${new Date().toLocaleDateString('fa-IR')} ${new Date().toLocaleTimeString('fa-IR')}`;
     const newConversation = {
@@ -1620,21 +1640,26 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
       }))
     };
 
-    setData(prev => ({
-      ...prev,
-      archivedConversations: [...(prev.archivedConversations || []), newConversation]
-    }));
+    try {
+      setData(prev => ({
+        ...prev,
+        archivedConversations: [...(prev.archivedConversations || []), newConversation]
+      }));
 
-    if (addJournalEntry) {
-      addJournalEntry(`مکالمه زنده با جاد ذخیره شد (${conversationMessages.length} پیام)`);
+      if (addJournalEntry) {
+        addJournalEntry(`مکالمه زنده با جاد ذخیره شد (${conversationMessages.length} پیام)`);
+      }
+
+      setConversationSaved(true);
+      console.log('Conversation saved successfully');
+    } catch (error) {
+      console.error('Error saving conversation:', error);
     }
-
-    setConversationSaved(true);
   };
 
   // Handle close with save option
   const handleClose = () => {
-    if (transcript.length > 1 && !conversationSaved) {
+    if (transcript.some(t => t.role === 'ai') && !conversationSaved) {
       saveConversation();
     }
     disconnect();
@@ -1931,7 +1956,7 @@ function LiveVoiceChat({ isOpen, onClose, data, setData, addJournalEntry }) {
         </h2>
         <div className="flex items-center gap-2">
           {/* Save button */}
-          {transcript.length > 1 && (
+          {transcript.some(t => t.role === 'ai') && (
             <button
               onClick={saveConversation}
               disabled={conversationSaved}
