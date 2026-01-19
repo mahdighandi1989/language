@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Translate, Archive } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -1071,6 +1071,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const [attachedFile, setAttachedFile] = useState(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const [voiceConversationMode, setVoiceConversationMode] = useState(false);
+  const currentAudioRef = useRef(null);
+  const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
   
   const [selectedTopics, setSelectedTopics] = useState(['general']);
   const [writingStyle, setWritingStyle] = useState(defaultChatSettings.writingStyle);
@@ -1185,47 +1188,139 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     try {
         const aiResponseText = await callGeminiAPI(payload);
         let ttsPrompt = `Say in a clear, ${accentMode === 'standard' ? 'standard' : 'authentic, colloquial Beirut'} Lebanese accent: ${aiResponseText.split('TRANSLATION:')[0]}`;
-        const audioPromise = (aiResponseType === 'audio') ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
+        const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
         const audioResult = await audioPromise;
         const audioUrl = audioResult ? getWavUrl(audioResult.audioData, audioResult.mimeType) : null;
         const newAiMessage = { role: 'model', parts: [{ text: aiResponseText, type: 'text', audioUrl }] };
         newHistory = [...newHistory, newAiMessage];
         setChatHistory(newHistory);
         saveChatHistory(context, newHistory);
-        if (aiResponseType === 'audio' && audioUrl) new Audio(audioUrl).play();
+
+        // Play audio and handle voice conversation mode
+        if ((aiResponseType === 'audio' || voiceConversationMode) && audioUrl) {
+            const audio = new Audio(audioUrl);
+            currentAudioRef.current = audio;
+
+            audio.onended = () => {
+                currentAudioRef.current = null;
+                // Auto-start recording if voice conversation mode is active
+                if (voiceConversationMode) {
+                    setTimeout(() => startVoiceRecording(), 500);
+                }
+            };
+
+            audio.play().catch(err => {
+                console.error('Audio playback error:', err);
+                // Still try to start recording if in voice conversation mode
+                if (voiceConversationMode) {
+                    setTimeout(() => startVoiceRecording(), 500);
+                }
+            });
+        }
     } catch(error) {
         const errorAiMessage = { role: 'model', parts: [{ text: "متاسفانه مشکلی پیش آمد.", type: 'text', isError: true }] };
         setChatHistory(prev => [...prev, errorAiMessage]);
+        // Stop voice conversation mode on error
+        if (voiceConversationMode) {
+            setVoiceConversationMode(false);
+        }
     } finally {
         setIsLoading(false);
     }
   };
 
-  const handleMicClick = async () => {
-    if (isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorderRef.current = new MediaRecorder(stream);
-        audioChunksRef.current = [];
-        mediaRecorderRef.current.ondataavailable = event => audioChunksRef.current.push(event.data);
-        mediaRecorderRef.current.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          if (sendVoiceAs === 'text' && recognitionRef.current) {
-            recognitionRef.current.start();
-          } else {
-            handleSend("[کاربر یک پیام صوتی فرستاد]", audioUrl);
+  // Start voice recording function (used by both manual click and voice conversation mode)
+  const startVoiceRecording = async () => {
+    if (isRecording || isLoading) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = event => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+
+        if (audioChunksRef.current.length === 0) {
+          if (!voiceConversationMode) {
+            setModalConfig({ title: "خطا", message: "صدایی ضبط نشد. لطفا دوباره تلاش کنید." });
           }
-          stream.getTracks().forEach(track => track.stop());
-        };
-        mediaRecorderRef.current.start();
-        setIsRecording(true);
-      } catch (err) {
-        setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست." });
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationMode) {
+          try {
+            recognitionRef.current.start();
+          } catch (err) {
+            handleSend("[پیام صوتی]", audioUrl);
+          }
+        } else {
+          handleSend("[پیام صوتی]", audioUrl);
+        }
+      };
+
+      mediaRecorderRef.current.onerror = (err) => {
+        console.error('MediaRecorder error:', err);
+        stream.getTracks().forEach(track => track.stop());
+        setIsRecording(false);
+        if (voiceConversationMode) {
+          setVoiceConversationMode(false);
+        }
+        setModalConfig({ title: "خطای ضبط", message: "مشکلی در ضبط صدا پیش آمد." });
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Microphone error:', err);
+      if (voiceConversationMode) {
+        setVoiceConversationMode(false);
       }
+      setModalConfig({ title: "خطای میکروفون", message: "دسترسی به میکروفون امکان‌پذیر نیست. لطفا دسترسی را در تنظیمات مرورگر فعال کنید." });
+    }
+  };
+
+  // Stop voice recording
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  // Toggle voice conversation mode
+  const toggleVoiceConversationMode = () => {
+    if (voiceConversationMode) {
+      // Turning off - stop any ongoing audio/recording
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+      stopVoiceRecording();
+      setVoiceConversationMode(false);
+    } else {
+      // Turning on - start voice conversation mode and begin recording
+      setVoiceConversationMode(true);
+      startVoiceRecording();
+    }
+  };
+
+  const handleMicClick = async (e) => {
+    e.preventDefault();
+
+    if (isRecording) {
+      stopVoiceRecording();
+    } else {
+      startVoiceRecording();
     }
   };
 
@@ -1278,20 +1373,51 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text.slice(0, 10)}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
+        {/* Voice Conversation Mode Indicator */}
+        {voiceConversationMode && (
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-xl mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone size={20} className="animate-pulse" />
+              <span className="font-bold">حالت مکالمه صوتی فعال</span>
+              {isRecording && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال گوش دادن...</span>}
+              {isLoading && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال پاسخگویی...</span>}
+            </div>
+            <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg">
+              <PhoneOff size={18} />
+            </button>
+          </div>
+        )}
+
         <div className="pt-2 flex-shrink-0 space-y-2">
           <div className="flex items-center gap-2">
-            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 p-3 border rounded-xl text-base bg-white" placeholder="پیام خود را بنویسید..." disabled={isLoading} />
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 p-3 border rounded-xl text-base bg-white" placeholder="پیام خود را بنویسید..." disabled={isLoading || voiceConversationMode} />
           </div>
           <div className="flex items-center justify-between gap-2">
             <div className="flex gap-2">
-              <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200"><Paperclip size={20}/></button>
+              <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200" disabled={voiceConversationMode}><Paperclip size={20}/></button>
               <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-              <button onTouchStart={handleMicClick} onTouchEnd={handleMicClick} onMouseDown={handleMicClick} onMouseUp={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white' : 'hover:bg-slate-200'}`}><Mic size={20}/></button>
+              <button onClick={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`} disabled={voiceConversationMode}><Mic size={20}/></button>
+              <button
+                onClick={toggleVoiceConversationMode}
+                className={`p-2 border rounded-xl flex items-center gap-1 ${voiceConversationMode ? 'bg-purple-500 text-white' : 'hover:bg-purple-100 text-purple-600 border-purple-300'}`}
+                title="حالت مکالمه صوتی"
+              >
+                <Phone size={20}/>
+              </button>
+              <button
+                onClick={() => setIsLiveChatOpen(true)}
+                className="p-2 border rounded-xl flex items-center gap-1 hover:bg-pink-100 text-pink-600 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50"
+                title="مکالمه زنده با جاد (Gemini Live)"
+              >
+                <Phone size={20}/>
+                <span className="text-xs font-bold">Live</span>
+              </button>
             </div>
-            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold" disabled={isLoading}>{isLoading ? '...' : 'ارسال'}</button>
+            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
           </div>
         </div>
       </div>
+      <LiveVoiceChat isOpen={isLiveChatOpen} onClose={() => setIsLiveChatOpen(false)} />
     </>
   );
 }
@@ -1343,23 +1469,519 @@ const getWavUrl = (base64, mimeType) => {
 
 function TTSButton({ textToSpeak, voice, audioUrl }) {
     const [isLoading, setIsLoading] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
 
     const playAudio = async () => {
-        if (!textToSpeak || isLoading) return;
-        if (audioUrl) { new Audio(audioUrl).play(); return; }
+        if (!textToSpeak) return;
+
+        // If already playing, stop it
+        if (isPlaying && audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            setIsPlaying(false);
+            return;
+        }
+
+        // If we have a pre-generated audio URL, use it
+        if (audioUrl) {
+            // Stop any existing audio
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+
+            const audio = new Audio(audioUrl);
+            audioRef.current = audio;
+
+            audio.onplay = () => setIsPlaying(true);
+            audio.onended = () => setIsPlaying(false);
+            audio.onerror = () => setIsPlaying(false);
+            audio.onpause = () => setIsPlaying(false);
+
+            audio.play().catch(() => setIsPlaying(false));
+            return;
+        }
+
+        // Generate new TTS
+        if (isLoading) return;
         setIsLoading(true);
+
         const result = await callGeminiTTS(`Say: ${textToSpeak}`, voice);
         if (result) {
             const newAudioUrl = getWavUrl(result.audioData, result.mimeType);
             const audio = new Audio(newAudioUrl);
-            audio.play();
-            audio.onended = () => { setIsLoading(false); URL.revokeObjectURL(newAudioUrl); };
+            audioRef.current = audio;
+
+            audio.onplay = () => setIsPlaying(true);
+            audio.onended = () => {
+                setIsPlaying(false);
+                setIsLoading(false);
+                URL.revokeObjectURL(newAudioUrl);
+            };
+            audio.onerror = () => { setIsPlaying(false); setIsLoading(false); };
+
+            audio.play().catch(() => { setIsPlaying(false); setIsLoading(false); });
         } else {
             setIsLoading(false);
         }
     };
-    return (<button onClick={playAudio} disabled={isLoading} className="text-slate-500 hover:text-teal-600 disabled:text-slate-300 p-1">{isLoading ? <Loader size={18} className="animate-spin" /> : <Volume2 size={18} />}</button>);
+
+    return (
+        <button
+            onClick={playAudio}
+            disabled={isLoading}
+            className={`p-1 ${isPlaying ? 'text-teal-600' : 'text-slate-500 hover:text-teal-600'} disabled:text-slate-300`}
+        >
+            {isLoading ? <Loader size={18} className="animate-spin" /> : <Volume2 size={18} className={isPlaying ? 'animate-pulse' : ''} />}
+        </button>
+    );
+}
+
+// --- Gemini Live API Real-time Voice Chat ---
+function LiveVoiceChat({ isOpen, onClose }) {
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('Charon');
+
+  const wsRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const streamRef = useRef(null);
+  const processorRef = useRef(null);
+  const audioQueueRef = useRef([]);
+  const isPlayingRef = useRef(false);
+
+  // Available voices for Live API
+  const availableVoices = {
+    'Charon': 'مرد - استاندارد',
+    'Kore': 'زن - محکم',
+    'Zephyr': 'زن - روشن',
+    'Puck': 'مرد - شاد',
+    'Leda': 'زن - جوان',
+    'Fenrir': 'مرد - هیجان‌زده'
+  };
+
+  // Clean up on unmount or close
+  useEffect(() => {
+    return () => {
+      disconnect();
+    };
+  }, []);
+
+  // Connect to WebSocket when opened
+  useEffect(() => {
+    if (isOpen && connectionStatus === 'disconnected') {
+      connect();
+    } else if (!isOpen && connectionStatus !== 'disconnected') {
+      disconnect();
+    }
+  }, [isOpen]);
+
+  const connect = () => {
+    setConnectionStatus('connecting');
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/live`;
+
+    try {
+      wsRef.current = new WebSocket(wsUrl);
+
+      wsRef.current.onopen = () => {
+        console.log('WebSocket connected to backend');
+      };
+
+      wsRef.current.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          handleGeminiMessage(message);
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
+
+      wsRef.current.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionStatus('error');
+      };
+
+      wsRef.current.onclose = () => {
+        console.log('WebSocket closed');
+        setConnectionStatus('disconnected');
+        stopListening();
+      };
+    } catch (error) {
+      console.error('Failed to create WebSocket:', error);
+      setConnectionStatus('error');
+    }
+  };
+
+  const disconnect = () => {
+    stopListening();
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setConnectionStatus('disconnected');
+    setTranscript([]);
+  };
+
+  const handleGeminiMessage = (message) => {
+    // Handle WebSocket ready - send setup with voice
+    if (message.type === 'ws_ready') {
+      console.log('WebSocket ready, sending setup with voice:', selectedVoice);
+      wsRef.current?.send(JSON.stringify({ type: 'setup', voice: selectedVoice }));
+      setTranscript(prev => [...prev, { role: 'system', text: 'در حال راه‌اندازی...' }]);
+      return;
+    }
+
+    // Handle setup complete
+    if (message.type === 'connected') {
+      setConnectionStatus('connected');
+      setTranscript(prev => [...prev, { role: 'system', text: `متصل شدم! با صدای ${availableVoices[selectedVoice]} صحبت می‌کنم. روی دکمه میکروفون بزنید...` }]);
+      return;
+    }
+
+    // Handle disconnection
+    if (message.type === 'disconnected') {
+      setConnectionStatus('disconnected');
+      if (message.error) {
+        setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
+      }
+      return;
+    }
+
+    // Handle error
+    if (message.error) {
+      setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
+      setConnectionStatus('error');
+      return;
+    }
+
+    // Handle setup complete from Gemini
+    if (message.setupComplete) {
+      console.log('Gemini setup complete');
+      return;
+    }
+
+    // Handle server content (audio response)
+    if (message.serverContent) {
+      const parts = message.serverContent.modelTurn?.parts || [];
+
+      for (const part of parts) {
+        // Handle audio data
+        if (part.inlineData?.mimeType?.startsWith('audio/')) {
+          const audioData = part.inlineData.data;
+          const mimeType = part.inlineData.mimeType;
+          playAudioChunk(audioData, mimeType);
+          setIsSpeaking(true);
+        }
+
+        // Handle text transcript
+        if (part.text) {
+          setTranscript(prev => [...prev, { role: 'ai', text: part.text }]);
+        }
+      }
+
+      // Check if turn is complete
+      if (message.serverContent.turnComplete) {
+        setIsSpeaking(false);
+      }
+    }
+  };
+
+  const playAudioChunk = async (base64Data, mimeType) => {
+    try {
+      // Extract sample rate from mimeType (e.g., "audio/pcm;rate=24000")
+      const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+      const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000;
+
+      // Decode base64 to ArrayBuffer
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // Convert to Int16Array (PCM 16-bit)
+      const pcmData = new Int16Array(bytes.buffer);
+
+      // Convert Int16 to Float32 for Web Audio API
+      const floatData = new Float32Array(pcmData.length);
+      for (let i = 0; i < pcmData.length; i++) {
+        floatData[i] = pcmData[i] / 32768.0;
+      }
+
+      // Create AudioContext if needed
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      // Create audio buffer
+      const audioBuffer = audioContextRef.current.createBuffer(1, floatData.length, sampleRate);
+      audioBuffer.getChannelData(0).set(floatData);
+
+      // Queue the audio
+      audioQueueRef.current.push(audioBuffer);
+
+      // Play if not already playing
+      if (!isPlayingRef.current) {
+        playNextInQueue();
+      }
+    } catch (error) {
+      console.error('Error playing audio chunk:', error);
+    }
+  };
+
+  const playNextInQueue = () => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingRef.current = false;
+      return;
+    }
+
+    isPlayingRef.current = true;
+    const audioBuffer = audioQueueRef.current.shift();
+
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+    source.onended = playNextInQueue;
+    source.start();
+  };
+
+  const startListening = async () => {
+    if (connectionStatus !== 'connected') return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+
+      streamRef.current = stream;
+
+      // Create AudioContext for recording at 16kHz
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+
+      // Use ScriptProcessorNode for capturing audio (deprecated but widely supported)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = { audioContext, processor };
+
+      processor.onaudioprocess = (e) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0);
+
+          // Convert Float32 to Int16 PCM
+          const pcmData = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+
+          // Convert to base64
+          const bytes = new Uint8Array(pcmData.buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64Audio = btoa(binary);
+
+          // Send to Gemini via WebSocket
+          const message = {
+            realtimeInput: {
+              mediaChunks: [{
+                mimeType: 'audio/pcm;rate=16000',
+                data: base64Audio
+              }]
+            }
+          };
+
+          wsRef.current.send(JSON.stringify(message));
+        }
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      setIsListening(true);
+      setTranscript(prev => [...prev, { role: 'system', text: 'در حال گوش دادن...' }]);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      setTranscript(prev => [...prev, { role: 'error', text: 'خطا در دسترسی به میکروفون' }]);
+    }
+  };
+
+  const stopListening = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    if (processorRef.current) {
+      processorRef.current.processor.disconnect();
+      processorRef.current.audioContext.close();
+      processorRef.current = null;
+    }
+
+    setIsListening(false);
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-pink-900 z-50 flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center p-4 text-white">
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Phone size={24} />
+          مکالمه زنده با جاد
+        </h2>
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-white/20 rounded-full transition-colors"
+        >
+          <X size={24} />
+        </button>
+      </div>
+
+      {/* Voice Selection - only show when disconnected */}
+      {connectionStatus === 'disconnected' && (
+        <div className="px-4 py-2">
+          <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
+            <label className="block text-white/80 text-sm mb-2 text-center">انتخاب صدای استاد:</label>
+            <select
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
+              className="w-full p-2 rounded-lg bg-white/20 text-white border border-white/30 text-center"
+            >
+              {Object.entries(availableVoices).map(([key, name]) => (
+                <option key={key} value={key} className="bg-purple-800 text-white">{name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Status */}
+      <div className="text-center text-white/80 text-sm py-2">
+        {connectionStatus === 'connecting' && 'در حال اتصال...'}
+        {connectionStatus === 'connected' && `متصل - صدای ${availableVoices[selectedVoice]}`}
+        {connectionStatus === 'disconnected' && 'صدا را انتخاب کنید و روی دکمه شروع بزنید'}
+        {connectionStatus === 'error' && 'خطا در اتصال'}
+      </div>
+
+      {/* Transcript */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {transcript.map((item, index) => (
+          <div
+            key={index}
+            className={`p-3 rounded-xl max-w-[80%] ${
+              item.role === 'ai'
+                ? 'bg-white/20 text-white mr-auto'
+                : item.role === 'user'
+                  ? 'bg-teal-500 text-white ml-auto'
+                  : item.role === 'error'
+                    ? 'bg-red-500/50 text-white mx-auto'
+                    : 'bg-white/10 text-white/70 mx-auto text-center text-sm'
+            }`}
+          >
+            {item.text}
+          </div>
+        ))}
+      </div>
+
+      {/* Controls */}
+      <div className="p-6 flex flex-col items-center gap-4">
+        {/* Start Call button when disconnected */}
+        {connectionStatus === 'disconnected' && (
+          <button
+            onClick={connect}
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-400 shadow-lg shadow-green-500/50 transition-all duration-300"
+          >
+            <Phone size={40} className="text-white" />
+          </button>
+        )}
+
+        {/* Connecting indicator */}
+        {connectionStatus === 'connecting' && (
+          <div className="w-24 h-24 rounded-full flex items-center justify-center bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50">
+            <Loader size={40} className="text-white animate-spin" />
+          </div>
+        )}
+
+        {/* Main microphone button when connected */}
+        {connectionStatus === 'connected' && (
+          <button
+            onClick={toggleListening}
+            className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${
+              isListening
+                ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
+                : 'bg-teal-500 hover:bg-teal-400 shadow-lg shadow-teal-500/50'
+            }`}
+          >
+            {isListening ? (
+              <PhoneOff size={40} className="text-white" />
+            ) : (
+              <Mic size={40} className="text-white" />
+            )}
+          </button>
+        )}
+
+        {/* Error state */}
+        {connectionStatus === 'error' && (
+          <button
+            onClick={connect}
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-400 shadow-lg shadow-red-500/50 transition-all duration-300"
+          >
+            <Phone size={40} className="text-white" />
+          </button>
+        )}
+
+        {/* Status indicators */}
+        <div className="flex gap-4 text-white/80 text-sm">
+          {isListening && (
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+              در حال ضبط
+            </span>
+          )}
+          {isSpeaking && (
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              جاد صحبت می‌کند
+            </span>
+          )}
+        </div>
+
+        {/* Instructions */}
+        <p className="text-white/60 text-sm text-center">
+          {connectionStatus === 'disconnected'
+            ? 'صدای استاد را انتخاب کنید و شروع کنید'
+            : connectionStatus === 'connecting'
+              ? 'در حال برقراری ارتباط...'
+              : connectionStatus === 'error'
+                ? 'خطا! دوباره تلاش کنید'
+                : isListening
+                  ? 'صحبت کنید - جاد در حال گوش دادن است'
+                  : 'روی دکمه بزنید تا شروع به صحبت کنید'
+          }
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function Flashcard({ term, definition }) {

@@ -3,6 +3,8 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 
 dotenv.config();
 
@@ -11,6 +13,12 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Create HTTP server
+const server = createServer(app);
+
+// Create WebSocket server
+const wss = new WebSocketServer({ server, path: '/ws/live' });
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -198,6 +206,154 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../frontend/dist/index.html'));
 });
 
-app.listen(PORT, () => {
+// ============================================
+// GEMINI LIVE API WEBSOCKET PROXY
+// ============================================
+
+const GEMINI_LIVE_MODEL = 'gemini-2.0-flash-exp';
+const GEMINI_LIVE_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`;
+
+wss.on('connection', (clientWs) => {
+  console.log('Client connected to Live API proxy');
+  let geminiWs = null;
+  let isSetupSent = false;
+
+  // Connect to Gemini Live API
+  const geminiUrl = `${GEMINI_LIVE_WS_URL}?key=${GEMINI_API_KEY}`;
+
+  try {
+    geminiWs = new WebSocket(geminiUrl);
+  } catch (error) {
+    console.error('Failed to create Gemini WebSocket:', error);
+    clientWs.send(JSON.stringify({ error: 'Failed to connect to Gemini Live API' }));
+    clientWs.close();
+    return;
+  }
+
+  const sendSetupMessage = (voiceName = 'Charon') => {
+    if (isSetupSent) return;
+    isSetupSent = true;
+
+    const setupMessage = {
+      setup: {
+        model: `models/${GEMINI_LIVE_MODEL}`,
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName
+              }
+            }
+          }
+        },
+        systemInstruction: {
+          parts: [{
+            text: `أنت "جاد"، معلم لهجة لبنانية ودود لطالب فارسي مبتدئ.
+
+قواعد مهمة جداً يجب اتباعها دائماً:
+1. تكلم فقط باللهجة اللبنانية العامية البيروتية - مش فصحى أبداً
+2. لا تستخدم اللغة الإنجليزية أبداً حتى لو المستخدم تكلم إنجليزي
+3. استخدم كلمات لبنانية عامية مثل:
+   - كيفك، شو، هلق، منيح، كتير، هيك، ليش، وين
+   - شو عم تعمل، كيف الحال، يلا، خلص، بس، هلق
+   - أهلاً فيك، مرحبا، الله يعطيك العافية
+4. كن صبور وودود ومشجع مع الطالب
+5. اجعل ردودك قصيرة وطبيعية مثل محادثة حقيقية
+6. تكلم ببطء ووضوح لأن الطالب مبتدئ
+7. لا تترجم للإنجليزية - فقط عربي لبناني
+
+أمثلة على طريقة الكلام الصحيحة:
+- "أهلاً فيك! كيفك اليوم؟"
+- "كتير منيح! شو بدك نحكي عنو؟"
+- "ما فهمت منيح، فيك تعيد من فضلك؟"
+- "برافو عليك! هيك صح!"
+- "يلا نكمل، شو كلمة تانية بدك تتعلمها؟"`
+          }]
+        }
+      }
+    };
+
+    console.log('Sending setup with voice:', voiceName);
+    geminiWs.send(JSON.stringify(setupMessage));
+  };
+
+  geminiWs.on('open', () => {
+    console.log('Connected to Gemini Live API WebSocket');
+    // Notify client that WebSocket is connected, waiting for voice selection
+    clientWs.send(JSON.stringify({ type: 'ws_ready', message: 'Ready for setup' }));
+  });
+
+  geminiWs.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      console.log('Received from Gemini:', JSON.stringify(message).substring(0, 300));
+
+      // When setup is complete, notify client that we're ready
+      if (message.setupComplete) {
+        console.log('Gemini setup complete - ready for audio');
+        clientWs.send(JSON.stringify({ type: 'connected', message: 'Gemini Live API ready' }));
+      }
+
+      // Forward Gemini response to client
+      clientWs.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('Error parsing Gemini message:', error);
+    }
+  });
+
+  geminiWs.on('error', (error) => {
+    console.error('Gemini WebSocket error:', error.message);
+    clientWs.send(JSON.stringify({ error: `خطا در Gemini Live: ${error.message}` }));
+  });
+
+  geminiWs.on('close', (code, reason) => {
+    const reasonStr = reason?.toString() || 'Unknown';
+    console.log('Gemini connection closed - Code:', code, 'Reason:', reasonStr);
+    clientWs.send(JSON.stringify({
+      type: 'disconnected',
+      error: `اتصال Gemini قطع شد (${code}): ${reasonStr}`
+    }));
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.close();
+    }
+  });
+
+  // Handle messages from client
+  clientWs.on('message', (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+
+      // Handle setup request with voice selection
+      if (message.type === 'setup' && message.voice) {
+        console.log('Client requested setup with voice:', message.voice);
+        sendSetupMessage(message.voice);
+        return;
+      }
+
+      // Forward audio to Gemini
+      if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+        geminiWs.send(JSON.stringify(message));
+      }
+    } catch (error) {
+      console.error('Error handling client message:', error);
+    }
+  });
+
+  clientWs.on('close', () => {
+    console.log('Client disconnected');
+    if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
+      geminiWs.close();
+    }
+  });
+
+  clientWs.on('error', (error) => {
+    console.error('Client WebSocket error:', error);
+  });
+});
+
+// Use server.listen instead of app.listen for WebSocket support
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`WebSocket Live API available at ws://localhost:${PORT}/ws/live`);
 });
