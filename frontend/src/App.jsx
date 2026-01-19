@@ -390,7 +390,7 @@ export default function App() {
     if (!isAuthReady) {
         return <div className="w-full h-full flex items-center justify-center"><Loader size={48} className="animate-spin text-teal-500" /></div>;
     }
-    const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData };
+    const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection };
     switch (activeView) {
       case 'dashboard': return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
       case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} />;
@@ -488,7 +488,9 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
     );
 }
 
-function SettingsPage({ data, setData, setModalConfig }) {
+function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection }) {
+    const pronunciationCorrections = data.pronunciationCorrections || [];
+
     const handleSettingChange = (key, value) => {
         setData(prev => ({
             ...prev,
@@ -511,6 +513,44 @@ function SettingsPage({ data, setData, setModalConfig }) {
                     <div className="border-t pt-3"><label className="font-bold">سبک نوشتار:</label><select value={defaultChatSettings.writingStyle} onChange={e => handleSettingChange('writingStyle', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="simple_arabic">عربی ساده</option><option value="finglish">فینگلیش (Arabizi)</option><option value="tashkeel">عربی با اعراب</option></select></div>
                     <div className="border-t pt-3"><label className="font-bold">نمایش ترجمه:</label><select value={defaultChatSettings.translationLanguage} onChange={e => handleSettingChange('translationLanguage', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="none">بدون ترجمه</option><option value="persian">فارسی</option><option value="english">انگلیسی</option></select></div>
                     <div className="border-t pt-3"><label className="font-bold">پاسخ استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="receiveAs" value="audio" checked={defaultChatSettings.aiResponseType === 'audio'} onChange={() => handleSettingChange('aiResponseType', 'audio')} /> صدا</label><label><input type="radio" name="receiveAs" value="text" checked={defaultChatSettings.aiResponseType === 'text'} onChange={() => handleSettingChange('aiResponseType', 'text')} /> فقط متن</label></div></div>
+                </div>
+            </Card>
+
+            <Card title="📝 اصلاحات تلفظی یادگرفته شده">
+                <div className="space-y-3">
+                    <p className="text-sm text-slate-600">
+                        این اصلاحات از آنالیز تماس‌های قبلی استخراج شدن و در تماس‌های بعدی به Live API ارسال میشن.
+                    </p>
+                    {pronunciationCorrections.length === 0 ? (
+                        <p className="text-center text-slate-400 py-4">هنوز اصلاحی ثبت نشده. بعد از هر تماس، سیستم خودکار آنالیز میکنه.</p>
+                    ) : (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {pronunciationCorrections.map((c, i) => (
+                                <div key={c.id || i} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-red-500 line-through">{c.wrong}</span>
+                                            <span className="text-slate-400">←</span>
+                                            <span className="text-green-600 font-bold">{c.correct}</span>
+                                        </div>
+                                        {c.date && <p className="text-xs text-slate-400 mt-1">{new Date(c.date).toLocaleDateString('fa-IR')}</p>}
+                                    </div>
+                                    <button
+                                        onClick={() => removePronunciationCorrection && removePronunciationCorrection(c.id)}
+                                        className="text-red-400 hover:text-red-600 p-1"
+                                        title="حذف"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className="border-t pt-3 mt-3">
+                        <p className="text-xs text-slate-500">
+                            💡 <strong>نحوه کار:</strong> وقتی تماس تموم میشه → آنالیز خودکار → اصلاحات ذخیره میشن → در تماس بعدی به Live API گفته میشه
+                        </p>
+                    </div>
                 </div>
             </Card>
         </div>
@@ -2066,13 +2106,26 @@ ${conversationSummary}
         context: contextInfo,
         corrections: correctionsInfo
       }));
-      setTranscript([{ role: 'system', text: 'در حال اتصال...' }]);
+
+      // Show what corrections are being applied
+      if (pronunciationCorrections && pronunciationCorrections.length > 0) {
+        setTranscript([
+          { role: 'system', text: 'در حال اتصال...' },
+          { role: 'system', text: `📚 ${pronunciationCorrections.length} اصلاح تلفظی در حال اعمال...` }
+        ]);
+        console.log('Applying corrections to Live API:', pronunciationCorrections);
+      } else {
+        setTranscript([{ role: 'system', text: 'در حال اتصال...' }]);
+      }
       return;
     }
 
     if (message.type === 'connected') {
       setConnectionStatus('connected');
-      setTranscript([{ role: 'system', text: 'متصل شدم! دکمه رو نگه دارید و صحبت کنید' }]);
+      const connectMsg = pronunciationCorrections && pronunciationCorrections.length > 0
+        ? `متصل شدم! ${pronunciationCorrections.length} اصلاح تلفظی اعمال شد. دکمه رو نگه دارید.`
+        : 'متصل شدم! دکمه رو نگه دارید و صحبت کنید';
+      setTranscript(prev => [...prev.filter(p => !p.text.includes('در حال')), { role: 'system', text: connectMsg }]);
       return;
     }
 
