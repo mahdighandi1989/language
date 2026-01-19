@@ -1459,23 +1459,72 @@ const getWavUrl = (base64, mimeType) => {
 
 function TTSButton({ textToSpeak, voice, audioUrl }) {
     const [isLoading, setIsLoading] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
 
     const playAudio = async () => {
-        if (!textToSpeak || isLoading) return;
-        if (audioUrl) { new Audio(audioUrl).play(); return; }
+        if (!textToSpeak) return;
+
+        // If already playing, stop it
+        if (isPlaying && audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            setIsPlaying(false);
+            return;
+        }
+
+        // If we have a pre-generated audio URL, use it
+        if (audioUrl) {
+            // Stop any existing audio
+            if (audioRef.current) {
+                audioRef.current.pause();
+            }
+
+            const audio = new Audio(audioUrl);
+            audioRef.current = audio;
+
+            audio.onplay = () => setIsPlaying(true);
+            audio.onended = () => setIsPlaying(false);
+            audio.onerror = () => setIsPlaying(false);
+            audio.onpause = () => setIsPlaying(false);
+
+            audio.play().catch(() => setIsPlaying(false));
+            return;
+        }
+
+        // Generate new TTS
+        if (isLoading) return;
         setIsLoading(true);
+
         const result = await callGeminiTTS(`Say: ${textToSpeak}`, voice);
         if (result) {
             const newAudioUrl = getWavUrl(result.audioData, result.mimeType);
             const audio = new Audio(newAudioUrl);
-            audio.play();
-            audio.onended = () => { setIsLoading(false); URL.revokeObjectURL(newAudioUrl); };
+            audioRef.current = audio;
+
+            audio.onplay = () => setIsPlaying(true);
+            audio.onended = () => {
+                setIsPlaying(false);
+                setIsLoading(false);
+                URL.revokeObjectURL(newAudioUrl);
+            };
+            audio.onerror = () => { setIsPlaying(false); setIsLoading(false); };
+
+            audio.play().catch(() => { setIsPlaying(false); setIsLoading(false); });
         } else {
             setIsLoading(false);
         }
     };
-    return (<button onClick={playAudio} disabled={isLoading} className="text-slate-500 hover:text-teal-600 disabled:text-slate-300 p-1">{isLoading ? <Loader size={18} className="animate-spin" /> : <Volume2 size={18} />}</button>);
+
+    return (
+        <button
+            onClick={playAudio}
+            disabled={isLoading}
+            className={`p-1 ${isPlaying ? 'text-teal-600' : 'text-slate-500 hover:text-teal-600'} disabled:text-slate-300`}
+        >
+            {isLoading ? <Loader size={18} className="animate-spin" /> : <Volume2 size={18} className={isPlaying ? 'animate-pulse' : ''} />}
+        </button>
+    );
 }
 
 function Flashcard({ term, definition }) {
