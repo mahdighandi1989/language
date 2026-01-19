@@ -1980,6 +1980,9 @@ ${conversationSummary}
 إذا ما في أخطاء، اكتب "اللهجة ممتازة!" بس.`;
 
     try {
+      console.log('🔍 Starting dialect analysis...');
+      console.log('📝 Conversation summary:', conversationSummary.substring(0, 200));
+
       const response = await fetch('/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1988,12 +1991,18 @@ ${conversationSummary}
         })
       });
 
+      console.log('📡 Analysis response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Analysis result received');
         return data.text || data.candidates?.[0]?.content?.parts?.[0]?.text;
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Analysis API error:', response.status, errorText);
       }
     } catch (error) {
-      console.error('Error analyzing call:', error);
+      console.error('❌ Error analyzing call:', error);
     }
     return null;
   };
@@ -2398,11 +2407,13 @@ ${conversationSummary}
 
         {connectionStatus === 'connected' && (
           <button
-            onMouseDown={startListening}
-            onMouseUp={stopListening}
-            onMouseLeave={stopListening}
-            onTouchStart={startListening}
-            onTouchEnd={stopListening}
+            onClick={() => {
+              if (isListening) {
+                stopListening();
+              } else {
+                startListening();
+              }
+            }}
             className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${
               isListening ? 'bg-red-500 animate-pulse shadow-red-500/50' :
               isSpeaking ? 'bg-purple-500 shadow-purple-500/50' :
@@ -2420,7 +2431,7 @@ ${conversationSummary}
         )}
 
         <p className="text-white/60 text-sm text-center">
-          {connectionStatus === 'connected' ? (isListening ? 'رها کنید تا جاد جواب بده' : 'نگه دارید و صحبت کنید') :
+          {connectionStatus === 'connected' ? (isListening ? 'بزنید تا جاد جواب بده' : 'بزنید و صحبت کنید') :
            connectionStatus === 'connecting' ? 'صبر کنید...' : 'شروع کنید'}
         </p>
 
