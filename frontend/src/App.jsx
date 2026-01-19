@@ -1881,14 +1881,40 @@ function LiveVoiceChat({
 
     // Combine base64 PCM chunks
     const mimeType = chunks[0].mimeType;
-    const allBytes = [];
+
+    // Collect all binary strings
+    const binaryStrings = [];
     for (const chunk of chunks) {
-      const binary = atob(chunk.data);
-      for (let i = 0; i < binary.length; i++) {
-        allBytes.push(binary.charCodeAt(i));
+      try {
+        binaryStrings.push(atob(chunk.data));
+      } catch (e) {
+        console.warn('Invalid base64 chunk, skipping');
       }
     }
-    const combined = btoa(String.fromCharCode(...allBytes));
+
+    // Calculate total length
+    let totalLength = 0;
+    for (const str of binaryStrings) {
+      totalLength += str.length;
+    }
+
+    // Create Uint8Array and fill it
+    const allBytes = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const str of binaryStrings) {
+      for (let i = 0; i < str.length; i++) {
+        allBytes[offset++] = str.charCodeAt(i);
+      }
+    }
+
+    // Convert to base64 in chunks to avoid stack overflow
+    const CHUNK_SIZE = 0x8000; // 32KB chunks
+    let result = '';
+    for (let i = 0; i < allBytes.length; i += CHUNK_SIZE) {
+      const chunk = allBytes.subarray(i, Math.min(i + CHUNK_SIZE, allBytes.length));
+      result += String.fromCharCode.apply(null, chunk);
+    }
+    const combined = btoa(result);
     return { data: combined, mimeType };
   };
 
