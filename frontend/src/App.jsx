@@ -1458,7 +1458,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             </div>
         )}
         <div ref={chatWindowRef} className="flex-1 overflow-y-auto p-2 space-y-4">
-          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} />))}
+          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} isVoiceCall={msg.isVoiceCall} isVoiceCallHeader={msg.isVoiceCallHeader} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
         {/* Voice Conversation Mode Indicator */}
@@ -1525,7 +1525,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   );
 }
 
-function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType }) {
+function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType, isVoiceCall, isVoiceCallHeader }) {
     const isError = message.isError;
     const [mainText, translation] = useMemo(() => {
         if (!message.text) return ['', ''];
@@ -1533,9 +1533,9 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
         return [parts[0].trim(), parts[1]?.trim()];
     }, [message.text]);
 
-    // Create audio URL for live audio messages
+    // Create audio URL for live audio messages or voice calls
     const liveAudioUrl = useMemo(() => {
-        if (msgType === 'live_audio' && audioData) {
+        if ((msgType === 'live_audio' || isVoiceCall) && audioData) {
             try {
                 return getWavUrl(audioData, mimeType || 'audio/pcm;rate=24000');
             } catch (e) {
@@ -1544,7 +1544,40 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
             }
         }
         return null;
-    }, [msgType, audioData, mimeType]);
+    }, [msgType, audioData, mimeType, isVoiceCall]);
+
+    // Handle voice call header
+    if (isVoiceCallHeader) {
+        return (
+            <div className="flex justify-center my-4">
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 px-4 rounded-full text-sm font-medium">
+                    {mainText}
+                </div>
+            </div>
+        );
+    }
+
+    // Handle voice call messages
+    if (isVoiceCall) {
+        return (
+            <div className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] py-2 px-4 rounded-2xl ${
+                    role === 'user'
+                        ? 'bg-teal-500 text-white rounded-br-none'
+                        : 'bg-gradient-to-r from-purple-100 to-pink-100 text-slate-800 rounded-bl-none shadow-sm border border-purple-200'
+                }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Phone size={14} className={role === 'user' ? 'text-white' : 'text-purple-600'} />
+                        <span className="text-xs opacity-80">تماس صوتی</span>
+                    </div>
+                    {mainText && <p className="text-sm">{mainText}</p>}
+                    {liveAudioUrl && (
+                        <audio src={liveAudioUrl} controls className="h-8 mt-2 w-full" />
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     // Handle live audio messages (from Live Voice Chat)
     if (msgType === 'live_audio' && audioData) {
@@ -1675,7 +1708,7 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
     );
 }
 
-// --- Voice Call with TTS (Hybrid Mode) ---
+// --- Gemini Live API Real-time Voice Chat ---
 function LiveVoiceChat({
   isOpen,
   onClose,
@@ -1692,407 +1725,374 @@ function LiveVoiceChat({
   addJournalEntry,
   knowledgeBase
 }) {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Charon');
-  const [conversationHistory, setConversationHistory] = useState([]);
-  const [silenceDuration, setSilenceDuration] = useState(1500); // ms
+  const [selectedVoice, setSelectedVoice] = useState(aiVoice || 'Aoede');
 
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const streamRef = useRef(null);
-  const currentAudioRef = useRef(null);
-  const silenceTimeoutRef = useRef(null);
+  const wsRef = useRef(null);
   const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const silenceStartRef = useRef(null);
+  const streamRef = useRef(null);
+  const processorRef = useRef(null);
+  const audioQueueRef = useRef([]);
+  const isPlayingRef = useRef(false);
 
+  // Recording refs
+  const conversationRef = useRef([]); // Stores {role, text, audioData, mimeType}
+  const currentAiAudioChunksRef = useRef([]); // Collects audio chunks for current AI response
+  const currentAiTextRef = useRef(''); // Collects text for current AI response
+
+  // Voices optimized for Arabic - Aoede and Charon seem better
   const availableVoices = {
-    'Charon': 'مرد - استاندارد',
-    'Kore': 'زن - محکم',
-    'Zephyr': 'زن - روشن',
-    'Puck': 'مرد - شاد',
-    'Leda': 'زن - جوان',
-    'Fenrir': 'مرد - هیجان‌زده'
+    'Aoede': 'صدای ۱ (پیشنهادی)',
+    'Charon': 'صدای ۲ - مرد',
+    'Fenrir': 'صدای ۳ - مرد',
+    'Kore': 'صدای ۴ - زن',
+    'Puck': 'صدای ۵ - مرد'
   };
 
   useEffect(() => {
-    if (aiVoice) setSelectedVoice(aiVoice);
+    if (aiVoice && availableVoices[aiVoice]) setSelectedVoice(aiVoice);
   }, [aiVoice]);
 
   useEffect(() => {
-    return () => {
-      stopRecording();
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-      }
-    };
+    return () => disconnect();
   }, []);
 
-  const handleClose = () => {
-    stopRecording();
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
+  useEffect(() => {
+    if (isOpen && connectionStatus === 'disconnected') {
+      // Don't auto-connect, wait for user to press start
+    } else if (!isOpen && connectionStatus !== 'disconnected') {
+      disconnect();
     }
-    // Save conversation to chat history
-    if (conversationHistory.length > 0 && setChatHistory) {
-      setChatHistory(prev => [...prev, ...conversationHistory]);
-      if (saveChatHistory) {
-        setTimeout(() => saveChatHistory(), 500);
-      }
-      if (addJournalEntry) {
-        addJournalEntry(`مکالمه صوتی با جاد انجام شد (${conversationHistory.length} پیام)`);
+  }, [isOpen]);
+
+  const connect = () => {
+    setConnectionStatus('connecting');
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/live`;
+
+    try {
+      wsRef.current = new WebSocket(wsUrl);
+      wsRef.current.onopen = () => console.log('WebSocket connected');
+      wsRef.current.onmessage = (event) => {
+        try {
+          handleGeminiMessage(JSON.parse(event.data));
+        } catch (error) {
+          console.error('Error parsing message:', error);
+        }
+      };
+      wsRef.current.onerror = () => setConnectionStatus('error');
+      wsRef.current.onclose = () => {
+        setConnectionStatus('disconnected');
+        stopListening();
+      };
+    } catch (error) {
+      setConnectionStatus('error');
+    }
+  };
+
+  // Combine multiple audio chunks into one
+  const combineAudioChunks = (chunks) => {
+    if (!chunks || chunks.length === 0) return { data: null, mimeType: null };
+    if (chunks.length === 1) return { data: chunks[0].data, mimeType: chunks[0].mimeType };
+
+    // Combine base64 PCM chunks
+    const mimeType = chunks[0].mimeType;
+    const allBytes = [];
+    for (const chunk of chunks) {
+      const binary = atob(chunk.data);
+      for (let i = 0; i < binary.length; i++) {
+        allBytes.push(binary.charCodeAt(i));
       }
     }
-    setIsConnected(false);
+    const combined = btoa(String.fromCharCode(...allBytes));
+    return { data: combined, mimeType };
+  };
+
+  const disconnect = () => {
+    stopListening();
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setConnectionStatus('disconnected');
     setTranscript([]);
-    setConversationHistory([]);
+  };
+
+  const handleClose = () => {
+    // Save conversation to chat history before closing
+    if (conversationRef.current.length > 0) {
+      const callMessages = conversationRef.current.map(msg => ({
+        role: msg.role === 'ai' ? 'model' : 'user',
+        parts: [{ text: msg.text }],
+        audioData: msg.audioData,
+        mimeType: msg.mimeType,
+        isVoiceCall: true
+      }));
+
+      // Add a header message for the call
+      const callHeader = {
+        role: 'model',
+        parts: [{ text: '📞 تماس صوتی ضبط شده:' }],
+        isVoiceCallHeader: true
+      };
+
+      setChatHistory(prev => [...prev, callHeader, ...callMessages]);
+      saveChatHistory([...chatHistory, callHeader, ...callMessages]);
+      conversationRef.current = [];
+    }
+
+    disconnect();
     onClose();
   };
 
-  const startCall = () => {
-    setIsConnected(true);
-    setTranscript([{ role: 'system', text: `متصل شدم! با صدای ${availableVoices[selectedVoice]} صحبت می‌کنم. روی دکمه میکروفون بزنید...` }]);
+  const handleGeminiMessage = (message) => {
+    if (message.type === 'ws_ready') {
+      let contextInfo = '';
+      if (context?.startsWith('lesson') && lessonTitle) {
+        contextInfo = `الطالب بيتعلم درس: "${lessonTitle}". `;
+      } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
+        contextInfo = `سيناريو: "${customScenarioName}". `;
+      }
+
+      wsRef.current?.send(JSON.stringify({
+        type: 'setup',
+        voice: selectedVoice,
+        context: contextInfo
+      }));
+      setTranscript([{ role: 'system', text: 'در حال اتصال...' }]);
+      return;
+    }
+
+    if (message.type === 'connected') {
+      setConnectionStatus('connected');
+      setTranscript([{ role: 'system', text: 'متصل شدم! دکمه رو نگه دارید و صحبت کنید' }]);
+      return;
+    }
+
+    if (message.type === 'disconnected' || message.error) {
+      setConnectionStatus(message.error ? 'error' : 'disconnected');
+      if (message.error) setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
+      return;
+    }
+
+    if (message.serverContent) {
+      const parts = message.serverContent.modelTurn?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData?.mimeType?.startsWith('audio/')) {
+          playAudioChunk(part.inlineData.data, part.inlineData.mimeType);
+          // Store audio chunk for recording
+          currentAiAudioChunksRef.current.push({
+            data: part.inlineData.data,
+            mimeType: part.inlineData.mimeType
+          });
+          setIsSpeaking(true);
+        }
+        if (part.text) {
+          currentAiTextRef.current += part.text;
+          setTranscript(prev => [...prev, { role: 'ai', text: part.text }]);
+        }
+      }
+      if (message.serverContent.turnComplete) {
+        setIsSpeaking(false);
+        // Save completed AI response to conversation
+        if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
+          const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
+          conversationRef.current.push({
+            role: 'ai',
+            text: currentAiTextRef.current || '🔊 پاسخ صوتی',
+            audioData: combinedAudio.data,
+            mimeType: combinedAudio.mimeType
+          });
+          currentAiAudioChunksRef.current = [];
+          currentAiTextRef.current = '';
+        }
+      }
+    }
   };
 
-  const startRecording = async () => {
-    if (isRecording || isProcessing || isSpeaking) return;
-
+  const playAudioChunk = async (base64Data, mimeType) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || '24000', 10);
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+
+      const pcmData = new Int16Array(bytes.buffer);
+      const floatData = new Float32Array(pcmData.length);
+      for (let i = 0; i < pcmData.length; i++) floatData[i] = pcmData[i] / 32768.0;
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      const audioBuffer = audioContextRef.current.createBuffer(1, floatData.length, sampleRate);
+      audioBuffer.getChannelData(0).set(floatData);
+      audioQueueRef.current.push(audioBuffer);
+
+      if (!isPlayingRef.current) playNextInQueue();
+    } catch (error) {
+      console.error('Audio playback error:', error);
+    }
+  };
+
+  const playNextInQueue = () => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingRef.current = false;
+      return;
+    }
+    isPlayingRef.current = true;
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioQueueRef.current.shift();
+    source.connect(audioContextRef.current.destination);
+    source.onended = playNextInQueue;
+    source.start();
+  };
+
+  const startListening = async () => {
+    if (connectionStatus !== 'connected') return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+      });
       streamRef.current = stream;
 
-      // Set up audio analysis for Voice Activity Detection
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      source.connect(analyserRef.current);
-      analyserRef.current.fftSize = 512;
-      silenceStartRef.current = null;
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = { audioContext, processor };
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
-                       MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
-
-      mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      audioChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorderRef.current.onstop = async () => {
-        // Clean up VAD
-        if (silenceTimeoutRef.current) {
-          clearInterval(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = null;
-        }
-        if (audioContextRef.current) {
-          audioContextRef.current.close();
-          audioContextRef.current = null;
-        }
-        stream.getTracks().forEach(track => track.stop());
-        if (audioChunksRef.current.length === 0) return;
-
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
-        await processAudioAndRespond(audioBlob);
-      };
-
-      mediaRecorderRef.current.start(100); // Record in 100ms chunks for better VAD
-      setIsRecording(true);
-      setTranscript(prev => [...prev, { role: 'system', text: 'صحبت کنید... (خودکار متوقف میشه)' }]);
-
-      // Start Voice Activity Detection
-      const SILENCE_THRESHOLD = 15; // Adjust based on testing
-      const SILENCE_DURATION = silenceDuration; // Use state value
-
-      silenceTimeoutRef.current = setInterval(() => {
-        if (!analyserRef.current || !mediaRecorderRef.current) return;
-
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-
-        if (average < SILENCE_THRESHOLD) {
-          // Silence detected
-          if (!silenceStartRef.current) {
-            silenceStartRef.current = Date.now();
-          } else if (Date.now() - silenceStartRef.current > SILENCE_DURATION) {
-            // Silence lasted long enough - stop recording
-            if (audioChunksRef.current.length > 0) {
-              stopRecording();
-            }
+      processor.onaudioprocess = (e) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcmData = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
           }
-        } else {
-          // Sound detected - reset silence timer
-          silenceStartRef.current = null;
+          const bytes = new Uint8Array(pcmData.buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+
+          wsRef.current.send(JSON.stringify({
+            realtimeInput: { mediaChunks: [{ mimeType: 'audio/pcm;rate=16000', data: btoa(binary) }] }
+          }));
         }
-      }, 100);
-    } catch (err) {
-      console.error('Microphone error:', err);
-      setTranscript(prev => [...prev, { role: 'error', text: 'خطا در دسترسی به میکروفون' }]);
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      setIsListening(true);
+    } catch (error) {
+      setTranscript(prev => [...prev, { role: 'error', text: 'خطا در میکروفون' }]);
     }
   };
 
-  const stopRecording = () => {
-    // Clean up VAD
-    if (silenceTimeoutRef.current) {
-      clearInterval(silenceTimeoutRef.current);
-      silenceTimeoutRef.current = null;
-    }
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
+  const stopListening = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    setIsRecording(false);
-  };
-
-  const processAudioAndRespond = async (audioBlob) => {
-    setIsProcessing(true);
-    setTranscript(prev => [...prev, { role: 'user', text: '🎤 پیام صوتی شما' }]);
-
-    try {
-      // Convert audio to base64
-      const base64Audio = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.readAsDataURL(audioBlob);
-      });
-
-      // Build system prompt
-      let systemPrompt = `You are "Jad", a friendly Lebanese Arabic tutor. Respond ONLY in Lebanese Arabic dialect. Keep responses short and conversational (1-2 sentences max).`;
-
-      if (context?.startsWith('lesson') && lessonTitle) {
-        systemPrompt += ` Current topic: lesson "${lessonTitle}".`;
-      } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
-        systemPrompt += ` Scenario: "${customScenarioName}". Details: "${customScenarioDetails}".`;
-      } else if (selectedTopics && !selectedTopics.includes('general') && knowledgeBase) {
-        const items = selectedTopics.flatMap(t => knowledgeBase[t]?.map(i => i.term) || []).slice(0, 5);
-        if (items.length) systemPrompt += ` Focus on: ${items.join(', ')}.`;
-      }
-
-      // Build conversation for API
-      const apiContents = [
-        ...conversationHistory.map(m => ({
-          role: m.role,
-          parts: [{ text: m.parts[0].text }]
-        })),
-        {
-          role: 'user',
-          parts: [
-            { text: "The user sent a voice message. Listen and respond briefly in Lebanese Arabic:" },
-            { inline_data: { mime_type: audioBlob.type || 'audio/webm', data: base64Audio } }
-          ]
-        }
-      ];
-
-      // Call Gemini API
-      const response = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: apiContents,
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          includeAudio: true  // Flag to preserve audio data
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`API error: ${errText}`);
-      }
-      const data = await response.json();
-      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'ما فهمت، فيك تعيد؟';
-
-      // Add to conversation history
-      const userMsg = { role: 'user', parts: [{ text: '🎤 پیام صوتی' }] };
-      const aiMsg = { role: 'model', parts: [{ text: aiText }] };
-      setConversationHistory(prev => [...prev, userMsg, aiMsg]);
-      setTranscript(prev => [...prev, { role: 'ai', text: aiText }]);
-
-      // Generate TTS with good Lebanese accent
-      setIsSpeaking(true);
-      const ttsPrompt = `Say in authentic Lebanese Beirut accent: ${aiText}`;
-      const ttsResponse = await fetch('/api/gemini/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: ttsPrompt, voice: selectedVoice })
-      });
-
-      if (ttsResponse.ok) {
-        const ttsData = await ttsResponse.json();
-        if (ttsData.audioData) {
-          const audioUrl = getWavUrl(ttsData.audioData, ttsData.mimeType || 'audio/pcm;rate=24000');
-          const audio = new Audio(audioUrl);
-          currentAudioRef.current = audio;
-
-          audio.onended = () => {
-            setIsSpeaking(false);
-            currentAudioRef.current = null;
-            // Auto-start recording for continuous conversation
-            setTimeout(() => startRecording(), 500);
-          };
-          audio.onerror = () => setIsSpeaking(false);
-          await audio.play();
-        } else {
-          setIsSpeaking(false);
-        }
-      } else {
-        setIsSpeaking(false);
-      }
-    } catch (err) {
-      console.error('Error processing audio:', err);
-      setTranscript(prev => [...prev, { role: 'error', text: `خطا: ${err.message}` }]);
-      setIsSpeaking(false);
-    } finally {
-      setIsProcessing(false);
+    if (processorRef.current) {
+      processorRef.current.processor.disconnect();
+      processorRef.current.audioContext.close();
+      processorRef.current = null;
     }
-  };
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
+    setIsListening(false);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-pink-900 z-50 flex flex-col">
-      {/* Header */}
       <div className="flex justify-between items-center p-4 text-white">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <Phone size={24} />
-          مکالمه صوتی با جاد
+          تماس زنده با جاد
         </h2>
-        <div className="flex items-center gap-2">
-          {conversationHistory.length > 0 && (
-            <div className="bg-green-500/30 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-              <MessageCircle size={14} />
-              {conversationHistory.length} پیام
-            </div>
-          )}
-          <button onClick={handleClose} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-            <X size={24} />
-          </button>
-        </div>
+        <button onClick={handleClose} className="p-2 hover:bg-white/20 rounded-full">
+          <X size={24} />
+        </button>
       </div>
 
-      {/* Voice Selection & Settings */}
-      {!isConnected && (
-        <div className="px-4 py-2 space-y-3">
+      {connectionStatus === 'disconnected' && (
+        <div className="px-4 py-2">
           <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
-            <label className="block text-white/80 text-sm mb-2 text-center">انتخاب صدای استاد:</label>
+            <label className="block text-white/80 text-sm mb-2 text-center">انتخاب صدا:</label>
             <select
               value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
               className="w-full p-2 rounded-lg bg-white/20 text-white border border-white/30 text-center"
             >
               {Object.entries(availableVoices).map(([key, name]) => (
-                <option key={key} value={key} className="bg-purple-800 text-white">{name}</option>
+                <option key={key} value={key} className="bg-purple-800">{name}</option>
               ))}
-            </select>
-          </div>
-          <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
-            <label className="block text-white/80 text-sm mb-2 text-center">زمان سکوت برای توقف خودکار:</label>
-            <select
-              value={silenceDuration}
-              onChange={(e) => setSilenceDuration(Number(e.target.value))}
-              className="w-full p-2 rounded-lg bg-white/20 text-white border border-white/30 text-center"
-            >
-              <option value={500} className="bg-purple-800 text-white">۰.۵ ثانیه (سریع)</option>
-              <option value={1000} className="bg-purple-800 text-white">۱ ثانیه</option>
-              <option value={1500} className="bg-purple-800 text-white">۱.۵ ثانیه (پیش‌فرض)</option>
-              <option value={2000} className="bg-purple-800 text-white">۲ ثانیه</option>
-              <option value={3000} className="bg-purple-800 text-white">۳ ثانیه (آهسته)</option>
             </select>
           </div>
         </div>
       )}
 
-      {/* Status */}
       <div className="text-center text-white/80 text-sm py-2">
-        {!isConnected && 'صدا را انتخاب کنید و شروع کنید'}
-        {isConnected && !isRecording && !isProcessing && !isSpeaking && 'روی دکمه بزنید و صحبت کنید'}
-        {isRecording && 'در حال گوش دادن...'}
-        {isProcessing && 'در حال پردازش...'}
-        {isSpeaking && 'جاد در حال صحبت است...'}
+        {connectionStatus === 'connecting' && 'در حال اتصال...'}
+        {connectionStatus === 'connected' && (isListening ? '🎤 در حال گوش دادن...' : 'دکمه رو نگه دارید')}
+        {connectionStatus === 'disconnected' && 'روی دکمه سبز بزنید'}
+        {connectionStatus === 'error' && 'خطا! دوباره تلاش کنید'}
       </div>
 
-      {/* Transcript */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {transcript.map((item, index) => (
-          <div
-            key={index}
-            className={`p-3 rounded-xl max-w-[80%] ${
-              item.role === 'ai' ? 'bg-white/20 text-white mr-auto' :
-              item.role === 'user' ? 'bg-teal-500 text-white ml-auto' :
-              item.role === 'error' ? 'bg-red-500/50 text-white mx-auto' :
-              'bg-white/10 text-white/70 mx-auto text-center text-sm'
-            }`}
-          >
+          <div key={index} className={`p-3 rounded-xl max-w-[80%] ${
+            item.role === 'ai' ? 'bg-white/20 text-white mr-auto' :
+            item.role === 'user' ? 'bg-teal-500 text-white ml-auto' :
+            item.role === 'error' ? 'bg-red-500/50 text-white mx-auto' :
+            'bg-white/10 text-white/70 mx-auto text-center text-sm'
+          }`}>
             {item.text}
           </div>
         ))}
       </div>
 
-      {/* Controls */}
       <div className="p-6 flex flex-col items-center gap-4">
-        {!isConnected ? (
-          <button
-            onClick={startCall}
-            className="w-24 h-24 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-400 shadow-lg shadow-green-500/50 transition-all duration-300"
-          >
+        {connectionStatus === 'disconnected' && (
+          <button onClick={connect} className="w-24 h-24 rounded-full bg-green-500 hover:bg-green-400 shadow-lg shadow-green-500/50 flex items-center justify-center">
             <Phone size={40} className="text-white" />
-          </button>
-        ) : (
-          <button
-            onClick={toggleRecording}
-            disabled={isProcessing || isSpeaking}
-            className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isRecording ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50' :
-              isProcessing ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50' :
-              isSpeaking ? 'bg-purple-500 shadow-lg shadow-purple-500/50' :
-              'bg-teal-500 hover:bg-teal-400 shadow-lg shadow-teal-500/50'
-            }`}
-          >
-            {isRecording ? <MicOff size={40} className="text-white" /> :
-             isProcessing ? <Loader size={40} className="text-white animate-spin" /> :
-             isSpeaking ? <Volume2 size={40} className="text-white animate-pulse" /> :
-             <Mic size={40} className="text-white" />}
           </button>
         )}
 
-        {/* Status indicators */}
-        <div className="flex gap-4 text-white/80 text-sm">
-          {isRecording && (
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-              در حال ضبط
-            </span>
-          )}
-          {isSpeaking && (
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              جاد صحبت می‌کند
-            </span>
-          )}
-        </div>
+        {connectionStatus === 'connecting' && (
+          <div className="w-24 h-24 rounded-full bg-yellow-500 animate-pulse shadow-lg flex items-center justify-center">
+            <Loader size={40} className="text-white animate-spin" />
+          </div>
+        )}
+
+        {connectionStatus === 'connected' && (
+          <button
+            onMouseDown={startListening}
+            onMouseUp={stopListening}
+            onMouseLeave={stopListening}
+            onTouchStart={startListening}
+            onTouchEnd={stopListening}
+            className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${
+              isListening ? 'bg-red-500 animate-pulse shadow-red-500/50' :
+              isSpeaking ? 'bg-purple-500 shadow-purple-500/50' :
+              'bg-teal-500 hover:bg-teal-400 shadow-teal-500/50'
+            } shadow-lg`}
+          >
+            {isSpeaking ? <Volume2 size={40} className="text-white animate-pulse" /> : <Mic size={40} className="text-white" />}
+          </button>
+        )}
+
+        {connectionStatus === 'error' && (
+          <button onClick={connect} className="w-24 h-24 rounded-full bg-red-500 hover:bg-red-400 shadow-lg flex items-center justify-center">
+            <Phone size={40} className="text-white" />
+          </button>
+        )}
 
         <p className="text-white/60 text-sm text-center">
-          {!isConnected ? 'صدای استاد را انتخاب کنید و شروع کنید' :
-           isRecording ? 'صحبت کنید - وقتی تمام شد روی دکمه بزنید' :
-           isSpeaking ? 'صبر کنید تا جاد صحبتش تمام شود' :
-           isProcessing ? 'در حال پردازش پیام شما...' :
-           'روی دکمه بزنید و صحبت کنید'}
+          {connectionStatus === 'connected' ? (isListening ? 'رها کنید تا جاد جواب بده' : 'نگه دارید و صحبت کنید') :
+           connectionStatus === 'connecting' ? 'صبر کنید...' : 'شروع کنید'}
         </p>
       </div>
     </div>
