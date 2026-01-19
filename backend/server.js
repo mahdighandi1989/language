@@ -39,7 +39,7 @@ app.post('/api/gemini/chat', async (req, res) => {
       }));
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -120,6 +120,77 @@ app.post('/api/gemini/tts', async (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// List available models
+app.get('/api/list-models', async (req, res) => {
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data, keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...' });
+    }
+
+    // Return just model names for easier reading
+    const modelNames = data.models?.map(m => m.name) || [];
+    res.json({ models: modelNames, count: modelNames.length, keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test Gemini API directly
+app.get('/api/test-gemini', async (req, res) => {
+  if (!GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'API key not configured', keyExists: false });
+  }
+
+  try {
+    const testPayload = {
+      contents: [{ role: 'user', parts: [{ text: 'Say hello in Lebanese Arabic' }] }]
+    };
+
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    console.log('Testing Gemini API with URL:', apiUrl.replace(GEMINI_API_KEY, 'HIDDEN'));
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(testPayload)
+    });
+
+    const responseText = await response.text();
+    console.log('Gemini test response status:', response.status);
+    console.log('Gemini test response:', responseText);
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: 'Gemini API failed',
+        status: response.status,
+        response: responseText,
+        keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...'
+      });
+    }
+
+    const result = JSON.parse(responseText);
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    res.json({
+      success: true,
+      text: text,
+      keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...'
+    });
+  } catch (error) {
+    console.error('Test error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Serve frontend for all other routes (SPA)
