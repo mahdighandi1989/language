@@ -238,7 +238,7 @@ wss.on('connection', (clientWs) => {
       setup: {
         model: `models/${GEMINI_LIVE_MODEL}`,
         generationConfig: {
-          responseModalities: ['AUDIO', 'TEXT'],
+          responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
