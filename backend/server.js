@@ -210,8 +210,8 @@ app.get('*', (req, res) => {
 // GEMINI LIVE API WEBSOCKET PROXY
 // ============================================
 
-const GEMINI_LIVE_MODEL = 'gemini-2.0-flash-live-001';
-const GEMINI_LIVE_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent`;
+const GEMINI_LIVE_MODEL = 'gemini-2.0-flash-exp';
+const GEMINI_LIVE_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`;
 
 wss.on('connection', (clientWs) => {
   console.log('Client connected to Live API proxy');
@@ -230,7 +230,7 @@ wss.on('connection', (clientWs) => {
   }
 
   geminiWs.on('open', () => {
-    console.log('Connected to Gemini Live API');
+    console.log('Connected to Gemini Live API WebSocket');
 
     // Send setup message to Gemini
     const setupMessage = {
@@ -257,13 +257,21 @@ wss.on('connection', (clientWs) => {
       }
     };
 
+    console.log('Sending setup message to Gemini:', JSON.stringify(setupMessage).substring(0, 200));
     geminiWs.send(JSON.stringify(setupMessage));
-    clientWs.send(JSON.stringify({ type: 'connected', message: 'Connected to Gemini Live API' }));
   });
 
   geminiWs.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
+      console.log('Received from Gemini:', JSON.stringify(message).substring(0, 300));
+
+      // When setup is complete, notify client that we're ready
+      if (message.setupComplete) {
+        console.log('Gemini setup complete - ready for audio');
+        clientWs.send(JSON.stringify({ type: 'connected', message: 'Gemini Live API ready' }));
+      }
+
       // Forward Gemini response to client
       clientWs.send(JSON.stringify(message));
     } catch (error) {
@@ -272,13 +280,17 @@ wss.on('connection', (clientWs) => {
   });
 
   geminiWs.on('error', (error) => {
-    console.error('Gemini WebSocket error:', error);
-    clientWs.send(JSON.stringify({ error: 'Gemini Live API error', details: error.message }));
+    console.error('Gemini WebSocket error:', error.message);
+    clientWs.send(JSON.stringify({ error: `خطا در Gemini Live: ${error.message}` }));
   });
 
   geminiWs.on('close', (code, reason) => {
-    console.log('Gemini connection closed:', code, reason.toString());
-    clientWs.send(JSON.stringify({ type: 'disconnected', code, reason: reason.toString() }));
+    const reasonStr = reason?.toString() || 'Unknown';
+    console.log('Gemini connection closed - Code:', code, 'Reason:', reasonStr);
+    clientWs.send(JSON.stringify({
+      type: 'disconnected',
+      error: `اتصال Gemini قطع شد (${code}): ${reasonStr}`
+    }));
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.close();
     }

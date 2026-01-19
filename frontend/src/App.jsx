@@ -1626,12 +1626,16 @@ function LiveVoiceChat({ isOpen, onClose }) {
     // Handle disconnection
     if (message.type === 'disconnected') {
       setConnectionStatus('disconnected');
+      if (message.error) {
+        setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
+      }
       return;
     }
 
     // Handle error
     if (message.error) {
       setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
+      setConnectionStatus('error');
       return;
     }
 
