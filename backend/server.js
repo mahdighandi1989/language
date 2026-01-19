@@ -216,6 +216,7 @@ const GEMINI_LIVE_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai
 wss.on('connection', (clientWs) => {
   console.log('Client connected to Live API proxy');
   let geminiWs = null;
+  let isSetupSent = false;
 
   // Connect to Gemini Live API
   const geminiUrl = `${GEMINI_LIVE_WS_URL}?key=${GEMINI_API_KEY}`;
@@ -229,10 +230,10 @@ wss.on('connection', (clientWs) => {
     return;
   }
 
-  geminiWs.on('open', () => {
-    console.log('Connected to Gemini Live API WebSocket');
+  const sendSetupMessage = (voiceName = 'Charon') => {
+    if (isSetupSent) return;
+    isSetupSent = true;
 
-    // Send setup message to Gemini
     const setupMessage = {
       setup: {
         model: `models/${GEMINI_LIVE_MODEL}`,
@@ -241,24 +242,46 @@ wss.on('connection', (clientWs) => {
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: 'Charon'
+                voiceName: voiceName
               }
             }
           }
         },
         systemInstruction: {
           parts: [{
-            text: `You are "Jad", a friendly Lebanese Arabic tutor for a Persian beginner.
-            Speak in simple Lebanese Arabic dialect. Be patient, encouraging, and helpful.
-            Keep your responses concise and conversational.
-            When the user speaks in Persian or English, respond in Lebanese Arabic but keep it simple.`
+            text: `أنت "جاد"، معلم لهجة لبنانية ودود لطالب فارسي مبتدئ.
+
+قواعد مهمة جداً يجب اتباعها دائماً:
+1. تكلم فقط باللهجة اللبنانية العامية البيروتية - مش فصحى أبداً
+2. لا تستخدم اللغة الإنجليزية أبداً حتى لو المستخدم تكلم إنجليزي
+3. استخدم كلمات لبنانية عامية مثل:
+   - كيفك، شو، هلق، منيح، كتير، هيك، ليش، وين
+   - شو عم تعمل، كيف الحال، يلا، خلص، بس، هلق
+   - أهلاً فيك، مرحبا، الله يعطيك العافية
+4. كن صبور وودود ومشجع مع الطالب
+5. اجعل ردودك قصيرة وطبيعية مثل محادثة حقيقية
+6. تكلم ببطء ووضوح لأن الطالب مبتدئ
+7. لا تترجم للإنجليزية - فقط عربي لبناني
+
+أمثلة على طريقة الكلام الصحيحة:
+- "أهلاً فيك! كيفك اليوم؟"
+- "كتير منيح! شو بدك نحكي عنو؟"
+- "ما فهمت منيح، فيك تعيد من فضلك؟"
+- "برافو عليك! هيك صح!"
+- "يلا نكمل، شو كلمة تانية بدك تتعلمها؟"`
           }]
         }
       }
     };
 
-    console.log('Sending setup message to Gemini:', JSON.stringify(setupMessage).substring(0, 200));
+    console.log('Sending setup with voice:', voiceName);
     geminiWs.send(JSON.stringify(setupMessage));
+  };
+
+  geminiWs.on('open', () => {
+    console.log('Connected to Gemini Live API WebSocket');
+    // Notify client that WebSocket is connected, waiting for voice selection
+    clientWs.send(JSON.stringify({ type: 'ws_ready', message: 'Ready for setup' }));
   });
 
   geminiWs.on('message', (data) => {
@@ -301,7 +324,14 @@ wss.on('connection', (clientWs) => {
     try {
       const message = JSON.parse(data.toString());
 
-      // Forward to Gemini
+      // Handle setup request with voice selection
+      if (message.type === 'setup' && message.voice) {
+        console.log('Client requested setup with voice:', message.voice);
+        sendSetupMessage(message.voice);
+        return;
+      }
+
+      // Forward audio to Gemini
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         geminiWs.send(JSON.stringify(message));
       }

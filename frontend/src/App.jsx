@@ -1543,6 +1543,7 @@ function LiveVoiceChat({ isOpen, onClose }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('Charon');
 
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -1550,6 +1551,16 @@ function LiveVoiceChat({ isOpen, onClose }) {
   const processorRef = useRef(null);
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
+
+  // Available voices for Live API
+  const availableVoices = {
+    'Charon': 'مرد - استاندارد',
+    'Kore': 'زن - محکم',
+    'Zephyr': 'زن - روشن',
+    'Puck': 'مرد - شاد',
+    'Leda': 'زن - جوان',
+    'Fenrir': 'مرد - هیجان‌زده'
+  };
 
   // Clean up on unmount or close
   useEffect(() => {
@@ -1616,10 +1627,18 @@ function LiveVoiceChat({ isOpen, onClose }) {
   };
 
   const handleGeminiMessage = (message) => {
+    // Handle WebSocket ready - send setup with voice
+    if (message.type === 'ws_ready') {
+      console.log('WebSocket ready, sending setup with voice:', selectedVoice);
+      wsRef.current?.send(JSON.stringify({ type: 'setup', voice: selectedVoice }));
+      setTranscript(prev => [...prev, { role: 'system', text: 'در حال راه‌اندازی...' }]);
+      return;
+    }
+
     // Handle setup complete
     if (message.type === 'connected') {
       setConnectionStatus('connected');
-      setTranscript(prev => [...prev, { role: 'system', text: 'متصل شدم! صحبت کنید...' }]);
+      setTranscript(prev => [...prev, { role: 'system', text: `متصل شدم! با صدای ${availableVoices[selectedVoice]} صحبت می‌کنم. روی دکمه میکروفون بزنید...` }]);
       return;
     }
 
@@ -1838,11 +1857,29 @@ function LiveVoiceChat({ isOpen, onClose }) {
         </button>
       </div>
 
+      {/* Voice Selection - only show when disconnected */}
+      {connectionStatus === 'disconnected' && (
+        <div className="px-4 py-2">
+          <div className="bg-white/10 rounded-xl p-3 max-w-md mx-auto">
+            <label className="block text-white/80 text-sm mb-2 text-center">انتخاب صدای استاد:</label>
+            <select
+              value={selectedVoice}
+              onChange={(e) => setSelectedVoice(e.target.value)}
+              className="w-full p-2 rounded-lg bg-white/20 text-white border border-white/30 text-center"
+            >
+              {Object.entries(availableVoices).map(([key, name]) => (
+                <option key={key} value={key} className="bg-purple-800 text-white">{name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Status */}
-      <div className="text-center text-white/80 text-sm">
+      <div className="text-center text-white/80 text-sm py-2">
         {connectionStatus === 'connecting' && 'در حال اتصال...'}
-        {connectionStatus === 'connected' && 'متصل - آماده مکالمه'}
-        {connectionStatus === 'disconnected' && 'قطع اتصال'}
+        {connectionStatus === 'connected' && `متصل - صدای ${availableVoices[selectedVoice]}`}
+        {connectionStatus === 'disconnected' && 'صدا را انتخاب کنید و روی دکمه شروع بزنید'}
         {connectionStatus === 'error' && 'خطا در اتصال'}
       </div>
 
@@ -1868,24 +1905,50 @@ function LiveVoiceChat({ isOpen, onClose }) {
 
       {/* Controls */}
       <div className="p-6 flex flex-col items-center gap-4">
-        {/* Main microphone button */}
-        <button
-          onClick={toggleListening}
-          disabled={connectionStatus !== 'connected'}
-          className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${
-            isListening
-              ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
-              : connectionStatus === 'connected'
-                ? 'bg-teal-500 hover:bg-teal-400 shadow-lg shadow-teal-500/50'
-                : 'bg-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {isListening ? (
-            <PhoneOff size={40} className="text-white" />
-          ) : (
-            <Mic size={40} className="text-white" />
-          )}
-        </button>
+        {/* Start Call button when disconnected */}
+        {connectionStatus === 'disconnected' && (
+          <button
+            onClick={connect}
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-400 shadow-lg shadow-green-500/50 transition-all duration-300"
+          >
+            <Phone size={40} className="text-white" />
+          </button>
+        )}
+
+        {/* Connecting indicator */}
+        {connectionStatus === 'connecting' && (
+          <div className="w-24 h-24 rounded-full flex items-center justify-center bg-yellow-500 animate-pulse shadow-lg shadow-yellow-500/50">
+            <Loader size={40} className="text-white animate-spin" />
+          </div>
+        )}
+
+        {/* Main microphone button when connected */}
+        {connectionStatus === 'connected' && (
+          <button
+            onClick={toggleListening}
+            className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 ${
+              isListening
+                ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
+                : 'bg-teal-500 hover:bg-teal-400 shadow-lg shadow-teal-500/50'
+            }`}
+          >
+            {isListening ? (
+              <PhoneOff size={40} className="text-white" />
+            ) : (
+              <Mic size={40} className="text-white" />
+            )}
+          </button>
+        )}
+
+        {/* Error state */}
+        {connectionStatus === 'error' && (
+          <button
+            onClick={connect}
+            className="w-24 h-24 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-400 shadow-lg shadow-red-500/50 transition-all duration-300"
+          >
+            <Phone size={40} className="text-white" />
+          </button>
+        )}
 
         {/* Status indicators */}
         <div className="flex gap-4 text-white/80 text-sm">
@@ -1905,11 +1968,15 @@ function LiveVoiceChat({ isOpen, onClose }) {
 
         {/* Instructions */}
         <p className="text-white/60 text-sm text-center">
-          {connectionStatus !== 'connected'
-            ? 'در حال برقراری ارتباط...'
-            : isListening
-              ? 'صحبت کنید - جاد در حال گوش دادن است'
-              : 'روی دکمه بزنید تا شروع به صحبت کنید'
+          {connectionStatus === 'disconnected'
+            ? 'صدای استاد را انتخاب کنید و شروع کنید'
+            : connectionStatus === 'connecting'
+              ? 'در حال برقراری ارتباط...'
+              : connectionStatus === 'error'
+                ? 'خطا! دوباره تلاش کنید'
+                : isListening
+                  ? 'صحبت کنید - جاد در حال گوش دادن است'
+                  : 'روی دکمه بزنید تا شروع به صحبت کنید'
           }
         </p>
       </div>
