@@ -1155,7 +1155,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
   const handleSend = async (textToSend, audioBlobUrl = null) => {
     const messageText = textToSend || input;
-    if ((!messageText.trim() && !attachedFile) || isLoading) return;
+    if ((!messageText.trim() && !attachedFile && !audioBlobUrl) || isLoading) return;
 
     let fullMessage = messageText;
     if (attachedFile) {
@@ -1179,7 +1179,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (translationLanguage !== 'none') {
         systemPrompt += ` After your Lebanese Arabic response, provide a ${translationLanguage} translation on a new line, formatted as 'TRANSLATION: [text]'.`;
     }
-    
+
     if (context.startsWith('lesson')) {
         systemPrompt += `\nYour conversation MUST be based on the provided lesson notes: \n---\n${lessonNotes || "No notes available."}\n---`;
     } else {
@@ -1192,11 +1192,41 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
     }
 
-    // Filter out audio-only messages but keep the text content
-    const contentsForApi = newHistory.map(m => ({
-      role: m.role,
-      parts: [{ text: m.parts[0].text }]
-    })).filter(m => m.parts[0].text && m.parts[0].text.trim());
+    // Build contents for API, including audio if present
+    let contentsForApi = [];
+    for (const m of newHistory) {
+      if (m.parts[0].type === 'audio' && m.parts[0].audioUrl) {
+        // Convert audio blob URL to base64 for Gemini
+        try {
+          const response = await fetch(m.parts[0].audioUrl);
+          const blob = await response.blob();
+          const base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64data = reader.result.split(',')[1];
+              resolve(base64data);
+            };
+            reader.readAsDataURL(blob);
+          });
+
+          contentsForApi.push({
+            role: m.role,
+            parts: [
+              { text: "The user sent a voice message. Please listen and respond in Lebanese Arabic:" },
+              { inline_data: { mime_type: blob.type || 'audio/webm', data: base64 } }
+            ]
+          });
+        } catch (e) {
+          console.error('Error converting audio:', e);
+          // Fallback to text
+          if (m.parts[0].text?.trim()) {
+            contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
+          }
+        }
+      } else if (m.parts[0].text?.trim()) {
+        contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
+      }
+    }
 
     const payload = { contents: contentsForApi, systemInstruction: { parts: [{ text: systemPrompt }] } };
 
