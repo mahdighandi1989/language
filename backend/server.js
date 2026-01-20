@@ -375,6 +375,8 @@ ${accentInstruction}
             }
           }
         },
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
         systemInstruction: {
           parts: [{ text: systemText }]
         }
