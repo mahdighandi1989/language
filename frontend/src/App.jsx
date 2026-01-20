@@ -1514,7 +1514,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             </div>
         )}
         <div ref={chatWindowRef} className="flex-1 overflow-y-auto p-2 space-y-4">
-          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} isVoiceCall={msg.isVoiceCall} isVoiceCallHeader={msg.isVoiceCallHeader} />))}
+          {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} isVoiceCall={msg.isVoiceCall} isVoiceCallHeader={msg.isVoiceCallHeader} isCallAnalysis={msg.isCallAnalysis} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
         {/* Voice Conversation Mode Indicator */}
@@ -1583,7 +1583,154 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   );
 }
 
-function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType, isVoiceCall, isVoiceCallHeader }) {
+// Format analysis text into nice structured display
+function AnalysisDisplay({ text }) {
+  const sections = useMemo(() => {
+    if (!text) return { general: '', pronunciations: [], words: [] };
+
+    const result = { general: '', pronunciations: [], words: [] };
+
+    // Extract general analysis
+    const generalMatch = text.match(/---تحليل---\s*([\s\S]*?)(?=---اصلاحات|---نهاية|$)/);
+    if (generalMatch) {
+      result.general = generalMatch[1].trim();
+    }
+
+    // Extract pronunciation corrections
+    const pronMatch = text.match(/---اصلاحات-تلفظ---\s*([\s\S]*?)(?=---اصلاحات-كلمات|---نهاية|$)/);
+    if (pronMatch) {
+      const pronText = pronMatch[1];
+      const corrections = [];
+      let current = {};
+
+      pronText.split('\n').forEach(line => {
+        const wrongMatch = line.match(/غلط:\s*(.+)/);
+        const correctMatch = line.match(/صح:\s*(.+)/);
+        const explainMatch = line.match(/شرح:\s*(.+)/);
+
+        if (wrongMatch) {
+          if (current.wrong) corrections.push(current);
+          current = { wrong: wrongMatch[1].trim() };
+        } else if (correctMatch && current.wrong) {
+          current.correct = correctMatch[1].trim();
+        } else if (explainMatch && current.wrong) {
+          current.explanation = explainMatch[1].trim();
+          corrections.push(current);
+          current = {};
+        }
+      });
+
+      if (current.wrong && current.correct) corrections.push(current);
+      result.pronunciations = corrections;
+    }
+
+    // Extract word corrections
+    const wordMatch = text.match(/---اصلاحات-كلمات---\s*([\s\S]*?)(?=---نهاية|$)/);
+    if (wordMatch) {
+      const wordText = wordMatch[1];
+      const corrections = [];
+      let current = {};
+
+      wordText.split('\n').forEach(line => {
+        const wrongMatch = line.match(/غلط:\s*(.+)/);
+        const correctMatch = line.match(/صح:\s*(.+)/);
+
+        if (wrongMatch) {
+          if (current.wrong) corrections.push(current);
+          current = { wrong: wrongMatch[1].trim() };
+        } else if (correctMatch && current.wrong) {
+          current.correct = correctMatch[1].trim();
+          corrections.push(current);
+          current = {};
+        }
+      });
+
+      if (current.wrong && current.correct) corrections.push(current);
+      result.words = corrections;
+    }
+
+    // If no sections found, it might be simple text like "اللهجة ممتازة!"
+    if (!result.general && result.pronunciations.length === 0 && result.words.length === 0) {
+      result.general = text.replace(/---[^-]+---/g, '').trim();
+    }
+
+    return result;
+  }, [text]);
+
+  const hasCorrections = sections.pronunciations.length > 0 || sections.words.length > 0;
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 text-purple-700 font-bold text-sm border-b border-purple-200 pb-2">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+        تحلیل لهجه تماس
+      </div>
+
+      {/* General analysis */}
+      {sections.general && (
+        <div className="bg-purple-50 rounded-lg p-3 text-sm text-slate-700">
+          {sections.general}
+        </div>
+      )}
+
+      {/* Pronunciation corrections */}
+      {sections.pronunciations.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-orange-600 flex items-center gap-1">
+            <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+            اصلاحات تلفظی
+          </h4>
+          {sections.pronunciations.map((corr, i) => (
+            <div key={i} className="bg-orange-50 rounded-lg p-2 text-sm border-r-4 border-orange-400">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded line-through">{corr.wrong}</span>
+                <span className="text-slate-400">→</span>
+                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">{corr.correct}</span>
+              </div>
+              {corr.explanation && (
+                <p className="text-xs text-slate-600 mt-1 pr-2">{corr.explanation}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Word corrections */}
+      {sections.words.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-blue-600 flex items-center gap-1">
+            <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+            اصلاحات کلمات
+          </h4>
+          {sections.words.map((corr, i) => (
+            <div key={i} className="bg-blue-50 rounded-lg p-2 text-sm border-r-4 border-blue-400">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded">{corr.wrong}</span>
+                <span className="text-slate-400">→</span>
+                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">{corr.correct}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Success message when no corrections needed */}
+      {!hasCorrections && sections.general && sections.general.includes('ممتاز') && (
+        <div className="flex items-center gap-2 text-green-600 text-sm">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          عالی! لهجه درست بود
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatMessage({ message, role, onSave, voice, disableSave = false, msgType, audioData, mimeType, isVoiceCall, isVoiceCallHeader, isCallAnalysis }) {
     const isError = message.isError;
     const [mainText, translation] = useMemo(() => {
         if (!message.text) return ['', ''];
@@ -1610,6 +1757,17 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
             <div className="flex justify-center my-4">
                 <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 px-4 rounded-full text-sm font-medium">
                     {mainText}
+                </div>
+            </div>
+        );
+    }
+
+    // Handle call analysis - nicely formatted
+    if (isCallAnalysis) {
+        return (
+            <div className="flex justify-start my-2">
+                <div className="max-w-[90%] bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-4 shadow-sm border border-purple-100">
+                    <AnalysisDisplay text={mainText} />
                 </div>
             </div>
         );
@@ -2030,7 +2188,16 @@ ${conversationSummary}
     return corrections;
   };
 
-  const handleClose = async () => {
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = async (forceClose = false) => {
+    // Prevent double-closing
+    if (isClosing) return;
+    setIsClosing(true);
+
+    // First disconnect and close UI immediately
+    disconnect();
+
     // First, save any remaining unsaved audio chunks
     if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
       const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
@@ -2044,10 +2211,21 @@ ${conversationSummary}
       currentAiTextRef.current = '';
     }
 
-    // Save conversation to chat history before closing
+    // Save conversation to chat history
     if (conversationRef.current.length > 0) {
       console.log('Saving conversation with', conversationRef.current.length, 'messages');
-      const callMessages = conversationRef.current.map(msg => ({
+
+      // Limit audio data to avoid performance issues - only keep last 20 messages with audio
+      const limitedConversation = conversationRef.current.map((msg, index) => {
+        const keepAudio = index >= conversationRef.current.length - 20;
+        return {
+          ...msg,
+          audioData: keepAudio ? msg.audioData : null,
+          mimeType: keepAudio ? msg.mimeType : null
+        };
+      });
+
+      const callMessages = limitedConversation.map(msg => ({
         role: msg.role === 'ai' ? 'model' : 'user',
         parts: [{ text: msg.text }],
         audioData: msg.audioData,
@@ -2064,6 +2242,16 @@ ${conversationSummary}
 
       let newHistory = [...chatHistory, callHeader, ...callMessages];
 
+      // If force close, skip analysis
+      if (forceClose) {
+        setChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
+        conversationRef.current = [];
+        setIsClosing(false);
+        onClose();
+        return;
+      }
+
       // Analyze the call for dialect issues
       const conversationTexts = conversationRef.current.filter(c => c.text);
       if (conversationTexts.length > 0) {
@@ -2076,6 +2264,9 @@ ${conversationSummary}
         newHistory = [...newHistory, analyzingMsg];
         setChatHistory(newHistory);
         saveChatHistory(context, newHistory);
+
+        // Close UI now, analysis continues in background
+        onClose();
 
         // Perform analysis with timeout
         let analysis = null;
@@ -2095,7 +2286,7 @@ ${conversationSummary}
         if (analysis) {
           const analysisMessage = {
             role: 'model',
-            parts: [{ text: `📝 تحلیل لهجه تماس:\n\n${analysis}` }],
+            parts: [{ text: analysis }],
             isCallAnalysis: true
           };
           newHistory = [...newHistory, analysisMessage];
@@ -2109,7 +2300,7 @@ ${conversationSummary}
             // Add message about saved corrections
             const savedMsg = {
               role: 'model',
-              parts: [{ text: `✅ ${foundCorrections.length} اصلاح تلفظی ذخیره شد و در تماس‌های بعدی اعمال خواهد شد.` }]
+              parts: [{ text: `✅ ${foundCorrections.length} اصلاح تلفظی ذخیره شد` }]
             };
             newHistory = [...newHistory, savedMsg];
           }
@@ -2121,6 +2312,12 @@ ${conversationSummary}
           };
           newHistory = [...newHistory, failMsg];
         }
+
+        setChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
+        conversationRef.current = [];
+        setIsClosing(false);
+        return;
       }
 
       setChatHistory(newHistory);
@@ -2129,8 +2326,7 @@ ${conversationSummary}
 
     // Reset recording refs
     conversationRef.current = [];
-
-    disconnect();
+    setIsClosing(false);
     onClose();
   };
 
@@ -2141,6 +2337,25 @@ ${conversationSummary}
         contextInfo = `الطالب بيتعلم درس: "${lessonTitle}". `;
       } else if (selectedTopics?.includes('custom_scenario') && customScenarioName) {
         contextInfo = `سيناريو: "${customScenarioName}". `;
+      }
+
+      // Build chat history summary for context (last 15 messages)
+      let chatHistorySummary = '';
+      if (chatHistory && chatHistory.length > 0) {
+        const recentMessages = chatHistory
+          .filter(msg => msg.parts?.[0]?.text && !msg.isVoiceCallHeader && !msg.isAnalyzing && !msg.isCallAnalysis)
+          .slice(-15)
+          .map(msg => {
+            const text = msg.parts[0].text;
+            // Truncate long messages
+            const truncated = text.length > 100 ? text.substring(0, 100) + '...' : text;
+            return `${msg.role === 'user' ? 'الطالب' : 'جاد'}: ${truncated}`;
+          })
+          .join('\n');
+
+        if (recentMessages) {
+          chatHistorySummary = `\n\n=== سجل المحادثة السابقة ===\nهيدي آخر الرسائل يلي حكيتوها قبل التماس. إذا الطالب سألك عن شي حكيتوه قبل، ارجع لهالسجل:\n${recentMessages}\n`;
+        }
       }
 
       // Build corrections string for system prompt
@@ -2155,7 +2370,7 @@ ${conversationSummary}
       wsRef.current?.send(JSON.stringify({
         type: 'setup',
         voice: selectedVoice,
-        context: contextInfo,
+        context: contextInfo + chatHistorySummary,
         corrections: correctionsInfo
       }));
 
@@ -2370,9 +2585,24 @@ ${conversationSummary}
           <Phone size={24} />
           تماس زنده با جاد
         </h2>
-        <button onClick={handleClose} className="p-2 hover:bg-white/20 rounded-full">
-          <X size={24} />
-        </button>
+        <div className="flex items-center gap-2">
+          {connectionStatus !== 'disconnected' && (
+            <button
+              onClick={() => handleClose(true)}
+              className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-sm font-medium"
+              title="بستن سریع بدون تحلیل"
+            >
+              بستن سریع
+            </button>
+          )}
+          <button
+            onClick={() => handleClose(false)}
+            disabled={isClosing}
+            className={`p-2 rounded-full ${isClosing ? 'bg-white/10 cursor-not-allowed' : 'hover:bg-white/20 bg-white/10'}`}
+          >
+            {isClosing ? <Loader size={24} className="animate-spin" /> : <X size={24} />}
+          </button>
+        </div>
       </div>
 
       {connectionStatus === 'disconnected' && (
