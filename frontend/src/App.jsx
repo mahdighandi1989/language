@@ -1216,6 +1216,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const [voiceConversationMode, setVoiceConversationMode] = useState(false);
+  const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
   const currentAudioRef = useRef(null);
   const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
 
@@ -1251,12 +1252,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   }, []);
 
   useEffect(() => {
+    // Don't reset conversation during voice conversation mode
+    if (voiceConversationModeRef.current) return;
     if (!initialHistory || initialHistory.length === 0) {
         startNewConversation();
     }
   }, [context, lessonTitle, initialHistory]);
 
   const startNewConversation = (archiveCurrent = false) => {
+    // Don't start new conversation during voice conversation mode
+    if (voiceConversationModeRef.current) return;
+
     if (archiveCurrent && chatHistory.length > 1) {
         const conversationTitle = chatHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
         const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: chatHistory }];
@@ -1410,23 +1416,28 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
             audio.onended = async () => {
                 currentAudioRef.current = null;
-                // Auto-start recording if voice conversation mode is active
-                if (voiceConversationMode) {
+                // Auto-start recording if voice conversation mode is still active (use ref to avoid stale closure)
+                if (voiceConversationModeRef.current) {
                     // Wait for beep delay, then play beep, then start recording
                     setTimeout(async () => {
-                        await playBeepSound(800, 150); // Play beep sound
-                        startVoiceRecording();
+                        // Double-check ref before starting (user might have turned off mode during delay)
+                        if (voiceConversationModeRef.current) {
+                            await playBeepSound(800, 150); // Play beep sound
+                            startVoiceRecording(true); // Pass true for voice conversation mode
+                        }
                     }, beepDelay);
                 }
             };
 
             audio.play().catch(async err => {
                 console.error('Audio playback error:', err);
-                // Still try to start recording if in voice conversation mode
-                if (voiceConversationMode) {
+                // Still try to start recording if in voice conversation mode (use ref)
+                if (voiceConversationModeRef.current) {
                     setTimeout(async () => {
-                        await playBeepSound(800, 150);
-                        startVoiceRecording();
+                        if (voiceConversationModeRef.current) {
+                            await playBeepSound(800, 150);
+                            startVoiceRecording(true); // Pass true for voice conversation mode
+                        }
                     }, beepDelay);
                 }
             });
@@ -1436,6 +1447,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         setChatHistory(prev => [...prev, errorAiMessage]);
         // Stop voice conversation mode on error
         if (voiceConversationMode) {
+            voiceConversationModeRef.current = false;
             setVoiceConversationMode(false);
         }
     } finally {
@@ -1544,6 +1556,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       };
 
       mediaRecorderRef.current.onstop = () => {
+        // Important: Reset recording state first so next recording can start
+        setIsRecording(false);
+
         // Cleanup silence detection
         cleanupSilenceDetection();
 
@@ -1553,7 +1568,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
 
         if (audioChunksRef.current.length === 0) {
-          if (!voiceConversationMode) {
+          if (!voiceConversationModeRef.current) {
             setModalConfig({ title: "خطا", message: "صدایی ضبط نشد. لطفا دوباره تلاش کنید." });
           }
           return;
@@ -1562,7 +1577,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
-        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationMode) {
+        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationModeRef.current) {
           try {
             recognitionRef.current.start();
           } catch (err) {
@@ -1582,6 +1597,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
         setIsRecording(false);
         if (voiceConversationMode) {
+          voiceConversationModeRef.current = false;
           setVoiceConversationMode(false);
         }
         setModalConfig({ title: "خطای ضبط", message: "مشکلی در ضبط صدا پیش آمد." });
@@ -1593,6 +1609,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       console.error('Microphone error:', err);
       cleanupSilenceDetection();
       if (voiceConversationMode) {
+        voiceConversationModeRef.current = false;
         setVoiceConversationMode(false);
       }
 
@@ -1627,6 +1644,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const toggleVoiceConversationMode = () => {
     if (voiceConversationMode) {
       // Turning off - stop any ongoing audio/recording
+      voiceConversationModeRef.current = false;
       cleanupSilenceDetection();
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
@@ -1636,6 +1654,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       setVoiceConversationMode(false);
     } else {
       // Turning on - start voice conversation mode and begin recording
+      voiceConversationModeRef.current = true;
       setVoiceConversationMode(true);
       // Pass true to indicate voice conversation mode since state hasn't updated yet
       startVoiceRecording(true);
@@ -1670,11 +1689,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       <div className="h-[calc(100vh-200px)] min-h-[400px] max-h-[700px] flex flex-col bg-slate-100 rounded-xl p-2 sm:p-3">
         <div className="flex justify-between items-center mb-2">
           {context === 'global' && (
-              <div className="relative group flex-1">
-                  <button className="w-full p-2 border rounded-lg text-sm text-left">انتخاب موضوع تمرین ({selectedTopics.includes('general') || selectedTopics.includes('custom_scenario') ? 1 : selectedTopics.length})</button>
-                  <div className="hidden group-hover:block absolute z-10 bg-white shadow-lg rounded-lg p-2 w-full space-y-1">
-                      {Object.entries(kbCategories).map(([key, value]) => (<label key={key} className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="checkbox" checked={selectedTopics.includes(key)} onChange={() => handleTopicChange(key)} disabled={!knowledgeBase[key]?.length}/>{value}</label>))}
-                      <div className="border-t pt-1 mt-1"><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('general')} onChange={() => handleTopicChange('general')}/>مکالمه عمومی</label><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('custom_scenario')} onChange={() => handleTopicChange('custom_scenario')}/>سناریوی سفارشی</label></div>
+              <div className={`relative group flex-1 ${voiceConversationMode ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <button className="w-full p-2 border rounded-lg text-sm text-left" disabled={voiceConversationMode}>انتخاب موضوع تمرین ({selectedTopics.includes('general') || selectedTopics.includes('custom_scenario') ? 1 : selectedTopics.length})</button>
+                  <div className={`${voiceConversationMode ? 'hidden' : 'hidden group-hover:block'} absolute z-10 bg-white shadow-lg rounded-lg p-2 w-full space-y-1`}>
+                      {Object.entries(kbCategories).map(([key, value]) => (<label key={key} className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="checkbox" checked={selectedTopics.includes(key)} onChange={() => handleTopicChange(key)} disabled={!knowledgeBase[key]?.length || voiceConversationMode}/>{value}</label>))}
+                      <div className="border-t pt-1 mt-1"><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('general')} onChange={() => handleTopicChange('general')} disabled={voiceConversationMode}/>مکالمه عمومی</label><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('custom_scenario')} onChange={() => handleTopicChange('custom_scenario')} disabled={voiceConversationMode}/>سناریوی سفارشی</label></div>
                   </div>
               </div>
           )}
