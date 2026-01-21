@@ -1217,6 +1217,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const recognitionRef = useRef(null);
   const [voiceConversationMode, setVoiceConversationMode] = useState(false);
   const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
+  const lastSavedHistoryLengthRef = useRef(0); // Track last saved history length to prevent sync loops
   const currentAudioRef = useRef(null);
   const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
 
@@ -1251,10 +1252,24 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     }
   }, []);
 
+  // Reset the saved history length ref when context changes
+  useEffect(() => {
+    lastSavedHistoryLengthRef.current = 0;
+  }, [context]);
+
   useEffect(() => {
     // Don't reset conversation during voice conversation mode
     if (voiceConversationModeRef.current) return;
-    if (!initialHistory || initialHistory.length === 0) {
+
+    if (initialHistory && initialHistory.length > 0) {
+        // Sync with initialHistory if it has more messages than what we last saved
+        // This handles the case when data is loaded from storage after component mounts
+        if (initialHistory.length > lastSavedHistoryLengthRef.current) {
+            setChatHistory(initialHistory);
+            lastSavedHistoryLengthRef.current = initialHistory.length;
+        }
+    } else {
+        // Start new conversation only if we don't have any history
         startNewConversation();
     }
   }, [context, lessonTitle, initialHistory]);
@@ -1266,6 +1281,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (archiveCurrent && chatHistory.length > 1) {
         const conversationTitle = chatHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
         const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: chatHistory }];
+        lastSavedHistoryLengthRef.current = 0;
         saveChatHistory(context, []); // Clear current history
         setData(prev => ({...prev, archivedConversations: newArchive}));
     }
@@ -1274,7 +1290,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (context.startsWith('lesson')) {
         initialText = `أهلاً فيك! خلينا نمرّن شوي على درس "${lessonTitle}". شو أول كلمة تعلمتها من هيدا الدرس؟`;
     }
-    setChatHistory([{ role: 'model', parts: [{ text: initialText, type: 'text' }] }]);
+    const newHistory = [{ role: 'model', parts: [{ text: initialText, type: 'text' }] }];
+    setChatHistory(newHistory);
+    lastSavedHistoryLengthRef.current = newHistory.length;
   };
 
   useEffect(() => { chatWindowRef.current?.scrollTo(0, chatWindowRef.current.scrollHeight); }, [chatHistory]);
@@ -1405,6 +1423,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         const newAiMessage = { role: 'model', parts: [{ text: aiResponseText, type: 'text', audioUrl }] };
         newHistory = [...newHistory, newAiMessage];
         setChatHistory(newHistory);
+        lastSavedHistoryLengthRef.current = newHistory.length;
         saveChatHistory(context, newHistory);
 
         // Play audio and handle voice conversation mode
@@ -1773,7 +1792,10 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         onClose={() => setIsLiveChatOpen(false)}
         chatHistory={chatHistory}
         setChatHistory={setChatHistory}
-        saveChatHistory={() => saveChatHistory(context, chatHistory)}
+        saveChatHistory={(newHistory) => {
+          lastSavedHistoryLengthRef.current = newHistory.length;
+          saveChatHistory(context, newHistory);
+        }}
         context={context}
         lessonTitle={lessonTitle}
         selectedTopics={selectedTopics}
@@ -2452,7 +2474,7 @@ ${conversationSummary}
       // If force close, skip analysis
       if (forceClose) {
         setChatHistory(newHistory);
-        saveChatHistory(context, newHistory);
+        saveChatHistory(newHistory);
         conversationRef.current = [];
         setIsClosing(false);
         onClose();
@@ -2470,7 +2492,7 @@ ${conversationSummary}
         };
         newHistory = [...newHistory, analyzingMsg];
         setChatHistory(newHistory);
-        saveChatHistory(context, newHistory);
+        saveChatHistory(newHistory);
 
         // Close UI now, analysis continues in background
         onClose();
@@ -2521,14 +2543,14 @@ ${conversationSummary}
         }
 
         setChatHistory(newHistory);
-        saveChatHistory(context, newHistory);
+        saveChatHistory(newHistory);
         conversationRef.current = [];
         setIsClosing(false);
         return;
       }
 
       setChatHistory(newHistory);
-      saveChatHistory(context, newHistory);
+      saveChatHistory(newHistory);
     }
 
     // Reset recording refs
