@@ -1217,6 +1217,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const recognitionRef = useRef(null);
   const [voiceConversationMode, setVoiceConversationMode] = useState(false);
   const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
+  const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
   const currentAudioRef = useRef(null);
   const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
 
@@ -1279,6 +1280,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
   useEffect(() => { chatWindowRef.current?.scrollTo(0, chatWindowRef.current.scrollHeight); }, [chatHistory]);
 
+  // Keep chatHistoryRef in sync with chatHistory state (for async callbacks)
+  useEffect(() => { chatHistoryRef.current = chatHistory; }, [chatHistory]);
+
   const handleTopicChange = (topicKey) => {
     startNewConversation(true);
     setSelectedTopics(prev => {
@@ -1314,7 +1318,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     // In voice conversation mode, always send audio; otherwise respect sendVoiceAs setting
     const messageType = audioBlobUrl && (voiceConversationMode || sendVoiceAs === 'audio') ? 'audio' : 'text';
     const newUserMessage = { role: 'user', parts: [{ text: fullMessage, type: messageType, audioUrl: audioBlobUrl }] };
-    let newHistory = [...chatHistory, newUserMessage];
+    // Use ref to get latest history (avoids stale closure in voice conversation mode)
+    let newHistory = [...chatHistoryRef.current, newUserMessage];
     setChatHistory(newHistory);
     setInput('');
     setAttachedFile(null);
