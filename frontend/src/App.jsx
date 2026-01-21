@@ -57,6 +57,9 @@ const initialData = {
     translationLanguage: 'none',
     aiResponseType: 'audio',
     sendVoiceAs: 'audio',
+    // Voice conversation mode settings
+    voiceConversationBeepDelay: 500, // ms - delay before beep after AI response
+    voiceConversationSilenceThreshold: 2000, // ms - silence duration to auto-send
   },
   archivedConversations: [],
 };
@@ -102,6 +105,40 @@ async function callGeminiTTS(fullPrompt, voiceName = "Kore") {
     console.error("Error with TTS API:", error);
     return null;
   }
+}
+
+// --- Beep Sound Utility ---
+// Creates a short beep sound using Web Audio API
+function playBeepSound(frequency = 800, duration = 150) {
+  return new Promise((resolve) => {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = frequency;
+      oscillator.type = 'sine';
+
+      // Fade in and out to avoid clicks
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration / 1000);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + duration / 1000);
+
+      oscillator.onended = () => {
+        audioContext.close();
+        resolve();
+      };
+    } catch (e) {
+      console.error('Beep sound error:', e);
+      resolve();
+    }
+  });
 }
 
 // --- Main App Component ---
@@ -513,6 +550,48 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
                     <div className="border-t pt-3"><label className="font-bold">سبک نوشتار:</label><select value={defaultChatSettings.writingStyle} onChange={e => handleSettingChange('writingStyle', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="simple_arabic">عربی ساده</option><option value="finglish">فینگلیش (Arabizi)</option><option value="tashkeel">عربی با اعراب</option></select></div>
                     <div className="border-t pt-3"><label className="font-bold">نمایش ترجمه:</label><select value={defaultChatSettings.translationLanguage} onChange={e => handleSettingChange('translationLanguage', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="none">بدون ترجمه</option><option value="persian">فارسی</option><option value="english">انگلیسی</option></select></div>
                     <div className="border-t pt-3"><label className="font-bold">پاسخ استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="receiveAs" value="audio" checked={defaultChatSettings.aiResponseType === 'audio'} onChange={() => handleSettingChange('aiResponseType', 'audio')} /> صدا</label><label><input type="radio" name="receiveAs" value="text" checked={defaultChatSettings.aiResponseType === 'text'} onChange={() => handleSettingChange('aiResponseType', 'text')} /> فقط متن</label></div></div>
+                </div>
+            </Card>
+
+            <Card title="⚙️ تنظیمات حالت مکالمه صوتی">
+                <div className="space-y-4 text-sm">
+                    <p className="text-slate-600 text-xs">این تنظیمات فقط روی حالت مکالمه صوتی (دکمه تلفن بنفش) اعمال میشن.</p>
+                    <div>
+                        <label className="font-bold">تاخیر قبل از بوق (میلی‌ثانیه):</label>
+                        <p className="text-xs text-slate-500 mb-1">بعد از پاسخ استاد، چند میلی‌ثانیه صبر کنه تا بوق بزنه</p>
+                        <input
+                            type="range"
+                            min="0"
+                            max="2000"
+                            step="100"
+                            value={defaultChatSettings.voiceConversationBeepDelay || 500}
+                            onChange={e => handleSettingChange('voiceConversationBeepDelay', parseInt(e.target.value))}
+                            className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-slate-400">
+                            <span>0</span>
+                            <span className="font-bold text-teal-600">{defaultChatSettings.voiceConversationBeepDelay || 500} ms</span>
+                            <span>2000</span>
+                        </div>
+                    </div>
+                    <div className="border-t pt-3">
+                        <label className="font-bold">آستانه سکوت برای ارسال (ثانیه):</label>
+                        <p className="text-xs text-slate-500 mb-1">اگر این مدت سکوت کنید، صدا خودکار ارسال میشه</p>
+                        <input
+                            type="range"
+                            min="1000"
+                            max="5000"
+                            step="500"
+                            value={defaultChatSettings.voiceConversationSilenceThreshold || 2000}
+                            onChange={e => handleSettingChange('voiceConversationSilenceThreshold', parseInt(e.target.value))}
+                            className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-slate-400">
+                            <span>1 ثانیه</span>
+                            <span className="font-bold text-teal-600">{(defaultChatSettings.voiceConversationSilenceThreshold || 2000) / 1000} ثانیه</span>
+                            <span>5 ثانیه</span>
+                        </div>
+                    </div>
                 </div>
             </Card>
 
@@ -1139,6 +1218,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const [voiceConversationMode, setVoiceConversationMode] = useState(false);
   const currentAudioRef = useRef(null);
   const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
+
+  // Silence detection refs for voice conversation mode
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const silenceCheckIntervalRef = useRef(null);
+  const streamRef = useRef(null);
+  const hasSpokenRef = useRef(false); // Track if user has spoken at all
   
   const [selectedTopics, setSelectedTopics] = useState(['general']);
   const [writingStyle, setWritingStyle] = useState(defaultChatSettings.writingStyle);
@@ -1318,19 +1405,28 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             const audio = new Audio(audioUrl);
             currentAudioRef.current = audio;
 
-            audio.onended = () => {
+            const beepDelay = defaultChatSettings.voiceConversationBeepDelay || 500;
+
+            audio.onended = async () => {
                 currentAudioRef.current = null;
                 // Auto-start recording if voice conversation mode is active
                 if (voiceConversationMode) {
-                    setTimeout(() => startVoiceRecording(), 500);
+                    // Wait for beep delay, then play beep, then start recording
+                    setTimeout(async () => {
+                        await playBeepSound(800, 150); // Play beep sound
+                        startVoiceRecording();
+                    }, beepDelay);
                 }
             };
 
-            audio.play().catch(err => {
+            audio.play().catch(async err => {
                 console.error('Audio playback error:', err);
                 // Still try to start recording if in voice conversation mode
                 if (voiceConversationMode) {
-                    setTimeout(() => startVoiceRecording(), 500);
+                    setTimeout(async () => {
+                        await playBeepSound(800, 150);
+                        startVoiceRecording();
+                    }, beepDelay);
                 }
             });
         }
@@ -1346,6 +1442,24 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     }
   };
 
+  // Cleanup silence detection resources
+  const cleanupSilenceDetection = () => {
+    if (silenceCheckIntervalRef.current) {
+      clearInterval(silenceCheckIntervalRef.current);
+      silenceCheckIntervalRef.current = null;
+    }
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    hasSpokenRef.current = false;
+  };
+
   // Start voice recording function (used by both manual click and voice conversation mode)
   const startVoiceRecording = async () => {
     if (isRecording || isLoading) return;
@@ -1358,6 +1472,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
       // Check supported mimeTypes
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
@@ -1367,6 +1482,58 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       mediaRecorderRef.current = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       audioChunksRef.current = [];
 
+      // Setup silence detection for voice conversation mode
+      const silenceThreshold = defaultChatSettings.voiceConversationSilenceThreshold || 2000;
+
+      if (voiceConversationMode) {
+        try {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          analyserRef.current = audioContextRef.current.createAnalyser();
+          const source = audioContextRef.current.createMediaStreamSource(stream);
+          source.connect(analyserRef.current);
+
+          analyserRef.current.fftSize = 256;
+          const bufferLength = analyserRef.current.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+
+          hasSpokenRef.current = false;
+          let silenceStart = null;
+
+          // Check audio level every 100ms
+          silenceCheckIntervalRef.current = setInterval(() => {
+            if (!analyserRef.current || !mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+              return;
+            }
+
+            analyserRef.current.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+
+            // Threshold for silence (adjust as needed, 10-15 is typical for silence)
+            const isSilent = average < 12;
+
+            if (!isSilent) {
+              // User is speaking
+              hasSpokenRef.current = true;
+              silenceStart = null;
+            } else if (hasSpokenRef.current) {
+              // User has spoken before and is now silent
+              if (!silenceStart) {
+                silenceStart = Date.now();
+              } else if (Date.now() - silenceStart >= silenceThreshold) {
+                // Silence threshold reached - auto stop recording
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                  mediaRecorderRef.current.stop();
+                  cleanupSilenceDetection();
+                }
+              }
+            }
+          }, 100);
+        } catch (silenceErr) {
+          console.error('Silence detection setup error:', silenceErr);
+          // Continue without silence detection if it fails
+        }
+      }
+
       mediaRecorderRef.current.ondataavailable = event => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
@@ -1374,7 +1541,13 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       };
 
       mediaRecorderRef.current.onstop = () => {
-        stream.getTracks().forEach(track => track.stop());
+        // Cleanup silence detection
+        cleanupSilenceDetection();
+
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
 
         if (audioChunksRef.current.length === 0) {
           if (!voiceConversationMode) {
@@ -1399,7 +1572,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
       mediaRecorderRef.current.onerror = (err) => {
         console.error('MediaRecorder error:', err);
-        stream.getTracks().forEach(track => track.stop());
+        cleanupSilenceDetection();
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
         setIsRecording(false);
         if (voiceConversationMode) {
           setVoiceConversationMode(false);
@@ -1411,6 +1588,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       setIsRecording(true);
     } catch (err) {
       console.error('Microphone error:', err);
+      cleanupSilenceDetection();
       if (voiceConversationMode) {
         setVoiceConversationMode(false);
       }
@@ -1435,6 +1613,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
   // Stop voice recording
   const stopVoiceRecording = () => {
+    cleanupSilenceDetection();
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -1445,6 +1624,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const toggleVoiceConversationMode = () => {
     if (voiceConversationMode) {
       // Turning off - stop any ongoing audio/recording
+      cleanupSilenceDetection();
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
@@ -1521,13 +1701,16 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         {voiceConversationMode && (
           <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-xl mb-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Phone size={20} className="animate-pulse" />
-              <span className="font-bold">حالت مکالمه صوتی فعال</span>
-              {isRecording && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال گوش دادن...</span>}
+              <MessageCircle size={20} className="animate-pulse" />
+              <span className="font-bold">حالت مکالمه صوتی</span>
+              {isRecording && <span className="text-sm bg-white/20 px-2 py-1 rounded-full animate-pulse flex items-center gap-1"><Mic size={14} /> صحبت کنید...</span>}
               {isLoading && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال پاسخگویی...</span>}
+              {!isRecording && !isLoading && currentAudioRef.current && <span className="text-sm bg-white/20 px-2 py-1 rounded-full flex items-center gap-1"><Volume2 size={14} /> استاد صحبت میکنه...</span>}
+              {!isRecording && !isLoading && !currentAudioRef.current && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">منتظر بوق...</span>}
             </div>
-            <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg">
+            <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-1" title="پایان مکالمه">
               <PhoneOff size={18} />
+              <span className="text-xs">پایان</span>
             </button>
           </div>
         )}
@@ -1544,9 +1727,10 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
               <button
                 onClick={toggleVoiceConversationMode}
                 className={`p-2 border rounded-xl flex items-center gap-1 ${voiceConversationMode ? 'bg-purple-500 text-white' : 'hover:bg-purple-100 text-purple-600 border-purple-300'}`}
-                title="حالت مکالمه صوتی"
+                title="حالت مکالمه صوتی (با تشخیص سکوت خودکار)"
               >
-                <Phone size={20}/>
+                <MessageCircle size={20}/>
+                <span className="text-xs font-bold hidden sm:inline">گفتگو</span>
               </button>
               <button
                 onClick={() => setIsLiveChatOpen(true)}
