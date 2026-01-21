@@ -1219,6 +1219,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
   const lastSavedHistoryLengthRef = useRef(0); // Track last saved history length to prevent sync loops
   const currentAudioRef = useRef(null);
+  const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for archiving
   const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
 
   // Silence detection refs for voice conversation mode
@@ -1257,6 +1258,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     lastSavedHistoryLengthRef.current = 0;
   }, [context]);
 
+  // Keep chatHistoryRef in sync with chatHistory state for archiving
+  useEffect(() => {
+    chatHistoryRef.current = chatHistory;
+  }, [chatHistory]);
+
   useEffect(() => {
     // Don't reset conversation during voice conversation mode
     if (voiceConversationModeRef.current) return;
@@ -1278,9 +1284,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     // Don't start new conversation during voice conversation mode
     if (voiceConversationModeRef.current) return;
 
-    if (archiveCurrent && chatHistory.length > 1) {
-        const conversationTitle = chatHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
-        const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: chatHistory }];
+    // Use ref to get the latest chatHistory to avoid stale closure issues
+    const currentHistory = chatHistoryRef.current;
+    if (archiveCurrent && currentHistory.length > 1) {
+        const conversationTitle = currentHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
+        const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: [...currentHistory] }];
         lastSavedHistoryLengthRef.current = 0;
         saveChatHistory(context, []); // Clear current history
         setData(prev => ({...prev, archivedConversations: newArchive}));
