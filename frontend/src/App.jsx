@@ -1305,7 +1305,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         fullMessage = `[User has attached a file named: ${attachedFile.name}]\n${messageText}`;
     }
 
-    const messageType = audioBlobUrl && sendVoiceAs === 'audio' ? 'audio' : 'text';
+    // In voice conversation mode, always send audio; otherwise respect sendVoiceAs setting
+    const messageType = audioBlobUrl && (voiceConversationMode || sendVoiceAs === 'audio') ? 'audio' : 'text';
     const newUserMessage = { role: 'user', parts: [{ text: fullMessage, type: messageType, audioUrl: audioBlobUrl }] };
     let newHistory = [...chatHistory, newUserMessage];
     setChatHistory(newHistory);
@@ -1461,7 +1462,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   };
 
   // Start voice recording function (used by both manual click and voice conversation mode)
-  const startVoiceRecording = async () => {
+  // useVoiceConversation parameter overrides the state check for immediate use when toggling
+  const startVoiceRecording = async (useVoiceConversation = false) => {
+    const isVoiceConvMode = useVoiceConversation || voiceConversationMode;
     if (isRecording || isLoading) return;
 
     // Check if getUserMedia is supported
@@ -1485,7 +1488,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       // Setup silence detection for voice conversation mode
       const silenceThreshold = defaultChatSettings.voiceConversationSilenceThreshold || 2000;
 
-      if (voiceConversationMode) {
+      if (isVoiceConvMode) {
         try {
           audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
           analyserRef.current = audioContextRef.current.createAnalyser();
@@ -1634,7 +1637,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     } else {
       // Turning on - start voice conversation mode and begin recording
       setVoiceConversationMode(true);
-      startVoiceRecording();
+      // Pass true to indicate voice conversation mode since state hasn't updated yet
+      startVoiceRecording(true);
     }
   };
 
