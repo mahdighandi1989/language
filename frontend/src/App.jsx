@@ -1252,12 +1252,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   }, []);
 
   useEffect(() => {
+    // Don't reset conversation during voice conversation mode
+    if (voiceConversationModeRef.current) return;
     if (!initialHistory || initialHistory.length === 0) {
         startNewConversation();
     }
   }, [context, lessonTitle, initialHistory]);
 
   const startNewConversation = (archiveCurrent = false) => {
+    // Don't start new conversation during voice conversation mode
+    if (voiceConversationModeRef.current) return;
+
     if (archiveCurrent && chatHistory.length > 1) {
         const conversationTitle = chatHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
         const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: chatHistory }];
@@ -1684,11 +1689,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       <div className="h-[calc(100vh-200px)] min-h-[400px] max-h-[700px] flex flex-col bg-slate-100 rounded-xl p-2 sm:p-3">
         <div className="flex justify-between items-center mb-2">
           {context === 'global' && (
-              <div className="relative group flex-1">
-                  <button className="w-full p-2 border rounded-lg text-sm text-left">انتخاب موضوع تمرین ({selectedTopics.includes('general') || selectedTopics.includes('custom_scenario') ? 1 : selectedTopics.length})</button>
-                  <div className="hidden group-hover:block absolute z-10 bg-white shadow-lg rounded-lg p-2 w-full space-y-1">
-                      {Object.entries(kbCategories).map(([key, value]) => (<label key={key} className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="checkbox" checked={selectedTopics.includes(key)} onChange={() => handleTopicChange(key)} disabled={!knowledgeBase[key]?.length}/>{value}</label>))}
-                      <div className="border-t pt-1 mt-1"><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('general')} onChange={() => handleTopicChange('general')}/>مکالمه عمومی</label><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('custom_scenario')} onChange={() => handleTopicChange('custom_scenario')}/>سناریوی سفارشی</label></div>
+              <div className={`relative group flex-1 ${voiceConversationMode ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <button className="w-full p-2 border rounded-lg text-sm text-left" disabled={voiceConversationMode}>انتخاب موضوع تمرین ({selectedTopics.includes('general') || selectedTopics.includes('custom_scenario') ? 1 : selectedTopics.length})</button>
+                  <div className={`${voiceConversationMode ? 'hidden' : 'hidden group-hover:block'} absolute z-10 bg-white shadow-lg rounded-lg p-2 w-full space-y-1`}>
+                      {Object.entries(kbCategories).map(([key, value]) => (<label key={key} className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="checkbox" checked={selectedTopics.includes(key)} onChange={() => handleTopicChange(key)} disabled={!knowledgeBase[key]?.length || voiceConversationMode}/>{value}</label>))}
+                      <div className="border-t pt-1 mt-1"><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('general')} onChange={() => handleTopicChange('general')} disabled={voiceConversationMode}/>مکالمه عمومی</label><label className="flex items-center gap-2 p-1 rounded hover:bg-slate-100"><input type="radio" name="topic-mode" checked={selectedTopics.includes('custom_scenario')} onChange={() => handleTopicChange('custom_scenario')} disabled={voiceConversationMode}/>سناریوی سفارشی</label></div>
                   </div>
               </div>
           )}
