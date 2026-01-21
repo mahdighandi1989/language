@@ -1216,6 +1216,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const [voiceConversationMode, setVoiceConversationMode] = useState(false);
+  const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
   const currentAudioRef = useRef(null);
   const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
 
@@ -1410,23 +1411,28 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
             audio.onended = async () => {
                 currentAudioRef.current = null;
-                // Auto-start recording if voice conversation mode is active
-                if (voiceConversationMode) {
+                // Auto-start recording if voice conversation mode is still active (use ref to avoid stale closure)
+                if (voiceConversationModeRef.current) {
                     // Wait for beep delay, then play beep, then start recording
                     setTimeout(async () => {
-                        await playBeepSound(800, 150); // Play beep sound
-                        startVoiceRecording();
+                        // Double-check ref before starting (user might have turned off mode during delay)
+                        if (voiceConversationModeRef.current) {
+                            await playBeepSound(800, 150); // Play beep sound
+                            startVoiceRecording(true); // Pass true for voice conversation mode
+                        }
                     }, beepDelay);
                 }
             };
 
             audio.play().catch(async err => {
                 console.error('Audio playback error:', err);
-                // Still try to start recording if in voice conversation mode
-                if (voiceConversationMode) {
+                // Still try to start recording if in voice conversation mode (use ref)
+                if (voiceConversationModeRef.current) {
                     setTimeout(async () => {
-                        await playBeepSound(800, 150);
-                        startVoiceRecording();
+                        if (voiceConversationModeRef.current) {
+                            await playBeepSound(800, 150);
+                            startVoiceRecording(true); // Pass true for voice conversation mode
+                        }
                     }, beepDelay);
                 }
             });
@@ -1436,6 +1442,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         setChatHistory(prev => [...prev, errorAiMessage]);
         // Stop voice conversation mode on error
         if (voiceConversationMode) {
+            voiceConversationModeRef.current = false;
             setVoiceConversationMode(false);
         }
     } finally {
@@ -1544,6 +1551,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       };
 
       mediaRecorderRef.current.onstop = () => {
+        // Important: Reset recording state first so next recording can start
+        setIsRecording(false);
+
         // Cleanup silence detection
         cleanupSilenceDetection();
 
@@ -1553,7 +1563,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
 
         if (audioChunksRef.current.length === 0) {
-          if (!voiceConversationMode) {
+          if (!voiceConversationModeRef.current) {
             setModalConfig({ title: "خطا", message: "صدایی ضبط نشد. لطفا دوباره تلاش کنید." });
           }
           return;
@@ -1562,7 +1572,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
-        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationMode) {
+        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationModeRef.current) {
           try {
             recognitionRef.current.start();
           } catch (err) {
@@ -1582,6 +1592,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
         setIsRecording(false);
         if (voiceConversationMode) {
+          voiceConversationModeRef.current = false;
           setVoiceConversationMode(false);
         }
         setModalConfig({ title: "خطای ضبط", message: "مشکلی در ضبط صدا پیش آمد." });
@@ -1593,6 +1604,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       console.error('Microphone error:', err);
       cleanupSilenceDetection();
       if (voiceConversationMode) {
+        voiceConversationModeRef.current = false;
         setVoiceConversationMode(false);
       }
 
@@ -1627,6 +1639,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const toggleVoiceConversationMode = () => {
     if (voiceConversationMode) {
       // Turning off - stop any ongoing audio/recording
+      voiceConversationModeRef.current = false;
       cleanupSilenceDetection();
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
@@ -1636,6 +1649,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       setVoiceConversationMode(false);
     } else {
       // Turning on - start voice conversation mode and begin recording
+      voiceConversationModeRef.current = true;
       setVoiceConversationMode(true);
       // Pass true to indicate voice conversation mode since state hasn't updated yet
       startVoiceRecording(true);
