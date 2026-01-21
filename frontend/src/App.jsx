@@ -222,7 +222,7 @@ export default function App() {
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             console.log("Data loaded from Firestore (shared)");
-            setData(prevData => ({...initialData, ...docSnap.data()}));
+            setData(prevData => ({...prevData, ...docSnap.data()}));
           } else {
             console.log("Creating initial document in Firestore");
             setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
@@ -2482,7 +2482,7 @@ ${conversationSummary}
       // If force close, skip analysis
       if (forceClose) {
         setChatHistory(newHistory);
-        saveChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
         conversationRef.current = [];
         setIsClosing(false);
         onClose();
@@ -2500,7 +2500,7 @@ ${conversationSummary}
         };
         newHistory = [...newHistory, analyzingMsg];
         setChatHistory(newHistory);
-        saveChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
 
         // Close UI now, analysis continues in background
         onClose();
@@ -2551,14 +2551,14 @@ ${conversationSummary}
         }
 
         setChatHistory(newHistory);
-        saveChatHistory(newHistory);
+        saveChatHistory(context, newHistory);
         conversationRef.current = [];
         setIsClosing(false);
         return;
       }
 
       setChatHistory(newHistory);
-      saveChatHistory(newHistory);
+      saveChatHistory(context, newHistory);
     }
 
     // Reset recording refs
