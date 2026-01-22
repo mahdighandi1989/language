@@ -12,7 +12,7 @@ dotenv.config();
 // Configure multer for memory storage (files stored in buffer)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per file
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB max per file (Gemini File API supports up to 2GB)
 });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -276,6 +276,134 @@ async function analyzeWithGemini(parts, systemPrompt) {
   return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
+// Helper: Upload large file to Gemini File API
+async function uploadToGeminiFileAPI(buffer, mimeType, displayName) {
+  console.log(`Uploading file to Gemini File API: ${displayName}, size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+
+  // Step 1: Start resumable upload
+  const startUploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`;
+
+  const startResponse = await fetch(startUploadUrl, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': buffer.length.toString(),
+      'X-Goog-Upload-Header-Content-Type': mimeType,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      file: { display_name: displayName }
+    })
+  });
+
+  if (!startResponse.ok) {
+    const error = await startResponse.text();
+    throw new Error(`Failed to start upload: ${error}`);
+  }
+
+  const uploadUrl = startResponse.headers.get('X-Goog-Upload-URL');
+  if (!uploadUrl) {
+    throw new Error('No upload URL received');
+  }
+
+  // Step 2: Upload the file data
+  console.log('Uploading file data...');
+  const uploadResponse = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Command': 'upload, finalize',
+      'X-Goog-Upload-Offset': '0',
+      'Content-Type': mimeType
+    },
+    body: buffer
+  });
+
+  if (!uploadResponse.ok) {
+    const error = await uploadResponse.text();
+    throw new Error(`Failed to upload file: ${error}`);
+  }
+
+  const fileInfo = await uploadResponse.json();
+  console.log('File uploaded successfully:', fileInfo.file?.name);
+
+  // Step 3: Wait for file to be processed
+  const fileName = fileInfo.file?.name;
+  if (!fileName) {
+    throw new Error('No file name in response');
+  }
+
+  // Poll for file state
+  let fileState = fileInfo.file?.state;
+  let attempts = 0;
+  const maxAttempts = 60; // Max 5 minutes (60 * 5 seconds)
+
+  while (fileState === 'PROCESSING' && attempts < maxAttempts) {
+    console.log(`File processing... (attempt ${attempts + 1})`);
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+    const statusResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_API_KEY}`
+    );
+
+    if (statusResponse.ok) {
+      const statusData = await statusResponse.json();
+      fileState = statusData.state;
+      console.log(`File state: ${fileState}`);
+    }
+    attempts++;
+  }
+
+  if (fileState !== 'ACTIVE') {
+    throw new Error(`File processing failed or timed out. State: ${fileState}`);
+  }
+
+  return fileName; // Returns something like "files/abc123"
+}
+
+// Helper: Analyze large file using Gemini File API
+async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt) {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  const payload = {
+    contents: [{
+      role: 'user',
+      parts: [
+        { text: prompt },
+        { file_data: { file_uri: `https://generativelanguage.googleapis.com/v1beta/${fileUri}` } }
+      ]
+    }],
+    systemInstruction: { parts: [{ text: systemPrompt }] }
+  };
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error: ${error}`);
+  }
+
+  const result = await response.json();
+  return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// Helper: Delete file from Gemini File API
+async function deleteGeminiFile(fileName) {
+  try {
+    await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_API_KEY}`,
+      { method: 'DELETE' }
+    );
+    console.log(`Deleted file: ${fileName}`);
+  } catch (err) {
+    console.error(`Failed to delete file ${fileName}:`, err);
+  }
+}
+
 // Helper: Extract text from PDF using pdf-parse
 async function extractPdfText(buffer) {
   try {
@@ -327,7 +455,7 @@ const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     console.error('Multer error:', err);
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'حجم فایل بیش از حد مجاز است (حداکثر 100MB)' });
+      return res.status(400).json({ error: 'حجم فایل بیش از حد مجاز است (حداکثر 500MB)' });
     }
     return res.status(400).json({ error: `خطای آپلود: ${err.message}` });
   }
@@ -431,33 +559,84 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
           }
 
         } else if (mimeType.startsWith('audio/')) {
-          // Analyze audio file
-          const result = await analyzeWithGemini([
-            { text: `این یک فایل صوتی به نام "${fileName}" است. لطفاً آن را رونویسی کن و سپس محتوا را تحلیل کن:` },
-            { inline_data: { mime_type: mimeType, data: base64Data } }
-          ], systemPrompt);
+          const audioSizeMB = fileBuffer.length / (1024 * 1024);
+          console.log(`Audio file: ${fileName}, size: ${audioSizeMB.toFixed(2)} MB`);
 
-          allAnalysisResults.push(result);
+          try {
+            let result;
 
-          // Store audio for embedding
-          mediaItems.push({
-            type: 'audio',
-            name: fileName,
-            mimeType: mimeType,
-            data: base64Data
-          });
+            if (audioSizeMB > 15) {
+              // For large audio files, use Gemini File API
+              console.log(`Using File API for large audio: ${fileName}`);
+              const uploadedFileName = await uploadToGeminiFileAPI(fileBuffer, mimeType, fileName);
+
+              try {
+                result = await analyzeWithGeminiFileAPI(
+                  uploadedFileName,
+                  `این یک فایل صوتی به نام "${fileName}" است. لطفاً آن را رونویسی کن و سپس محتوا را تحلیل کن:`,
+                  systemPrompt
+                );
+              } finally {
+                await deleteGeminiFile(uploadedFileName);
+              }
+            } else {
+              // For smaller audio, use inline data
+              result = await analyzeWithGemini([
+                { text: `این یک فایل صوتی به نام "${fileName}" است. لطفاً آن را رونویسی کن و سپس محتوا را تحلیل کن:` },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ], systemPrompt);
+            }
+
+            allAnalysisResults.push(result);
+
+            // Store audio for embedding (only if under 10MB)
+            if (audioSizeMB <= 10) {
+              mediaItems.push({
+                type: 'audio',
+                name: fileName,
+                mimeType: mimeType,
+                data: base64Data
+              });
+            }
+          } catch (audioError) {
+            console.error(`Audio analysis error for ${fileName}:`, audioError);
+            allAnalysisResults.push(`**خطا در تحلیل صوت "${fileName}":**\n${audioError.message}`);
+          }
 
         } else if (mimeType.startsWith('video/')) {
-          // For videos, we need to be careful about size - Gemini has limits
           const videoSizeMB = fileBuffer.length / (1024 * 1024);
           console.log(`Video file: ${fileName}, size: ${videoSizeMB.toFixed(2)} MB`);
 
-          if (videoSizeMB > 15) {
-            // For large videos, just note that it needs manual review
-            console.log(`Video too large for analysis: ${videoSizeMB.toFixed(2)} MB`);
-            allAnalysisResults.push(`**فایل ویدیویی "${fileName}":**\nاین ویدیو بزرگتر از حد مجاز برای تحلیل خودکار است (${videoSizeMB.toFixed(1)} MB). حداکثر حجم مجاز ۱۵ مگابایت است.`);
+          try {
+            let result;
 
-            // Still store for embedding if under 10MB
+            if (videoSizeMB > 15) {
+              // For large videos, use Gemini File API
+              console.log(`Using File API for large video: ${fileName}`);
+              const uploadedFileName = await uploadToGeminiFileAPI(fileBuffer, mimeType, fileName);
+
+              try {
+                result = await analyzeWithGeminiFileAPI(
+                  uploadedFileName,
+                  `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:`,
+                  systemPrompt
+                );
+              } finally {
+                // Clean up uploaded file
+                await deleteGeminiFile(uploadedFileName);
+              }
+            } else {
+              // For smaller videos, use inline data
+              console.log(`Analyzing video inline: ${fileName}`);
+              result = await analyzeWithGemini([
+                { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ], systemPrompt);
+            }
+
+            allAnalysisResults.push(result);
+
+            // Store video for embedding (only small ones for playback)
             if (videoSizeMB <= 10) {
               mediaItems.push({
                 type: 'video',
@@ -466,38 +645,18 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
                 data: base64Data
               });
             }
-          } else {
-            try {
-              console.log(`Analyzing video: ${fileName}`);
-              const result = await analyzeWithGemini([
-                { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
-                { inline_data: { mime_type: mimeType, data: base64Data } }
-              ], systemPrompt);
+          } catch (videoError) {
+            console.error(`Video analysis error for ${fileName}:`, videoError);
+            allAnalysisResults.push(`**خطا در تحلیل ویدیو "${fileName}":**\n${videoError.message}`);
 
-              allAnalysisResults.push(result);
-
-              // Store video for embedding (only small ones)
-              if (videoSizeMB <= 10) {
-                mediaItems.push({
-                  type: 'video',
-                  name: fileName,
-                  mimeType: mimeType,
-                  data: base64Data
-                });
-              }
-            } catch (videoError) {
-              console.error(`Video analysis error for ${fileName}:`, videoError);
-              allAnalysisResults.push(`**خطا در تحلیل ویدیو "${fileName}":**\n${videoError.message}\n\nتوصیه: فایل ویدیویی را به صوت تبدیل کنید یا حجم را کاهش دهید.`);
-
-              // Still store for embedding
-              if (videoSizeMB <= 10) {
-                mediaItems.push({
-                  type: 'video',
-                  name: fileName,
-                  mimeType: mimeType,
-                  data: base64Data
-                });
-              }
+            // Still store for embedding if small enough
+            if (videoSizeMB <= 10) {
+              mediaItems.push({
+                type: 'video',
+                name: fileName,
+                mimeType: mimeType,
+                data: base64Data
+              });
             }
           }
 
