@@ -793,7 +793,7 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson }) {
             </div>
             <div className="space-y-4">
                 {filteredAndSortedLessons.length > 0 ? filteredAndSortedLessons.map(lesson => (
-                    <LessonListItem key={lesson.id} lesson={lesson} navigateTo={navigateTo} deleteLesson={confirmDeleteLesson} editLesson={editLesson} />
+                    <LessonListItem key={lesson.id} lesson={lesson} navigateTo={navigateTo} deleteLesson={deleteLesson} editLesson={editLesson} />
                 )) : <p className="text-center text-slate-500 py-4">درسی یافت نشد.</p>}
             </div>
         </Card>
@@ -828,10 +828,30 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   const [flashcards, setFlashcards] = useState([]);
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [analyzedContent, setAnalyzedContent] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]); // Store actual files for upload
+  const [processingStatus, setProcessingStatus] = useState(''); // Show progress messages
 
   const handleFileChange = (event) => {
-      const newFiles = Array.from(event.target.files).map(file => ({ id: Date.now() + Math.random(), name: file.name, type: file.type }));
-      updateLesson(lesson.id, { files: [...(lesson.files || []), ...newFiles] });
+      const newFiles = Array.from(event.target.files);
+      // Store actual File objects for upload
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      // Also update lesson metadata for display
+      const fileMetadata = newFiles.map(file => ({
+        id: Date.now() + Math.random(),
+        name: file.name,
+        type: file.type,
+        size: file.size
+      }));
+      updateLesson(lesson.id, { files: [...(lesson.files || []), ...fileMetadata] });
+  };
+
+  const removeFile = (fileId) => {
+      updateLesson(lesson.id, { files: (lesson.files || []).filter(f => f.id !== fileId) });
+      // Also remove from uploadedFiles by name match
+      const fileToRemove = (lesson.files || []).find(f => f.id === fileId);
+      if (fileToRemove) {
+        setUploadedFiles(prev => prev.filter(f => f.name !== fileToRemove.name));
+      }
   };
   
   const addAnalyzedContentToLesson = async () => {
@@ -883,22 +903,65 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
 
   const handleAnalysis = async () => {
     const userInstructions = pastedText.trim();
-    let contentToAnalyze = userInstructions || (lesson.files && lesson.files.length > 0 ? lesson.files.map(f => `محتوای فایل ${f.name}: [محتوای شبیه‌سازی شده برای تحلیل]`).join('\n\n') : '');
-    if (!contentToAnalyze) {
+    const hasFiles = uploadedFiles.length > 0;
+    const hasText = userInstructions.length > 0;
+
+    if (!hasFiles && !hasText) {
         setModalConfig({ title: "محتوا خالی است", message: "لطفاً متنی را پیست کنید یا فایلی را برای تحلیل پیوست نمایید." });
         return;
     }
+
     setIsProcessing(true);
     setAnalyzedContent(null);
+    setProcessingStatus('در حال آماده‌سازی فایل‌ها...');
     addJournalEntry(`پردازش محتوا برای درس "${lesson.title}" شروع شد.`);
-    const systemPrompt = `You are an expert linguistic analyzer for a Persian-speaking student learning Lebanese Arabic. Proofread the text, then extract key information into these Persian Markdown sections: **لغات و اصطلاحات جدید:**, **نکات گرامری کلیدی:**, and **عبارات کاربردی:**. Prioritize user instructions: "${userInstructions}"`;
-    const payload = { contents: [{ parts: [{ text: `Content to Analyze:\n${contentToAnalyze}` }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+
     try {
-        setAnalyzedContent(await callGeminiAPI(payload));
+      // Use new backend API for file analysis
+      const formData = new FormData();
+
+      // Add files to FormData
+      for (const file of uploadedFiles) {
+        formData.append('files', file);
+        setProcessingStatus(`در حال آپلود ${file.name}...`);
+      }
+
+      // Add text content and instructions
+      formData.append('textContent', userInstructions);
+      formData.append('userInstructions', userInstructions);
+
+      setProcessingStatus('در حال تحلیل محتوا (ممکن است چند دقیقه طول بکشد)...');
+
+      const response = await fetch('/api/analyze-files', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'خطا در تحلیل');
+      }
+
+      const result = await response.json();
+
+      setAnalyzedContent(result.analysis);
+
+      // Store media items in lesson for embedding
+      if (result.mediaItems && result.mediaItems.length > 0) {
+        updateLesson(lesson.id, {
+          mediaItems: [...(lesson.mediaItems || []), ...result.mediaItems]
+        });
+      }
+
+      setProcessingStatus('');
+      setModalConfig({ title: "تحلیل کامل شد", message: `${result.processedFiles?.length || 0} فایل با موفقیت تحلیل شد.` });
+
     } catch (error) {
-        setModalConfig({ title: "خطای API", message: "خطا در تحلیل محتوا." });
+      console.error('Analysis error:', error);
+      setModalConfig({ title: "خطای تحلیل", message: error.message || "خطا در تحلیل محتوا." });
+      setProcessingStatus('');
     } finally {
-        setIsProcessing(false);
+      setIsProcessing(false);
     }
   };
 
@@ -920,10 +983,24 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   };
   
   const analysisButtonText = () => {
-      if (isProcessing) return 'در حال پردازش...';
+      if (isProcessing) return processingStatus || 'در حال پردازش...';
+      if (uploadedFiles.length > 0) return `✨ تحلیل ${uploadedFiles.length} فایل${pastedText.trim() ? ' و متن' : ''}`;
       if (pastedText.trim()) return '✨ تحلیل و تصحیح متن';
-      if (lesson.files && lesson.files.length > 0) return '✨ تحلیل فایل‌های پیوست شده';
       return 'تحلیل محتوا';
+  };
+
+  const formatFileSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const getFileIcon = (type) => {
+      if (type?.startsWith('audio/')) return '🎵';
+      if (type?.startsWith('video/')) return '🎬';
+      if (type?.startsWith('image/')) return '🖼️';
+      if (type === 'application/pdf') return '📄';
+      return '📎';
   };
 
   return (
@@ -933,13 +1010,34 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
            <Card title="افزودن و تحلیل محتوا">
-               <div className="p-6 border-dashed border-2 border-slate-300 rounded-xl text-center mb-4">
-                   <input type="file" multiple onChange={handleFileChange} id="file-upload" className="hidden" />
-                   <label htmlFor="file-upload" className="cursor-pointer text-teal-600 font-bold">برای آپلود فایل (صوت، ویدیو، متن) اینجا کلیک کنید</label>
+               <div className="p-6 border-dashed border-2 border-slate-300 rounded-xl text-center mb-4 hover:border-teal-500 transition-colors">
+                   <input type="file" multiple onChange={handleFileChange} id="file-upload" className="hidden" accept="audio/*,video/*,image/*,.pdf,.txt,.json" />
+                   <label htmlFor="file-upload" className="cursor-pointer">
+                     <span className="text-teal-600 font-bold block">برای آپلود فایل کلیک کنید</span>
+                     <span className="text-slate-500 text-sm block mt-1">صوت، ویدیو، تصویر، PDF، متن (تا 100MB)</span>
+                   </label>
                </div>
-               {(lesson.files || []).length > 0 && (<ul className="mb-4 space-y-2">{lesson.files.map(file => (<li key={file.id} className="flex items-center gap-2 p-2 bg-slate-100 rounded-lg"><FileText size={16} className="text-slate-500"/><span>{file.name}</span></li>))}</ul>)}
-               <textarea value={pastedText} onChange={(e) => setPastedText(e.target.value)} rows="4" className="w-full p-3 border rounded-xl mb-2" placeholder="متن/جزوه خود را برای تحلیل و تصحیح اینجا پیست کنید..."></textarea>
-               <button onClick={handleAnalysis} disabled={isProcessing || (!pastedText.trim() && (!lesson.files || lesson.files.length === 0))} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold"><Sparkles size={18} />{analysisButtonText()}</button>
+               {(lesson.files || []).length > 0 && (
+                 <ul className="mb-4 space-y-2">
+                   {lesson.files.map(file => (
+                     <li key={file.id} className="flex items-center justify-between p-3 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
+                       <div className="flex items-center gap-2">
+                         <span className="text-xl">{getFileIcon(file.type)}</span>
+                         <div>
+                           <span className="font-medium">{file.name}</span>
+                           {file.size && <span className="text-slate-500 text-sm mr-2">({formatFileSize(file.size)})</span>}
+                         </div>
+                       </div>
+                       <button onClick={() => removeFile(file.id)} className="p-1 hover:bg-red-100 rounded-full text-red-500" title="حذف فایل">
+                         <Trash2 size={16}/>
+                       </button>
+                     </li>
+                   ))}
+                 </ul>
+               )}
+               <textarea value={pastedText} onChange={(e) => setPastedText(e.target.value)} rows="4" className="w-full p-3 border rounded-xl mb-2" placeholder="متن/جزوه خود را برای تحلیل و تصحیح اینجا پیست کنید... (سیستم اشتباهات عربی لبنانی را تصحیح می‌کند)"></textarea>
+               {processingStatus && <div className="text-center text-teal-600 mb-2 flex items-center justify-center gap-2"><Loader className="animate-spin" size={16}/>{processingStatus}</div>}
+               <button onClick={handleAnalysis} disabled={isProcessing || (uploadedFiles.length === 0 && !pastedText.trim())} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold"><Sparkles size={18} />{analysisButtonText()}</button>
            </Card>
             {analyzedContent && (
                 <Card title="نتایج تحلیل">
@@ -955,6 +1053,30 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
                     {lesson.archivedNotes && lesson.archivedNotes.trim() ? <MarkdownRenderer text={lesson.archivedNotes} /> : <p className="text-slate-500 text-center py-4">هنوز نکته‌ای به این درس اضافه نشده است.</p>}
                 </div>
             </Card>
+            {(lesson.mediaItems || []).length > 0 && (
+              <Card title="رسانه‌های استخراج شده">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {lesson.mediaItems.map((item, index) => (
+                    <div key={index} className="border rounded-lg p-3 bg-slate-50">
+                      <p className="font-medium mb-2 text-sm text-slate-600">{item.name}</p>
+                      {item.type === 'audio' && (
+                        <audio controls className="w-full" src={`data:${item.mimeType};base64,${item.data}`}>
+                          مرورگر شما از پخش صوت پشتیبانی نمی‌کند.
+                        </audio>
+                      )}
+                      {item.type === 'video' && (
+                        <video controls className="w-full rounded" src={`data:${item.mimeType};base64,${item.data}`}>
+                          مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+                        </video>
+                      )}
+                      {item.type === 'image' && (
+                        <img src={`data:${item.mimeType};base64,${item.data}`} alt={item.name} className="w-full rounded" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
           <Card title="فلش‌کارت‌های هوشمند" actionButton={<button onClick={generateFlashcards} disabled={isGeneratingFlashcards || !lesson.archivedNotes?.trim()} className="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600 disabled:bg-slate-400 flex items-center gap-2"><Sparkles size={16}/>{isGeneratingFlashcards ? '...' : 'ایجاد فلش‌کارت'}</button>}>
             {isGeneratingFlashcards && <div className="text-center p-4"><Loader className="animate-spin inline-block" /></div>}
             {flashcards.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 gap-4">{flashcards.map((card, index) => <Flashcard key={index} term={card.term} definition={card.definition} />)}</div>) : <p className="text-slate-500 text-center py-4">برای ایجاد فلش‌کارت، ابتدا باید نکاتی به درس اضافه کنید.</p>}

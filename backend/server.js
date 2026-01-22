@@ -5,8 +5,15 @@ import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import multer from 'multer';
 
 dotenv.config();
+
+// Configure multer for memory storage (files stored in buffer)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per file
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -212,6 +219,386 @@ app.get('/api/test-gemini', async (req, res) => {
   } catch (error) {
     console.error('Test error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// FILE ANALYSIS API
+// ============================================
+
+// Helper: Split large content into chunks
+function splitIntoChunks(content, maxChunkSize = 30000) {
+  if (content.length <= maxChunkSize) return [content];
+
+  const chunks = [];
+  let remaining = content;
+
+  while (remaining.length > 0) {
+    // Try to split at a natural break point (newline, period, space)
+    let splitPoint = maxChunkSize;
+    if (remaining.length > maxChunkSize) {
+      const lastNewline = remaining.lastIndexOf('\n', maxChunkSize);
+      const lastPeriod = remaining.lastIndexOf('.', maxChunkSize);
+      const lastSpace = remaining.lastIndexOf(' ', maxChunkSize);
+
+      splitPoint = Math.max(lastNewline, lastPeriod, lastSpace);
+      if (splitPoint < maxChunkSize * 0.5) splitPoint = maxChunkSize; // No good break found
+    }
+
+    chunks.push(remaining.substring(0, splitPoint));
+    remaining = remaining.substring(splitPoint).trim();
+  }
+
+  return chunks;
+}
+
+// Helper: Analyze content with Gemini (text, audio, image, video)
+async function analyzeWithGemini(parts, systemPrompt) {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  const payload = {
+    contents: [{ role: 'user', parts }],
+    systemInstruction: { parts: [{ text: systemPrompt }] }
+  };
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Gemini API error: ${error}`);
+  }
+
+  const result = await response.json();
+  return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// Helper: Extract text from PDF using pdf-parse
+async function extractPdfText(buffer) {
+  try {
+    // Try to dynamically import pdf-parse
+    const pdfParse = (await import('pdf-parse')).default;
+    const data = await pdfParse(buffer);
+    return data.text;
+  } catch (error) {
+    console.error('PDF extraction error:', error);
+    // If pdf-parse is not installed or fails, return a message
+    if (error.code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('ماژول pdf-parse نصب نیست. لطفاً npm install pdf-parse را اجرا کنید.');
+    }
+    throw new Error('خطا در استخراج متن از PDF: ' + error.message);
+  }
+}
+
+// Lebanese Arabic correction prompt
+const LEBANESE_CORRECTION_PROMPT = `
+=== قواعد تصحیح عربی لبنانی ===
+هنگام تحلیل محتوا، اشتباهات رایج را بر اساس این قواعد تصحیح کن:
+
+1. تبدیل حروف لبنانی:
+   - قاف → همزه: قال=آل، قلب=ألب، قهوة=أهوة
+   - ثاء → ت یا س: ثلاثة=تلاتة، كثير=كتير
+   - ذال → د یا ز: هذا=هيدا، لذيذ=لزيز
+
+2. واژگان صحیح لبنانی:
+   - "ماذا" → "شو"
+   - "كيف حالك" → "كيفك"
+   - "الآن" → "هلأ/هلق"
+   - "جيد" → "منيح"
+   - "كثيراً" → "كتير"
+   - "لماذا" → "ليش"
+   - "أين" → "وين"
+   - "أريد" → "بدّي"
+   - "هذا/هذه" → "هيدا/هيدي"
+
+3. ساختار فعل لبنانی:
+   - مضارع مستمر: عم + فعل (عم بحكي)
+   - آینده: رح + فعل (رح روح)
+   - نفی: ما + فعل (ما بعرف)
+
+اگر در محتوا اشتباهی دیدی، آن را در بخش جداگانه‌ای با عنوان "**تصحیحات:**" ذکر کن.
+`;
+
+// Error handling middleware for multer
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err);
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'حجم فایل بیش از حد مجاز است (حداکثر 100MB)' });
+    }
+    return res.status(400).json({ error: `خطای آپلود: ${err.message}` });
+  }
+  next(err);
+};
+
+// Main file analysis endpoint
+app.post('/api/analyze-files', upload.array('files', 10), handleMulterError, async (req, res) => {
+  console.log('Received file analysis request');
+
+  if (!GEMINI_API_KEY) {
+    console.error('API key not configured');
+    return res.status(500).json({ error: 'API key not configured' });
+  }
+
+  try {
+    const files = req.files || [];
+    const textContent = req.body.textContent || '';
+    const userInstructions = req.body.userInstructions || '';
+
+    console.log(`Files received: ${files.length}, Text length: ${textContent.length}`);
+
+    if (files.length === 0 && !textContent.trim()) {
+      return res.status(400).json({ error: 'هیچ فایل یا متنی برای تحلیل ارسال نشده است' });
+    }
+
+    console.log(`Processing ${files.length} files and ${textContent.length} chars of text`);
+
+    // Collect all content parts for analysis
+    const allAnalysisResults = [];
+    const mediaItems = []; // For embedding in notes
+
+    // System prompt for analysis
+    const systemPrompt = `تو یک تحلیلگر زبان‌شناسی متخصص برای دانش‌آموز فارسی‌زبانی هستی که عربی لبنانی یاد می‌گیرد.
+
+وظیفه‌ات:
+1. محتوا را به دقت بررسی کن (متن، صوت، تصویر، ویدیو)
+2. اشتباهات عربی لبنانی را بر اساس قواعد زیر تصحیح کن
+3. نکات کلیدی را استخراج و دسته‌بندی کن
+
+${LEBANESE_CORRECTION_PROMPT}
+
+=== فرمت خروجی (به فارسی) ===
+
+**لغات و اصطلاحات جدید:**
+- [کلمه لبنانی]: [معنی فارسی]
+
+**نکات گرامری کلیدی:**
+- [توضیح قاعده]
+
+**عبارات کاربردی:**
+- [عبارت لبنانی]: [معنی فارسی]
+
+**تصحیحات:**
+- [اگر اشتباهی در محتوا بود، اینجا ذکر کن]
+
+${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''}`;
+
+    // Process each file
+    for (const file of files) {
+      const mimeType = file.mimetype;
+      const fileName = file.originalname;
+      const fileBuffer = file.buffer;
+      const base64Data = fileBuffer.toString('base64');
+
+      console.log(`Processing file: ${fileName}, type: ${mimeType}, size: ${fileBuffer.length} bytes`);
+
+      try {
+        if (mimeType === 'application/pdf') {
+          // Extract text from PDF
+          const pdfText = await extractPdfText(fileBuffer);
+
+          if (pdfText.length > 50000) {
+            // Chunk large PDFs
+            const chunks = splitIntoChunks(pdfText, 30000);
+            console.log(`PDF split into ${chunks.length} chunks`);
+
+            const chunkResults = [];
+            for (let i = 0; i < chunks.length; i++) {
+              console.log(`Analyzing PDF chunk ${i + 1}/${chunks.length}`);
+              const chunkResult = await analyzeWithGemini(
+                [{ text: `محتوای فایل PDF "${fileName}" (بخش ${i + 1} از ${chunks.length}):\n\n${chunks[i]}` }],
+                systemPrompt
+              );
+              chunkResults.push(chunkResult);
+            }
+
+            // Merge chunk results
+            const mergePrompt = `این نتایج تحلیل چند بخش از یک فایل است. آنها را ادغام کن و موارد تکراری را حذف کن. خروجی را به همان فرمت (لغات، گرامر، عبارات) ارائه بده:`;
+            const mergedResult = await analyzeWithGemini(
+              [{ text: mergePrompt + '\n\n' + chunkResults.join('\n\n---\n\n') }],
+              'محتوا را ادغام و خلاصه کن. به فارسی پاسخ بده.'
+            );
+            allAnalysisResults.push(mergedResult);
+          } else {
+            const result = await analyzeWithGemini(
+              [{ text: `محتوای فایل PDF "${fileName}":\n\n${pdfText}` }],
+              systemPrompt
+            );
+            allAnalysisResults.push(result);
+          }
+
+        } else if (mimeType.startsWith('audio/')) {
+          // Analyze audio file
+          const result = await analyzeWithGemini([
+            { text: `این یک فایل صوتی به نام "${fileName}" است. لطفاً آن را رونویسی کن و سپس محتوا را تحلیل کن:` },
+            { inline_data: { mime_type: mimeType, data: base64Data } }
+          ], systemPrompt);
+
+          allAnalysisResults.push(result);
+
+          // Store audio for embedding
+          mediaItems.push({
+            type: 'audio',
+            name: fileName,
+            mimeType: mimeType,
+            data: base64Data
+          });
+
+        } else if (mimeType.startsWith('video/')) {
+          // For videos, we need to be careful about size - Gemini has limits
+          const videoSizeMB = fileBuffer.length / (1024 * 1024);
+          console.log(`Video file: ${fileName}, size: ${videoSizeMB.toFixed(2)} MB`);
+
+          if (videoSizeMB > 15) {
+            // For large videos, just note that it needs manual review
+            console.log(`Video too large for analysis: ${videoSizeMB.toFixed(2)} MB`);
+            allAnalysisResults.push(`**فایل ویدیویی "${fileName}":**\nاین ویدیو بزرگتر از حد مجاز برای تحلیل خودکار است (${videoSizeMB.toFixed(1)} MB). حداکثر حجم مجاز ۱۵ مگابایت است.`);
+
+            // Still store for embedding if under 10MB
+            if (videoSizeMB <= 10) {
+              mediaItems.push({
+                type: 'video',
+                name: fileName,
+                mimeType: mimeType,
+                data: base64Data
+              });
+            }
+          } else {
+            try {
+              console.log(`Analyzing video: ${fileName}`);
+              const result = await analyzeWithGemini([
+                { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ], systemPrompt);
+
+              allAnalysisResults.push(result);
+
+              // Store video for embedding (only small ones)
+              if (videoSizeMB <= 10) {
+                mediaItems.push({
+                  type: 'video',
+                  name: fileName,
+                  mimeType: mimeType,
+                  data: base64Data
+                });
+              }
+            } catch (videoError) {
+              console.error(`Video analysis error for ${fileName}:`, videoError);
+              allAnalysisResults.push(`**خطا در تحلیل ویدیو "${fileName}":**\n${videoError.message}\n\nتوصیه: فایل ویدیویی را به صوت تبدیل کنید یا حجم را کاهش دهید.`);
+
+              // Still store for embedding
+              if (videoSizeMB <= 10) {
+                mediaItems.push({
+                  type: 'video',
+                  name: fileName,
+                  mimeType: mimeType,
+                  data: base64Data
+                });
+              }
+            }
+          }
+
+        } else if (mimeType.startsWith('image/')) {
+          // Analyze image
+          const result = await analyzeWithGemini([
+            { text: `این یک تصویر به نام "${fileName}" است. هر متن عربی/لبنانی که در تصویر می‌بینی را استخراج و تحلیل کن:` },
+            { inline_data: { mime_type: mimeType, data: base64Data } }
+          ], systemPrompt);
+
+          allAnalysisResults.push(result);
+
+          // Store image for embedding
+          mediaItems.push({
+            type: 'image',
+            name: fileName,
+            mimeType: mimeType,
+            data: base64Data
+          });
+
+        } else if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+          // Plain text files
+          const textFromFile = fileBuffer.toString('utf-8');
+          const result = await analyzeWithGemini(
+            [{ text: `محتوای فایل متنی "${fileName}":\n\n${textFromFile}` }],
+            systemPrompt
+          );
+          allAnalysisResults.push(result);
+
+        } else {
+          console.log(`Unsupported file type: ${mimeType}`);
+          allAnalysisResults.push(`**فایل "${fileName}":**\nنوع فایل پشتیبانی نمی‌شود (${mimeType}).`);
+        }
+
+      } catch (fileError) {
+        console.error(`Error processing file ${fileName}:`, fileError);
+        allAnalysisResults.push(`**خطا در پردازش "${fileName}":**\n${fileError.message}`);
+      }
+    }
+
+    // Process text content if provided
+    if (textContent.trim()) {
+      if (textContent.length > 50000) {
+        const chunks = splitIntoChunks(textContent, 30000);
+        console.log(`Text content split into ${chunks.length} chunks`);
+
+        const chunkResults = [];
+        for (let i = 0; i < chunks.length; i++) {
+          console.log(`Analyzing text chunk ${i + 1}/${chunks.length}`);
+          const chunkResult = await analyzeWithGemini(
+            [{ text: `متن برای تحلیل (بخش ${i + 1} از ${chunks.length}):\n\n${chunks[i]}` }],
+            systemPrompt
+          );
+          chunkResults.push(chunkResult);
+        }
+
+        // Merge results
+        const mergePrompt = `این نتایج تحلیل چند بخش از یک متن است. آنها را ادغام کن:`;
+        const mergedResult = await analyzeWithGemini(
+          [{ text: mergePrompt + '\n\n' + chunkResults.join('\n\n---\n\n') }],
+          'محتوا را ادغام کن. به فارسی پاسخ بده.'
+        );
+        allAnalysisResults.push(mergedResult);
+      } else {
+        const result = await analyzeWithGemini(
+          [{ text: `متن برای تحلیل:\n\n${textContent}` }],
+          systemPrompt
+        );
+        allAnalysisResults.push(result);
+      }
+    }
+
+    // Combine all results
+    let finalAnalysis = allAnalysisResults.join('\n\n---\n\n');
+
+    // If multiple sources, create a final merged summary
+    if (allAnalysisResults.length > 1) {
+      console.log('Merging multiple analysis results');
+      const mergePrompt = `این نتایج تحلیل از چندین منبع مختلف است. لطفاً آنها را در یک خروجی منظم ادغام کن، موارد تکراری را حذف کن، و ساختار نهایی را به این فرمت ارائه بده:
+
+**لغات و اصطلاحات جدید:**
+**نکات گرامری کلیدی:**
+**عبارات کاربردی:**
+**تصحیحات:**`;
+
+      finalAnalysis = await analyzeWithGemini(
+        [{ text: mergePrompt + '\n\n' + finalAnalysis }],
+        'محتوا را ادغام و سازماندهی کن. به فارسی پاسخ بده.'
+      );
+    }
+
+    res.json({
+      success: true,
+      analysis: finalAnalysis,
+      mediaItems: mediaItems, // Return media for embedding in lesson
+      processedFiles: files.map(f => f.originalname)
+    });
+
+  } catch (error) {
+    console.error('File analysis error:', error);
+    res.status(500).json({ error: `خطا در تحلیل: ${error.message}` });
   }
 });
 
