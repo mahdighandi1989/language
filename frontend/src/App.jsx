@@ -1014,7 +1014,7 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
                    <input type="file" multiple onChange={handleFileChange} id="file-upload" className="hidden" accept="audio/*,video/*,image/*,.pdf,.txt,.json" />
                    <label htmlFor="file-upload" className="cursor-pointer">
                      <span className="text-teal-600 font-bold block">برای آپلود فایل کلیک کنید</span>
-                     <span className="text-slate-500 text-sm block mt-1">صوت، ویدیو، تصویر، PDF، متن (تا 100MB)</span>
+                     <span className="text-slate-500 text-sm block mt-1">صوت، ویدیو، تصویر، PDF، متن (تا 500MB)</span>
                    </label>
                </div>
                {(lesson.files || []).length > 0 && (
