@@ -279,12 +279,17 @@ async function analyzeWithGemini(parts, systemPrompt) {
 // Helper: Extract text from PDF using pdf-parse
 async function extractPdfText(buffer) {
   try {
+    // Try to dynamically import pdf-parse
     const pdfParse = (await import('pdf-parse')).default;
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {
     console.error('PDF extraction error:', error);
-    throw new Error('خطا در استخراج متن از PDF');
+    // If pdf-parse is not installed or fails, return a message
+    if (error.code === 'ERR_MODULE_NOT_FOUND') {
+      throw new Error('ماژول pdf-parse نصب نیست. لطفاً npm install pdf-parse را اجرا کنید.');
+    }
+    throw new Error('خطا در استخراج متن از PDF: ' + error.message);
   }
 }
 
@@ -317,9 +322,24 @@ const LEBANESE_CORRECTION_PROMPT = `
 اگر در محتوا اشتباهی دیدی، آن را در بخش جداگانه‌ای با عنوان "**تصحیحات:**" ذکر کن.
 `;
 
+// Error handling middleware for multer
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('Multer error:', err);
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'حجم فایل بیش از حد مجاز است (حداکثر 100MB)' });
+    }
+    return res.status(400).json({ error: `خطای آپلود: ${err.message}` });
+  }
+  next(err);
+};
+
 // Main file analysis endpoint
-app.post('/api/analyze-files', upload.array('files', 10), async (req, res) => {
+app.post('/api/analyze-files', upload.array('files', 10), handleMulterError, async (req, res) => {
+  console.log('Received file analysis request');
+
   if (!GEMINI_API_KEY) {
+    console.error('API key not configured');
     return res.status(500).json({ error: 'API key not configured' });
   }
 
@@ -327,6 +347,8 @@ app.post('/api/analyze-files', upload.array('files', 10), async (req, res) => {
     const files = req.files || [];
     const textContent = req.body.textContent || '';
     const userInstructions = req.body.userInstructions || '';
+
+    console.log(`Files received: ${files.length}, Text length: ${textContent.length}`);
 
     if (files.length === 0 && !textContent.trim()) {
       return res.status(400).json({ error: 'هیچ فایل یا متنی برای تحلیل ارسال نشده است' });
@@ -426,21 +448,16 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
           });
 
         } else if (mimeType.startsWith('video/')) {
-          // For videos, we need to be careful about size
+          // For videos, we need to be careful about size - Gemini has limits
           const videoSizeMB = fileBuffer.length / (1024 * 1024);
+          console.log(`Video file: ${fileName}, size: ${videoSizeMB.toFixed(2)} MB`);
 
-          if (videoSizeMB > 20) {
+          if (videoSizeMB > 15) {
             // For large videos, just note that it needs manual review
-            allAnalysisResults.push(`**فایل ویدیویی "${fileName}":**\nاین ویدیو بزرگتر از حد مجاز برای تحلیل خودکار است (${videoSizeMB.toFixed(1)} MB). لطفاً به صورت دستی بررسی شود.`);
-          } else {
-            const result = await analyzeWithGemini([
-              { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
-              { inline_data: { mime_type: mimeType, data: base64Data } }
-            ], systemPrompt);
+            console.log(`Video too large for analysis: ${videoSizeMB.toFixed(2)} MB`);
+            allAnalysisResults.push(`**فایل ویدیویی "${fileName}":**\nاین ویدیو بزرگتر از حد مجاز برای تحلیل خودکار است (${videoSizeMB.toFixed(1)} MB). حداکثر حجم مجاز ۱۵ مگابایت است.`);
 
-            allAnalysisResults.push(result);
-
-            // Store video for embedding (only small ones)
+            // Still store for embedding if under 10MB
             if (videoSizeMB <= 10) {
               mediaItems.push({
                 type: 'video',
@@ -448,6 +465,39 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
                 mimeType: mimeType,
                 data: base64Data
               });
+            }
+          } else {
+            try {
+              console.log(`Analyzing video: ${fileName}`);
+              const result = await analyzeWithGemini([
+                { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
+                { inline_data: { mime_type: mimeType, data: base64Data } }
+              ], systemPrompt);
+
+              allAnalysisResults.push(result);
+
+              // Store video for embedding (only small ones)
+              if (videoSizeMB <= 10) {
+                mediaItems.push({
+                  type: 'video',
+                  name: fileName,
+                  mimeType: mimeType,
+                  data: base64Data
+                });
+              }
+            } catch (videoError) {
+              console.error(`Video analysis error for ${fileName}:`, videoError);
+              allAnalysisResults.push(`**خطا در تحلیل ویدیو "${fileName}":**\n${videoError.message}\n\nتوصیه: فایل ویدیویی را به صوت تبدیل کنید یا حجم را کاهش دهید.`);
+
+              // Still store for embedding
+              if (videoSizeMB <= 10) {
+                mediaItems.push({
+                  type: 'video',
+                  name: fileName,
+                  mimeType: mimeType,
+                  data: base64Data
+                });
+              }
             }
           }
 
