@@ -692,10 +692,10 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
                 const useExtendedModel = fileSizeMB > 50;
                 console.log(`Video size: ${fileSizeMB.toFixed(0)}MB, using ${useExtendedModel ? 'gemini-2.0-flash-exp (extended)' : 'gemini-2.0-flash'} model`);
 
-                // Try with multiple models if needed
+                // Try with multiple models if needed - start with 2.5 Pro for best results
                 const modelsToTry = useExtendedModel
-                  ? ['gemini-2.0-flash-exp', 'gemini-exp-1206', 'gemini-1.5-pro']
-                  : ['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-exp-1206'];
+                  ? ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash-exp']
+                  : ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
 
                 let lastError = null;
                 for (const modelName of modelsToTry) {
