@@ -922,12 +922,50 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
 
       let mergedNotes = analyzedContent;
       if (lesson.archivedNotes && lesson.archivedNotes.trim().length > 0) {
-          const systemPrompt = `You are a text editor. Intelligently merge the following "Old Notes" and "New Content" about Lebanese Arabic. Combine related topics, remove redundancies, and structure the final text logically with clear Markdown headings. The final output must be in Persian.\n\n**Old Notes:**\n${lesson.archivedNotes}\n\n**New Content:**\n${analyzedContent}`;
+          const systemPrompt = `تو یک ویراستار متخصص هستی که جزوات آموزشی عربی لبنانی را ادغام می‌کنی.
+
+⚠️ قوانین حیاتی:
+1. **هرگز محتوای قبلی را حذف نکن** - همه لغات، عبارات و نکات قبلی باید کامل حفظ شوند
+2. فقط موارد **کاملاً یکسان** (کلمه به کلمه) را تکراری در نظر بگیر، نه موارد مشابه
+3. اگر یک لغت با معانی یا مثال‌های مختلف وجود دارد، همه را نگه دار
+4. محتوای جدید را به بخش‌های مربوطه اضافه کن
+
+📋 ساختار خروجی نهایی:
+
+---
+## 📚 لغات و واژگان
+| کلمه لبنانی | تلفظ | معنی فارسی | مثال |
+|------------|------|-----------|------|
+| [کلمه] | [تلفظ] | [معنی] | [مثال در جمله] |
+
+## 💬 عبارات و اصطلاحات
+- **[عبارت لبنانی]** → [معنی فارسی]
+  - 💡 کاربرد: [توضیح]
+
+## 📝 نکات گرامری
+### 🔹 [عنوان نکته]
+- توضیح: [توضیح کامل]
+- مثال: [مثال]
+
+## ✏️ تصحیحات رایج
+- ✅ [جمله صحیح لبنانی] ~~❌ [جمله غلط/فصیح]~~
+
+## 📌 نکات فرهنگی و مهم
+- [نکته]
+---
+
+📁 **جزوه قبلی (همه محتوا باید حفظ شود):**
+${lesson.archivedNotes}
+
+📥 **محتوای جدید برای افزودن:**
+${analyzedContent}
+
+⚡ خروجی نهایی باید شامل 100% موارد قبلی + موارد جدید باشد. زبان: فارسی (با عبارات عربی در جدول‌ها).`;
           try {
               mergedNotes = await callGeminiAPI({ contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } });
           } catch (error) {
               console.error("Failed to merge notes:", error);
-              mergedNotes = lesson.archivedNotes + "\n\n--- نکات استخراج شده جدید ---\n" + analyzedContent;
+              mergedNotes = lesson.archivedNotes + "\n\n---\n## 📥 محتوای جدید\n---\n\n" + analyzedContent;
               setModalConfig({ title: "خطای ادغام", message: "ادغام هوشمند ناموفق بود. محتوای جدید به انتهای نکات اضافه شد." });
           }
       }
