@@ -8,8 +8,13 @@ import { WebSocketServer, WebSocket } from 'ws';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
 
 dotenv.config();
+
+// Set ffmpeg path
+ffmpeg.setFfmpegPath(ffmpegStatic);
 
 // Configure multer for disk storage (for large files)
 const uploadDir = join(os.tmpdir(), 'lebanese-uploads');
@@ -436,6 +441,126 @@ async function deleteGeminiFile(fileName) {
   }
 }
 
+// Helper: Get video duration using ffmpeg
+function getVideoDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, metadata) => {
+      if (err) reject(err);
+      else resolve(metadata.format.duration);
+    });
+  });
+}
+
+// Helper: Split video into segments
+async function splitVideoIntoSegments(inputPath, outputDir, segmentDuration = 300) {
+  // segmentDuration in seconds (default 5 minutes = 300 seconds)
+  const duration = await getVideoDuration(inputPath);
+  const segmentCount = Math.ceil(duration / segmentDuration);
+
+  console.log(`Video duration: ${duration}s, splitting into ${segmentCount} segments of ${segmentDuration}s each`);
+
+  const segments = [];
+
+  for (let i = 0; i < segmentCount; i++) {
+    const startTime = i * segmentDuration;
+    const segmentPath = join(outputDir, `segment_${i}.mp4`);
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .setStartTime(startTime)
+        .setDuration(segmentDuration)
+        .output(segmentPath)
+        .outputOptions([
+          '-c:v libx264',      // Re-encode video
+          '-crf 28',           // Lower quality for smaller size
+          '-preset fast',      // Fast encoding
+          '-c:a aac',          // Audio codec
+          '-b:a 64k',          // Lower audio bitrate
+          '-vf scale=-2:480',  // Scale to 480p (keeps aspect ratio)
+          '-movflags +faststart'
+        ])
+        .on('end', () => {
+          console.log(`Segment ${i + 1}/${segmentCount} created: ${segmentPath}`);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error(`Error creating segment ${i}:`, err);
+          reject(err);
+        })
+        .run();
+    });
+
+    segments.push({
+      path: segmentPath,
+      startTime: startTime,
+      index: i
+    });
+  }
+
+  return segments;
+}
+
+// Helper: Extract audio only from video (much smaller file size)
+async function extractAudioFromVideo(inputPath, outputDir) {
+  const audioPath = join(outputDir, 'audio_only.mp3');
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .output(audioPath)
+      .outputOptions([
+        '-vn',           // No video
+        '-acodec mp3',   // MP3 codec
+        '-ab 64k',       // 64kbps bitrate
+        '-ar 22050'      // 22kHz sample rate
+      ])
+      .on('end', () => {
+        console.log(`Audio extracted: ${audioPath}`);
+        resolve();
+      })
+      .on('error', (err) => {
+        console.error('Error extracting audio:', err);
+        reject(err);
+      })
+      .run();
+  });
+
+  return audioPath;
+}
+
+// Helper: Extract key frames from video (for visual content)
+async function extractKeyFrames(inputPath, outputDir, interval = 30) {
+  // Extract one frame every 'interval' seconds
+  const framesDir = join(outputDir, 'frames');
+  if (!fs.existsSync(framesDir)) {
+    fs.mkdirSync(framesDir, { recursive: true });
+  }
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .output(join(framesDir, 'frame_%04d.jpg'))
+      .outputOptions([
+        `-vf fps=1/${interval}`,  // One frame per interval seconds
+        '-q:v 5'                   // JPEG quality (1-31, lower is better)
+      ])
+      .on('end', () => {
+        console.log(`Key frames extracted to: ${framesDir}`);
+        resolve();
+      })
+      .on('error', (err) => {
+        console.error('Error extracting frames:', err);
+        reject(err);
+      })
+      .run();
+  });
+
+  // Get list of extracted frames
+  const frames = fs.readdirSync(framesDir)
+    .filter(f => f.endsWith('.jpg'))
+    .map(f => join(framesDir, f));
+
+  return frames;
+}
+
 // Helper: Extract text from PDF using pdf-parse
 async function extractPdfText(buffer) {
   try {
@@ -682,61 +807,120 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
           try {
             let result;
 
-            if (isLargeFile) {
-              // For large videos, use Gemini File API with streaming
-              console.log(`Using File API for large video: ${fileName}`);
+            // For very large videos (>50MB), use chunked processing
+            if (fileSizeMB > 50) {
+              console.log(`Large video detected (${fileSizeMB.toFixed(0)}MB). Using chunked processing with ffmpeg...`);
+
+              // Create temp directory for video processing
+              const videoTempDir = join(uploadDir, `video_${Date.now()}`);
+              fs.mkdirSync(videoTempDir, { recursive: true });
+
+              try {
+                // Strategy: Extract audio + key frames for analysis
+                // This is more efficient than splitting video into segments
+
+                console.log('Step 1: Extracting audio from video...');
+                const audioPath = await extractAudioFromVideo(filePath, videoTempDir);
+                const audioSize = fs.statSync(audioPath).size / (1024 * 1024);
+                console.log(`Audio extracted: ${audioSize.toFixed(2)} MB`);
+
+                console.log('Step 2: Extracting key frames (every 15 seconds)...');
+                const framePaths = await extractKeyFrames(filePath, videoTempDir, 15);
+                console.log(`Extracted ${framePaths.length} key frames`);
+
+                // Step 3: Analyze audio
+                console.log('Step 3: Analyzing audio content...');
+                let audioResult = '';
+                const uploadedAudioFile = await uploadToGeminiFileAPI(audioPath, 'audio/mp3', `${fileName}_audio.mp3`);
+                try {
+                  audioResult = await analyzeWithGeminiFileAPIWithModel(
+                    uploadedAudioFile,
+                    `این فایل صوتی استخراج شده از یک ویدیوی آموزشی عربی لبنانی است.
+لطفاً تمام گفتار را رونویسی کن و نکات آموزشی را استخراج کن.
+اگر اشتباهی در تلفظ یا گرامر وجود دارد، تصحیح کن.`,
+                    systemPrompt,
+                    'gemini-2.0-flash'
+                  );
+                } finally {
+                  await deleteGeminiFile(uploadedAudioFile);
+                }
+                console.log('Audio analysis complete');
+
+                // Step 4: Analyze key frames in batches
+                console.log('Step 4: Analyzing key frames for visual content...');
+                const frameResults = [];
+                const batchSize = 10; // Process 10 frames at a time
+
+                for (let i = 0; i < framePaths.length; i += batchSize) {
+                  const batch = framePaths.slice(i, i + batchSize);
+                  console.log(`Analyzing frames ${i + 1} to ${Math.min(i + batchSize, framePaths.length)}...`);
+
+                  // Build parts array with multiple images
+                  const parts = [
+                    { text: `این ${batch.length} فریم از ویدیوی آموزشی "${fileName}" است (فریم‌های ${i + 1} تا ${Math.min(i + batchSize, framePaths.length)} از ${framePaths.length}).
+هر متن عربی/لبنانی که در این فریم‌ها می‌بینی را استخراج کن. اگر اسلاید، تخته، یا زیرنویس هست، محتوایش را بنویس.` }
+                  ];
+
+                  for (const framePath of batch) {
+                    const frameData = fs.readFileSync(framePath).toString('base64');
+                    parts.push({ inline_data: { mime_type: 'image/jpeg', data: frameData } });
+                  }
+
+                  try {
+                    const frameResult = await analyzeWithGemini(parts,
+                      'فقط متن‌های قابل مشاهده در تصاویر را استخراج کن. به فارسی پاسخ بده.');
+                    if (frameResult && !frameResult.includes('متنی یافت نشد') && !frameResult.includes('هیچ متنی')) {
+                      frameResults.push(frameResult);
+                    }
+                  } catch (frameErr) {
+                    console.log(`Frame batch ${i} error:`, frameErr.message);
+                  }
+                }
+                console.log(`Frame analysis complete. Found content in ${frameResults.length} batches`);
+
+                // Step 5: Merge audio and frame results
+                console.log('Step 5: Merging results...');
+                const mergeContent = `
+**نتایج تحلیل صوت:**
+${audioResult}
+
+**نتایج تحلیل فریم‌های آموزشی:**
+${frameResults.length > 0 ? frameResults.join('\n\n---\n\n') : 'متن قابل مشاهده‌ای در فریم‌ها یافت نشد.'}
+`;
+
+                result = await analyzeWithGemini(
+                  [{ text: `لطفاً این نتایج تحلیل ویدیوی "${fileName}" را ادغام و سازماندهی کن:\n${mergeContent}` }],
+                  systemPrompt
+                );
+
+              } finally {
+                // Cleanup temp directory
+                try {
+                  fs.rmSync(videoTempDir, { recursive: true, force: true });
+                  console.log(`Cleaned up video temp directory: ${videoTempDir}`);
+                } catch (cleanErr) {
+                  console.error('Error cleaning up video temp:', cleanErr);
+                }
+              }
+
+            } else if (isLargeFile) {
+              // For medium videos (15-50MB), try direct upload first
+              console.log(`Using File API for video: ${fileName}`);
               const uploadedFileName = await uploadToGeminiFileAPI(filePath, mimeType, fileName, fileSize);
 
               try {
-                // For videos > 50MB, use extended model from the start
-                const useExtendedModel = fileSizeMB > 50;
-                console.log(`Video size: ${fileSizeMB.toFixed(0)}MB, using ${useExtendedModel ? 'gemini-2.0-flash-exp (extended)' : 'gemini-2.0-flash'} model`);
-
-                // Try with multiple models if needed - start with 2.5 Pro for best results
-                const modelsToTry = useExtendedModel
-                  ? ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash-exp']
-                  : ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'];
-
-                let lastError = null;
-                for (const modelName of modelsToTry) {
-                  try {
-                    console.log(`Trying model: ${modelName}`);
-                    result = await analyzeWithGeminiFileAPIWithModel(
-                      uploadedFileName,
-                      smartVideoPrompt,
-                      systemPrompt,
-                      modelName
-                    );
-                    break; // Success, exit loop
-                  } catch (modelError) {
-                    console.log(`Model ${modelName} failed: ${modelError.message}`);
-                    lastError = modelError;
-
-                    // If it's not a token limit error, don't try other models
-                    if (!modelError.message.includes('token count') &&
-                        !modelError.message.includes('INVALID_ARGUMENT') &&
-                        !modelError.message.includes('not found')) {
-                      throw modelError;
-                    }
-                  }
-                }
-
-                if (!result && lastError) {
-                  throw new Error(`ویدیو "${fileName}" برای تمام مدل‌ها بزرگ است (${fileSizeMB.toFixed(0)} MB).
-
-راه‌حل‌ها:
-۱. ویدیو را به بخش‌های ۱۰-۱۵ دقیقه‌ای تقسیم کنید
-۲. کیفیت ویدیو را کاهش دهید (720p کافی است)
-۳. فایل صوتی را جدا استخراج کنید
-
-خطای آخر: ${lastError.message}`);
-                }
+                result = await analyzeWithGeminiFileAPIWithModel(
+                  uploadedFileName,
+                  smartVideoPrompt,
+                  systemPrompt,
+                  'gemini-2.0-flash'
+                );
               } finally {
-                // Clean up uploaded file
                 await deleteGeminiFile(uploadedFileName);
               }
+
             } else {
-              // For smaller videos, use inline data
+              // For smaller videos (<15MB), use inline data
               console.log(`Analyzing video inline: ${fileName}`);
               result = await analyzeWithGemini([
                 { text: smartVideoPrompt },
