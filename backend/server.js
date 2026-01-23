@@ -386,12 +386,10 @@ async function uploadToGeminiFileAPI(filePathOrBuffer, mimeType, displayName, fi
   return fileName; // Returns something like "files/abc123"
 }
 
-// Helper: Analyze large file using Gemini File API
-// useProModel: use gemini-1.5-pro for larger context window (2M tokens)
-async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useProModel = false) {
-  const model = useProModel ? 'gemini-1.5-pro' : 'gemini-2.0-flash';
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-  console.log(`Using model: ${model} for file analysis`);
+// Helper: Analyze large file using Gemini File API with specific model
+async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemPrompt, modelName) {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+  console.log(`Using model: ${modelName} for file analysis`);
 
   const payload = {
     contents: [{
@@ -417,6 +415,12 @@ async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useProMod
 
   const result = await response.json();
   return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// Helper: Analyze large file using Gemini File API (default model selection)
+async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useExtendedModel = false) {
+  const model = useExtendedModel ? 'gemini-2.0-flash-exp' : 'gemini-2.0-flash';
+  return analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemPrompt, model);
 }
 
 // Helper: Delete file from Gemini File API
@@ -684,41 +688,48 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
               const uploadedFileName = await uploadToGeminiFileAPI(filePath, mimeType, fileName, fileSize);
 
               try {
-                // For videos > 50MB, ALWAYS use Pro model (2M tokens) from the start
-                const useProModel = fileSizeMB > 50;
-                console.log(`Video size: ${fileSizeMB.toFixed(0)}MB, using ${useProModel ? 'Pro (2M tokens)' : 'Flash (1M tokens)'} model`);
+                // For videos > 50MB, use extended model from the start
+                const useExtendedModel = fileSizeMB > 50;
+                console.log(`Video size: ${fileSizeMB.toFixed(0)}MB, using ${useExtendedModel ? 'gemini-2.0-flash-exp (extended)' : 'gemini-2.0-flash'} model`);
 
-                try {
-                  result = await analyzeWithGeminiFileAPI(
-                    uploadedFileName,
-                    smartVideoPrompt,
-                    systemPrompt,
-                    useProModel
-                  );
-                } catch (tokenError) {
-                  // If token limit exceeded with Flash, retry with Pro
-                  if (!useProModel && (tokenError.message.includes('token count') || tokenError.message.includes('INVALID_ARGUMENT'))) {
-                    console.log(`Token limit exceeded for ${fileName}, retrying with Pro model (2M tokens)...`);
+                // Try with multiple models if needed
+                const modelsToTry = useExtendedModel
+                  ? ['gemini-2.0-flash-exp', 'gemini-exp-1206', 'gemini-1.5-pro']
+                  : ['gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-exp-1206'];
 
-                    result = await analyzeWithGeminiFileAPI(
+                let lastError = null;
+                for (const modelName of modelsToTry) {
+                  try {
+                    console.log(`Trying model: ${modelName}`);
+                    result = await analyzeWithGeminiFileAPIWithModel(
                       uploadedFileName,
                       smartVideoPrompt,
                       systemPrompt,
-                      true // Force Pro model
+                      modelName
                     );
-                  } else if (tokenError.message.includes('token count')) {
-                    // Pro model also failed - video is too large even for 2M tokens
-                    throw new Error(`ویدیو "${fileName}" بیش از ۲ میلیون توکن دارد (${fileSizeMB.toFixed(0)} MB).
+                    break; // Success, exit loop
+                  } catch (modelError) {
+                    console.log(`Model ${modelName} failed: ${modelError.message}`);
+                    lastError = modelError;
+
+                    // If it's not a token limit error, don't try other models
+                    if (!modelError.message.includes('token count') &&
+                        !modelError.message.includes('INVALID_ARGUMENT') &&
+                        !modelError.message.includes('not found')) {
+                      throw modelError;
+                    }
+                  }
+                }
+
+                if (!result && lastError) {
+                  throw new Error(`ویدیو "${fileName}" برای تمام مدل‌ها بزرگ است (${fileSizeMB.toFixed(0)} MB).
 
 راه‌حل‌ها:
 ۱. ویدیو را به بخش‌های ۱۰-۱۵ دقیقه‌ای تقسیم کنید
 ۲. کیفیت ویدیو را کاهش دهید (720p کافی است)
 ۳. فایل صوتی را جدا استخراج کنید
 
-ابزار پیشنهادی: HandBrake، VLC، یا ffmpeg`);
-                  } else {
-                    throw tokenError;
-                  }
+خطای آخر: ${lastError.message}`);
                 }
               } finally {
                 // Clean up uploaded file
