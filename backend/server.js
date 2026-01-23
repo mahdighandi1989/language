@@ -6,13 +6,25 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import multer from 'multer';
+import fs from 'fs';
+import os from 'os';
 
 dotenv.config();
 
-// Configure multer for memory storage (files stored in buffer)
+// Configure multer for disk storage (for large files)
+const uploadDir = join(os.tmpdir(), 'lebanese-uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+});
+
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 } // 500MB max per file (Gemini File API supports up to 2GB)
+  storage: storage,
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB max per file
 });
 
 const __filename = fileURLToPath(import.meta.url);
@@ -276,9 +288,12 @@ async function analyzeWithGemini(parts, systemPrompt) {
   return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
 
-// Helper: Upload large file to Gemini File API
-async function uploadToGeminiFileAPI(buffer, mimeType, displayName) {
-  console.log(`Uploading file to Gemini File API: ${displayName}, size: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+// Helper: Upload large file to Gemini File API (supports both buffer and file path)
+async function uploadToGeminiFileAPI(filePathOrBuffer, mimeType, displayName, fileSize = null) {
+  const isFilePath = typeof filePathOrBuffer === 'string';
+  const actualSize = fileSize || (isFilePath ? fs.statSync(filePathOrBuffer).size : filePathOrBuffer.length);
+
+  console.log(`Uploading file to Gemini File API: ${displayName}, size: ${(actualSize / 1024 / 1024).toFixed(2)} MB, from: ${isFilePath ? 'disk' : 'memory'}`);
 
   // Step 1: Start resumable upload
   const startUploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`;
@@ -288,7 +303,7 @@ async function uploadToGeminiFileAPI(buffer, mimeType, displayName) {
     headers: {
       'X-Goog-Upload-Protocol': 'resumable',
       'X-Goog-Upload-Command': 'start',
-      'X-Goog-Upload-Header-Content-Length': buffer.length.toString(),
+      'X-Goog-Upload-Header-Content-Length': actualSize.toString(),
       'X-Goog-Upload-Header-Content-Type': mimeType,
       'Content-Type': 'application/json'
     },
@@ -307,8 +322,17 @@ async function uploadToGeminiFileAPI(buffer, mimeType, displayName) {
     throw new Error('No upload URL received');
   }
 
-  // Step 2: Upload the file data
+  // Step 2: Upload the file data (stream from disk if file path)
   console.log('Uploading file data...');
+
+  let uploadBody;
+  if (isFilePath) {
+    // Stream from disk to avoid loading entire file into memory
+    uploadBody = fs.createReadStream(filePathOrBuffer);
+  } else {
+    uploadBody = filePathOrBuffer;
+  }
+
   const uploadResponse = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
@@ -316,7 +340,8 @@ async function uploadToGeminiFileAPI(buffer, mimeType, displayName) {
       'X-Goog-Upload-Offset': '0',
       'Content-Type': mimeType
     },
-    body: buffer
+    body: uploadBody,
+    duplex: 'half' // Required for streaming body in Node.js fetch
   });
 
   if (!uploadResponse.ok) {
@@ -362,8 +387,11 @@ async function uploadToGeminiFileAPI(buffer, mimeType, displayName) {
 }
 
 // Helper: Analyze large file using Gemini File API
-async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt) {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+// useProModel: use gemini-1.5-pro for larger context window (2M tokens)
+async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useProModel = false) {
+  const model = useProModel ? 'gemini-1.5-pro-latest' : 'gemini-2.0-flash';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  console.log(`Using model: ${model} for file analysis`);
 
   const payload = {
     contents: [{
@@ -518,15 +546,35 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
     for (const file of files) {
       const mimeType = file.mimetype;
       const fileName = file.originalname;
-      const fileBuffer = file.buffer;
-      const base64Data = fileBuffer.toString('base64');
+      const filePath = file.path; // Disk storage path
+      const fileSize = file.size;
+      const fileSizeMB = fileSize / (1024 * 1024);
 
-      console.log(`Processing file: ${fileName}, type: ${mimeType}, size: ${fileBuffer.length} bytes`);
+      console.log(`Processing file: ${fileName}, type: ${mimeType}, size: ${fileSizeMB.toFixed(2)} MB, path: ${filePath}`);
+
+      // For large files (>15MB), use Gemini File API directly without loading into memory
+      const isLargeFile = fileSizeMB > 15;
+
+      // Only read file into memory for small files
+      let fileBuffer = null;
+      let base64Data = null;
+
+      if (!isLargeFile) {
+        try {
+          fileBuffer = fs.readFileSync(filePath);
+          base64Data = fileBuffer.toString('base64');
+        } catch (readErr) {
+          console.error(`Error reading file ${fileName}:`, readErr);
+          allAnalysisResults.push(`**خطا در خواندن فایل "${fileName}":** ${readErr.message}`);
+          continue;
+        }
+      }
 
       try {
         if (mimeType === 'application/pdf') {
-          // Extract text from PDF
-          const pdfText = await extractPdfText(fileBuffer);
+          // Extract text from PDF - need to read from disk for large files
+          const pdfBuffer = isLargeFile ? fs.readFileSync(filePath) : fileBuffer;
+          const pdfText = await extractPdfText(pdfBuffer);
 
           if (pdfText.length > 50000) {
             // Chunk large PDFs
@@ -559,16 +607,15 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
           }
 
         } else if (mimeType.startsWith('audio/')) {
-          const audioSizeMB = fileBuffer.length / (1024 * 1024);
-          console.log(`Audio file: ${fileName}, size: ${audioSizeMB.toFixed(2)} MB`);
+          console.log(`Audio file: ${fileName}, size: ${fileSizeMB.toFixed(2)} MB`);
 
           try {
             let result;
 
-            if (audioSizeMB > 15) {
-              // For large audio files, use Gemini File API
+            if (isLargeFile) {
+              // For large audio files, use Gemini File API with streaming
               console.log(`Using File API for large audio: ${fileName}`);
-              const uploadedFileName = await uploadToGeminiFileAPI(fileBuffer, mimeType, fileName);
+              const uploadedFileName = await uploadToGeminiFileAPI(filePath, mimeType, fileName, fileSize);
 
               try {
                 result = await analyzeWithGeminiFileAPI(
@@ -590,7 +637,7 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
             allAnalysisResults.push(result);
 
             // Store audio for embedding (only if under 10MB)
-            if (audioSizeMB <= 10) {
+            if (fileSizeMB <= 10 && base64Data) {
               mediaItems.push({
                 type: 'audio',
                 name: fileName,
@@ -604,23 +651,75 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
           }
 
         } else if (mimeType.startsWith('video/')) {
-          const videoSizeMB = fileBuffer.length / (1024 * 1024);
-          console.log(`Video file: ${fileName}, size: ${videoSizeMB.toFixed(2)} MB`);
+          console.log(`Video file: ${fileName}, size: ${fileSizeMB.toFixed(2)} MB`);
+
+          // Smart video analysis prompt
+          const smartVideoPrompt = `
+این یک ویدیوی آموزشی عربی لبنانی است. لطفاً به صورت هوشمند تحلیل کن:
+
+**مرحله ۱ - شناسایی فریم‌های آموزشی:**
+- فریم‌هایی که متن عربی/لبنانی دارند (اسلاید، زیرنویس، تخته)
+- فریم‌هایی که نکات گرامری یا لغات نشان می‌دهند
+- این فریم‌ها را با دقت بخوان و محتوایشان را استخراج کن
+
+**مرحله ۲ - رونویسی صوت:**
+- تمام گفتار عربی لبنانی را رونویسی کن
+- اگر معلم توضیحی می‌دهد، آن را بنویس
+- مکالمات و مثال‌ها را دقیق ثبت کن
+
+**مرحله ۳ - ترکیب و تحلیل:**
+- محتوای فریم‌های آموزشی را با صوت مرتبط ترکیب کن
+- نکات کلیدی را استخراج کن
+- اشتباهات احتمالی در محتوا را تصحیح کن
+
+فایل: "${fileName}"
+`;
 
           try {
             let result;
 
-            if (videoSizeMB > 15) {
-              // For large videos, use Gemini File API
+            if (isLargeFile) {
+              // For large videos, use Gemini File API with streaming
               console.log(`Using File API for large video: ${fileName}`);
-              const uploadedFileName = await uploadToGeminiFileAPI(fileBuffer, mimeType, fileName);
+              const uploadedFileName = await uploadToGeminiFileAPI(filePath, mimeType, fileName, fileSize);
 
               try {
-                result = await analyzeWithGeminiFileAPI(
-                  uploadedFileName,
-                  `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:`,
-                  systemPrompt
-                );
+                // For videos > 50MB, ALWAYS use Pro model (2M tokens) from the start
+                const useProModel = fileSizeMB > 50;
+                console.log(`Video size: ${fileSizeMB.toFixed(0)}MB, using ${useProModel ? 'Pro (2M tokens)' : 'Flash (1M tokens)'} model`);
+
+                try {
+                  result = await analyzeWithGeminiFileAPI(
+                    uploadedFileName,
+                    smartVideoPrompt,
+                    systemPrompt,
+                    useProModel
+                  );
+                } catch (tokenError) {
+                  // If token limit exceeded with Flash, retry with Pro
+                  if (!useProModel && (tokenError.message.includes('token count') || tokenError.message.includes('INVALID_ARGUMENT'))) {
+                    console.log(`Token limit exceeded for ${fileName}, retrying with Pro model (2M tokens)...`);
+
+                    result = await analyzeWithGeminiFileAPI(
+                      uploadedFileName,
+                      smartVideoPrompt,
+                      systemPrompt,
+                      true // Force Pro model
+                    );
+                  } else if (tokenError.message.includes('token count')) {
+                    // Pro model also failed - video is too large even for 2M tokens
+                    throw new Error(`ویدیو "${fileName}" بیش از ۲ میلیون توکن دارد (${fileSizeMB.toFixed(0)} MB).
+
+راه‌حل‌ها:
+۱. ویدیو را به بخش‌های ۱۰-۱۵ دقیقه‌ای تقسیم کنید
+۲. کیفیت ویدیو را کاهش دهید (720p کافی است)
+۳. فایل صوتی را جدا استخراج کنید
+
+ابزار پیشنهادی: HandBrake، VLC، یا ffmpeg`);
+                  } else {
+                    throw tokenError;
+                  }
+                }
               } finally {
                 // Clean up uploaded file
                 await deleteGeminiFile(uploadedFileName);
@@ -629,7 +728,7 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
               // For smaller videos, use inline data
               console.log(`Analyzing video inline: ${fileName}`);
               result = await analyzeWithGemini([
-                { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
+                { text: smartVideoPrompt },
                 { inline_data: { mime_type: mimeType, data: base64Data } }
               ], systemPrompt);
             }
@@ -637,7 +736,7 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
             allAnalysisResults.push(result);
 
             // Store video for embedding (only small ones for playback)
-            if (videoSizeMB <= 10) {
+            if (fileSizeMB <= 10 && base64Data) {
               mediaItems.push({
                 type: 'video',
                 name: fileName,
@@ -650,7 +749,7 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
             allAnalysisResults.push(`**خطا در تحلیل ویدیو "${fileName}":**\n${videoError.message}`);
 
             // Still store for embedding if small enough
-            if (videoSizeMB <= 10) {
+            if (fileSizeMB <= 10 && base64Data) {
               mediaItems.push({
                 type: 'video',
                 name: fileName,
@@ -661,25 +760,29 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
           }
 
         } else if (mimeType.startsWith('image/')) {
-          // Analyze image
+          // Analyze image - read from disk if needed
+          const imgBase64 = isLargeFile ? fs.readFileSync(filePath).toString('base64') : base64Data;
+
           const result = await analyzeWithGemini([
             { text: `این یک تصویر به نام "${fileName}" است. هر متن عربی/لبنانی که در تصویر می‌بینی را استخراج و تحلیل کن:` },
-            { inline_data: { mime_type: mimeType, data: base64Data } }
+            { inline_data: { mime_type: mimeType, data: imgBase64 } }
           ], systemPrompt);
 
           allAnalysisResults.push(result);
 
-          // Store image for embedding
-          mediaItems.push({
-            type: 'image',
-            name: fileName,
-            mimeType: mimeType,
-            data: base64Data
-          });
+          // Store image for embedding (only if small enough)
+          if (fileSizeMB <= 5) {
+            mediaItems.push({
+              type: 'image',
+              name: fileName,
+              mimeType: mimeType,
+              data: imgBase64
+            });
+          }
 
         } else if (mimeType.startsWith('text/') || mimeType === 'application/json') {
-          // Plain text files
-          const textFromFile = fileBuffer.toString('utf-8');
+          // Plain text files - read from disk if needed
+          const textFromFile = isLargeFile ? fs.readFileSync(filePath, 'utf-8') : fileBuffer.toString('utf-8');
           const result = await analyzeWithGemini(
             [{ text: `محتوای فایل متنی "${fileName}":\n\n${textFromFile}` }],
             systemPrompt
@@ -748,6 +851,9 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
       );
     }
 
+    // Cleanup temp files
+    cleanupTempFiles(files);
+
     res.json({
       success: true,
       analysis: finalAnalysis,
@@ -757,9 +863,26 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
 
   } catch (error) {
     console.error('File analysis error:', error);
+    // Cleanup temp files even on error
+    if (req.files) cleanupTempFiles(req.files);
     res.status(500).json({ error: `خطا در تحلیل: ${error.message}` });
   }
 });
+
+// Helper: Cleanup uploaded temp files
+function cleanupTempFiles(files) {
+  if (!files || !Array.isArray(files)) return;
+  for (const file of files) {
+    if (file.path && fs.existsSync(file.path)) {
+      try {
+        fs.unlinkSync(file.path);
+        console.log(`Cleaned up temp file: ${file.path}`);
+      } catch (err) {
+        console.error(`Failed to cleanup temp file ${file.path}:`, err);
+      }
+    }
+  }
+}
 
 // Serve frontend for all other routes (SPA)
 app.get('*', (req, res) => {
