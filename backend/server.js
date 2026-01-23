@@ -387,8 +387,11 @@ async function uploadToGeminiFileAPI(filePathOrBuffer, mimeType, displayName, fi
 }
 
 // Helper: Analyze large file using Gemini File API
-async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt) {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+// useProModel: use gemini-1.5-pro for larger context window (2M tokens)
+async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useProModel = false) {
+  const model = useProModel ? 'gemini-1.5-pro-latest' : 'gemini-2.0-flash';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  console.log(`Using model: ${model} for file analysis`);
 
   const payload = {
     contents: [{
@@ -659,11 +662,40 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
               const uploadedFileName = await uploadToGeminiFileAPI(filePath, mimeType, fileName, fileSize);
 
               try {
-                result = await analyzeWithGeminiFileAPI(
-                  uploadedFileName,
-                  `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:`,
-                  systemPrompt
-                );
+                // For very large videos (>100MB), use Pro model with 2M context window
+                const isVeryLarge = fileSizeMB > 100;
+
+                // First try with appropriate model
+                try {
+                  result = await analyzeWithGeminiFileAPI(
+                    uploadedFileName,
+                    `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:`,
+                    systemPrompt,
+                    isVeryLarge // Use Pro model for very large videos
+                  );
+                } catch (tokenError) {
+                  // If token limit exceeded, try with Pro model (2M tokens)
+                  if (tokenError.message.includes('token count') || tokenError.message.includes('INVALID_ARGUMENT')) {
+                    console.log(`Token limit exceeded for ${fileName}, trying with Pro model (2M tokens)...`);
+
+                    try {
+                      result = await analyzeWithGeminiFileAPI(
+                        uploadedFileName,
+                        `این یک فایل ویدیویی است. فقط محتوای صوتی آن را رونویسی کن:`,
+                        `${LEBANESE_CORRECTION_PROMPT}\n\nرونویسی کن و نکات کلیدی را استخراج کن.`,
+                        true // Force Pro model
+                      );
+                    } catch (proError) {
+                      // If Pro model also fails, the video is just too large
+                      if (proError.message.includes('token count')) {
+                        throw new Error(`ویدیو "${fileName}" بیش از حد بزرگ است (${fileSizeMB.toFixed(0)} MB). لطفاً آن را به بخش‌های کوچکتر تقسیم کنید یا فقط صوت را استخراج کنید.`);
+                      }
+                      throw proError;
+                    }
+                  } else {
+                    throw tokenError;
+                  }
+                }
               } finally {
                 // Clean up uploaded file
                 await deleteGeminiFile(uploadedFileName);
