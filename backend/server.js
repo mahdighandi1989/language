@@ -389,7 +389,7 @@ async function uploadToGeminiFileAPI(filePathOrBuffer, mimeType, displayName, fi
 // Helper: Analyze large file using Gemini File API
 // useProModel: use gemini-1.5-pro for larger context window (2M tokens)
 async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useProModel = false) {
-  const model = useProModel ? 'gemini-1.5-pro-latest' : 'gemini-2.0-flash';
+  const model = useProModel ? 'gemini-1.5-pro' : 'gemini-2.0-flash';
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
   console.log(`Using model: ${model} for file analysis`);
 
