@@ -653,6 +653,28 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
         } else if (mimeType.startsWith('video/')) {
           console.log(`Video file: ${fileName}, size: ${fileSizeMB.toFixed(2)} MB`);
 
+          // Smart video analysis prompt
+          const smartVideoPrompt = `
+این یک ویدیوی آموزشی عربی لبنانی است. لطفاً به صورت هوشمند تحلیل کن:
+
+**مرحله ۱ - شناسایی فریم‌های آموزشی:**
+- فریم‌هایی که متن عربی/لبنانی دارند (اسلاید، زیرنویس، تخته)
+- فریم‌هایی که نکات گرامری یا لغات نشان می‌دهند
+- این فریم‌ها را با دقت بخوان و محتوایشان را استخراج کن
+
+**مرحله ۲ - رونویسی صوت:**
+- تمام گفتار عربی لبنانی را رونویسی کن
+- اگر معلم توضیحی می‌دهد، آن را بنویس
+- مکالمات و مثال‌ها را دقیق ثبت کن
+
+**مرحله ۳ - ترکیب و تحلیل:**
+- محتوای فریم‌های آموزشی را با صوت مرتبط ترکیب کن
+- نکات کلیدی را استخراج کن
+- اشتباهات احتمالی در محتوا را تصحیح کن
+
+فایل: "${fileName}"
+`;
+
           try {
             let result;
 
@@ -662,36 +684,38 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
               const uploadedFileName = await uploadToGeminiFileAPI(filePath, mimeType, fileName, fileSize);
 
               try {
-                // For very large videos (>100MB), use Pro model with 2M context window
-                const isVeryLarge = fileSizeMB > 100;
+                // For videos > 50MB, ALWAYS use Pro model (2M tokens) from the start
+                const useProModel = fileSizeMB > 50;
+                console.log(`Video size: ${fileSizeMB.toFixed(0)}MB, using ${useProModel ? 'Pro (2M tokens)' : 'Flash (1M tokens)'} model`);
 
-                // First try with appropriate model
                 try {
                   result = await analyzeWithGeminiFileAPI(
                     uploadedFileName,
-                    `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:`,
+                    smartVideoPrompt,
                     systemPrompt,
-                    isVeryLarge // Use Pro model for very large videos
+                    useProModel
                   );
                 } catch (tokenError) {
-                  // If token limit exceeded, try with Pro model (2M tokens)
-                  if (tokenError.message.includes('token count') || tokenError.message.includes('INVALID_ARGUMENT')) {
-                    console.log(`Token limit exceeded for ${fileName}, trying with Pro model (2M tokens)...`);
+                  // If token limit exceeded with Flash, retry with Pro
+                  if (!useProModel && (tokenError.message.includes('token count') || tokenError.message.includes('INVALID_ARGUMENT'))) {
+                    console.log(`Token limit exceeded for ${fileName}, retrying with Pro model (2M tokens)...`);
 
-                    try {
-                      result = await analyzeWithGeminiFileAPI(
-                        uploadedFileName,
-                        `این یک فایل ویدیویی است. فقط محتوای صوتی آن را رونویسی کن:`,
-                        `${LEBANESE_CORRECTION_PROMPT}\n\nرونویسی کن و نکات کلیدی را استخراج کن.`,
-                        true // Force Pro model
-                      );
-                    } catch (proError) {
-                      // If Pro model also fails, the video is just too large
-                      if (proError.message.includes('token count')) {
-                        throw new Error(`ویدیو "${fileName}" بیش از حد بزرگ است (${fileSizeMB.toFixed(0)} MB). لطفاً آن را به بخش‌های کوچکتر تقسیم کنید یا فقط صوت را استخراج کنید.`);
-                      }
-                      throw proError;
-                    }
+                    result = await analyzeWithGeminiFileAPI(
+                      uploadedFileName,
+                      smartVideoPrompt,
+                      systemPrompt,
+                      true // Force Pro model
+                    );
+                  } else if (tokenError.message.includes('token count')) {
+                    // Pro model also failed - video is too large even for 2M tokens
+                    throw new Error(`ویدیو "${fileName}" بیش از ۲ میلیون توکن دارد (${fileSizeMB.toFixed(0)} MB).
+
+راه‌حل‌ها:
+۱. ویدیو را به بخش‌های ۱۰-۱۵ دقیقه‌ای تقسیم کنید
+۲. کیفیت ویدیو را کاهش دهید (720p کافی است)
+۳. فایل صوتی را جدا استخراج کنید
+
+ابزار پیشنهادی: HandBrake، VLC، یا ffmpeg`);
                   } else {
                     throw tokenError;
                   }
@@ -704,7 +728,7 @@ ${userInstructions ? `\n**دستورات کاربر:** ${userInstructions}` : ''
               // For smaller videos, use inline data
               console.log(`Analyzing video inline: ${fileName}`);
               result = await analyzeWithGemini([
-                { text: `این یک فایل ویدیویی به نام "${fileName}" است. لطفاً محتوای صوتی آن را رونویسی کن و متن‌های قابل مشاهده را استخراج کن، سپس تحلیل کن:` },
+                { text: smartVideoPrompt },
                 { inline_data: { mime_type: mimeType, data: base64Data } }
               ], systemPrompt);
             }
