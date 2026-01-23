@@ -290,7 +290,20 @@ export default function App() {
   }, [selectedLessonId, data.lessons]);
 
   const addLesson = (title) => {
-    const newLesson = { id: Date.now(), title, summary: "خلاصه‌ای ایجاد نشده.", files: [], archivedNotes: "" };
+    const newLesson = {
+      id: Date.now(),
+      title,
+      summary: "خلاصه‌ای ایجاد نشده.",
+      files: [],
+      archivedNotes: "",
+      progress: {
+        totalItems: 0,       // Total items to learn in this lesson
+        learnedItems: 0,     // Items marked as learned
+        quizzesTaken: 0,     // Number of quizzes completed
+        correctAnswers: 0,   // Total correct answers in quizzes
+        chatPracticeCount: 0 // Number of chat practice sessions
+      }
+    };
     setData(prev => ({ ...prev, lessons: [...prev.lessons, newLesson] }));
     navigateTo('lesson', newLesson);
     addJournalEntry(`درس جدیدی با عنوان "${title}" ایجاد شد.`);
@@ -805,17 +818,66 @@ function LessonListItem({ lesson, navigateTo, deleteLesson, editLesson }) {
     const handleEditClick = (e, lesson) => { e.stopPropagation(); setEditingLesson(lesson); };
     const handleSave = (id, newTitle, newSummary) => { editLesson(id, newTitle, newSummary); setEditingLesson(null); };
 
+    // Calculate progress percentage
+    const progress = lesson.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
+    const hasContent = lesson.archivedNotes && lesson.archivedNotes.trim().length > 0;
+
+    // Progress calculation: weighted average of different metrics
+    // - Content added: 20%
+    // - Items learned: 40%
+    // - Quizzes taken: 20%
+    // - Chat practice: 20%
+    let progressPercent = 0;
+    if (hasContent) {
+        progressPercent += 20; // Content added
+        const itemProgress = progress.totalItems > 0 ? (progress.learnedItems / progress.totalItems) * 40 : 0;
+        const quizProgress = Math.min(progress.quizzesTaken * 10, 20); // Max 20% from quizzes
+        const chatProgress = Math.min(progress.chatPracticeCount * 5, 20); // Max 20% from chat
+        progressPercent += itemProgress + quizProgress + chatProgress;
+    }
+    progressPercent = Math.min(Math.round(progressPercent), 100);
+
+    // Progress bar color based on percentage
+    const getProgressColor = (percent) => {
+        if (percent < 25) return 'bg-red-400';
+        if (percent < 50) return 'bg-orange-400';
+        if (percent < 75) return 'bg-yellow-400';
+        return 'bg-green-500';
+    };
+
     return (
         <>
             {editingLesson && <EditLessonModal lesson={editingLesson} onSave={handleSave} onClose={() => setEditingLesson(null)} />}
-            <div onClick={() => navigateTo('lesson', lesson)} className="p-5 bg-white border rounded-xl shadow-sm hover:shadow-lg hover:border-teal-500 transition-all duration-200 flex justify-between items-center cursor-pointer">
-                <div className="flex-1">
-                    <h3 className="text-xl font-bold text-teal-600">{lesson.title}</h3>
-                    <p className="text-slate-600 mt-2">{lesson.summary}</p>
+            <div onClick={() => navigateTo('lesson', lesson)} className="p-5 bg-white border rounded-xl shadow-sm hover:shadow-lg hover:border-teal-500 transition-all duration-200 cursor-pointer">
+                <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                        <h3 className="text-xl font-bold text-teal-600">{lesson.title}</h3>
+                        <p className="text-slate-600 mt-2">{lesson.summary}</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={(e) => handleEditClick(e, lesson)} className="p-2 hover:bg-slate-200 rounded-full"><Edit size={18}/></button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteLesson(lesson.id); }} className="p-2 hover:bg-red-100 rounded-full text-red-600"><Trash2 size={18}/></button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={(e) => handleEditClick(e, lesson)} className="p-2 hover:bg-slate-200 rounded-full"><Edit size={18}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteLesson(lesson.id); }} className="p-2 hover:bg-red-100 rounded-full text-red-600"><Trash2 size={18}/></button>
+                {/* Progress Bar */}
+                <div className="mt-4">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-slate-500">پیشرفت یادگیری</span>
+                        <span className="text-xs font-bold text-slate-600">{progressPercent}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2.5">
+                        <div
+                            className={`h-2.5 rounded-full transition-all duration-500 ${getProgressColor(progressPercent)}`}
+                            style={{ width: `${progressPercent}%` }}
+                        ></div>
+                    </div>
+                    {progress.totalItems > 0 && (
+                        <div className="flex gap-3 mt-2 text-xs text-slate-500">
+                            <span>📚 {progress.learnedItems}/{progress.totalItems} مورد</span>
+                            {progress.quizzesTaken > 0 && <span>📝 {progress.quizzesTaken} آزمون</span>}
+                            {progress.chatPracticeCount > 0 && <span>💬 {progress.chatPracticeCount} تمرین</span>}
+                        </div>
+                    )}
                 </div>
             </div>
         </>
@@ -873,27 +935,94 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
       updateLesson(lesson.id, { archivedNotes: mergedNotes });
       addJournalEntry(`نکات درس "${lesson.title}" به‌روزرسانی شد.`);
 
-      const categorizationPrompt = `Analyze the following text from a Lebanese Arabic lesson. Extract and categorize every single item into the appropriate categories: 'vocabulary', 'grammar', 'phrases', 'verbs', 'pronouns', 'adjectives'. Return ONLY a valid JSON object with these exact keys. Each key must have an array of objects, with 'term' and 'definition'. If a category has no items, return an empty array. Text: ${mergedNotes}`;
-      const schema = { type: "OBJECT", properties: { vocabulary: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } } } }, grammar: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } } } }, phrases: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } } } }, verbs: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } } } }, pronouns: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } } } }, adjectives: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } } } } } };
-      const payload = { contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: categorizationPrompt }] }, generationConfig: { responseMimeType: "application/json", responseSchema: schema } };
+      // Categorize items for knowledge base
+      const categorizationPrompt = `از متن زیر که جزوه درس عربی لبنانی است، موارد را استخراج و دسته‌بندی کن.
+
+دسته‌بندی‌ها:
+- vocabulary: لغات (term: کلمه عربی, definition: معنی فارسی)
+- grammar: نکات گرامری (term: عنوان قاعده, definition: توضیح)
+- phrases: عبارات کاربردی (term: عبارت عربی, definition: معنی فارسی)
+- verbs: افعال (term: فعل عربی, definition: معنی و صرف)
+- pronouns: ضمایر (term: ضمیر, definition: معنی و کاربرد)
+- adjectives: صفات (term: صفت عربی, definition: معنی فارسی)
+
+فقط موارد صحیح و تصحیح‌شده را استخراج کن (موارد غلط را نادیده بگیر).
+متن: ${mergedNotes}`;
+
+      const schema = {
+        type: "OBJECT",
+        properties: {
+          vocabulary: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } }, required: ["term", "definition"] } },
+          grammar: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } }, required: ["term", "definition"] } },
+          phrases: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } }, required: ["term", "definition"] } },
+          verbs: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } }, required: ["term", "definition"] } },
+          pronouns: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } }, required: ["term", "definition"] } },
+          adjectives: { type: "ARRAY", items: { type: "OBJECT", properties: { term: { type: "STRING" }, definition: { type: "STRING" } }, required: ["term", "definition"] } }
+        },
+        required: ["vocabulary", "grammar", "phrases", "verbs", "pronouns", "adjectives"]
+      };
+
+      const payload = {
+        contents: [{ parts: [{ text: categorizationPrompt }] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+      };
 
       try {
-          const categorizedItems = JSON.parse(await callGeminiAPI(payload));
+          const response = await callGeminiAPI(payload);
+          let categorizedItems;
+
+          // Handle both string and object responses
+          if (typeof response === 'string') {
+            // Try to extract JSON from the response
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              categorizedItems = JSON.parse(jsonMatch[0]);
+            } else {
+              throw new Error('No valid JSON found in response');
+            }
+          } else {
+            categorizedItems = response;
+          }
+
           let itemsAdded = 0;
-          Object.entries(categorizedItems).forEach(([category, items]) => {
-              if (items && Array.isArray(items)) {
-                  items.forEach(item => {
-                      if (item.term && item.definition) {
-                          updateKnowledgeBase(category, { ...item, source: `درس: ${lesson.title}` });
-                          itemsAdded++;
-                      }
+          const validCategories = ['vocabulary', 'grammar', 'phrases', 'verbs', 'pronouns', 'adjectives'];
+
+          for (const category of validCategories) {
+            const items = categorizedItems[category];
+            if (items && Array.isArray(items)) {
+              for (const item of items) {
+                if (item.term && item.definition && item.term.trim() && item.definition.trim()) {
+                  updateKnowledgeBase(category, {
+                    term: item.term.trim(),
+                    definition: item.definition.trim(),
+                    source: `درس: ${lesson.title}`,
+                    learned: false,
+                    correctCount: 0,
+                    incorrectCount: 0
                   });
+                  itemsAdded++;
+                }
               }
-          });
-          setModalConfig({ title: "موفقیت", message: `${itemsAdded} مورد با موفقیت به مرکز دانش اضافه شد.` });
+            }
+          }
+
+          if (itemsAdded > 0) {
+            // Update lesson progress with total items
+            const currentProgress = lesson.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
+            updateLesson(lesson.id, {
+              progress: {
+                ...currentProgress,
+                totalItems: currentProgress.totalItems + itemsAdded
+              }
+            });
+            setModalConfig({ title: "موفقیت", message: `${itemsAdded} مورد با موفقیت به مرکز دانش اضافه شد.` });
+          } else {
+            setModalConfig({ title: "توجه", message: "موردی برای افزودن به مرکز دانش یافت نشد. محتوا ذخیره شد." });
+          }
       } catch (e) {
           console.error("Failed to auto-categorize:", e);
-          setModalConfig({ title: "خطا", message: "خطا در دسته‌بندی خودکار موارد. لطفاً به صورت دستی اضافه کنید." });
+          // Still save the notes even if categorization fails
+          setModalConfig({ title: "توجه", message: "نکات ذخیره شد. دسته‌بندی خودکار موفق نبود، اما می‌توانید از طریق چت با استاد هوش مصنوعی موارد را یاد بگیرید." });
       }
 
       setAnalyzedContent(null);
@@ -1088,7 +1217,7 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   );
 }
 
-function QuizCenter({ lessons, addJournalEntry, setModalConfig }) {
+function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData }) {
     const [selectedLessonId, setSelectedLessonId] = useState(lessons[0]?.id || '');
     const [quiz, setQuiz] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -1141,6 +1270,28 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig }) {
         let score = quiz.reduce((acc, q, i) => acc + (userAnswers[i]?.toLowerCase() === q.correctAnswer.toLowerCase() ? 1 : 0), 0);
         const finalScore = (score / quiz.length) * 100;
         addJournalEntry(`آزمون با امتیاز ${finalScore.toFixed(0)}% به پایان رسید.`);
+
+        // Update lesson progress
+        const lesson = lessons.find(l => l.id === selectedLessonId);
+        if (lesson) {
+            const currentProgress = lesson.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
+            setData(prev => ({
+                ...prev,
+                lessons: prev.lessons.map(l => l.id === selectedLessonId ? {
+                    ...l,
+                    progress: {
+                        ...currentProgress,
+                        quizzesTaken: currentProgress.quizzesTaken + 1,
+                        correctAnswers: currentProgress.correctAnswers + score,
+                        // Mark items as learned based on correct answers
+                        learnedItems: Math.min(
+                            currentProgress.totalItems,
+                            currentProgress.learnedItems + score
+                        )
+                    }
+                } : l)
+            }));
+        }
     };
 
     return (
@@ -1390,7 +1541,30 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         const conversationTitle = chatHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
         const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: chatHistory }];
         saveChatHistory(context, []); // Clear current history
-        setData(prev => ({...prev, archivedConversations: newArchive}));
+
+        // Track chat practice progress for lessons
+        if (context.startsWith('lesson-')) {
+            const lessonId = parseInt(context.replace('lesson-', ''));
+            setData(prev => ({
+                ...prev,
+                archivedConversations: newArchive,
+                lessons: prev.lessons.map(l => {
+                    if (l.id === lessonId) {
+                        const currentProgress = l.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
+                        return {
+                            ...l,
+                            progress: {
+                                ...currentProgress,
+                                chatPracticeCount: currentProgress.chatPracticeCount + 1
+                            }
+                        };
+                    }
+                    return l;
+                })
+            }));
+        } else {
+            setData(prev => ({...prev, archivedConversations: newArchive}));
+        }
     }
 
     let initialText = 'أهلاً فيك! أنا جاد، معلمك. كيفك اليوم؟';
@@ -1458,7 +1632,20 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     }
 
     if (context.startsWith('lesson')) {
-        systemPrompt += `\nYour conversation MUST be based on the provided lesson notes: \n---\n${lessonNotes || "No notes available."}\n---`;
+        // Strip out erroneous content (strikethrough text marked with ~~ or ❌)
+        // Only keep correct content for the AI to learn from
+        let cleanedNotes = lessonNotes || "No notes available.";
+        if (lessonNotes) {
+            // Remove strikethrough markdown content (~~error~~)
+            cleanedNotes = cleanedNotes.replace(/~~[^~]+~~/g, '');
+            // Remove error emoji markers and their content patterns like ❌ [text]
+            cleanedNotes = cleanedNotes.replace(/❌[^\n]*/g, '');
+            // Remove parenthetical corrections like (جمله غلط)
+            cleanedNotes = cleanedNotes.replace(/\([^)]*غلط[^)]*\)/g, '');
+            // Clean up extra whitespace and empty lines
+            cleanedNotes = cleanedNotes.replace(/\n{3,}/g, '\n\n').trim();
+        }
+        systemPrompt += `\nYour conversation MUST be based on the provided lesson notes (ONLY the correct content): \n---\n${cleanedNotes}\n---`;
     } else {
         const currentTopic = selectedTopics[0];
         if (currentTopic === 'custom_scenario') {
