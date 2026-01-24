@@ -1,11 +1,138 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo, createContext, useContext, useCallback } from 'react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, setLogLevel } from 'firebase/firestore';
+
+// ============================================
+// EXECUTION FLOW TRACKING CONTEXT
+// ============================================
+
+// Flow nodes definition - represents all possible states in the system
+const FLOW_NODES = {
+  // Chat flow
+  idle: { id: 'idle', label: 'آماده', icon: '⏸️', category: 'start' },
+  userInput: { id: 'userInput', label: 'ورودی کاربر', icon: '✍️', category: 'input' },
+  audioRecording: { id: 'audioRecording', label: 'ضبط صدا', icon: '🎤', category: 'input' },
+  audioTranscription: { id: 'audioTranscription', label: 'تبدیل صوت به متن', icon: '📝', category: 'processing' },
+  buildingPrompt: { id: 'buildingPrompt', label: 'ساخت پرامپت', icon: '🔧', category: 'processing' },
+  callingGemini: { id: 'callingGemini', label: 'ارسال به Gemini', icon: '🤖', category: 'api' },
+  receivingResponse: { id: 'receivingResponse', label: 'دریافت پاسخ', icon: '📥', category: 'api' },
+  generatingTTS: { id: 'generatingTTS', label: 'ساخت صوت', icon: '🔊', category: 'processing' },
+  playingAudio: { id: 'playingAudio', label: 'پخش صدا', icon: '▶️', category: 'output' },
+
+  // Live voice flow
+  wsConnecting: { id: 'wsConnecting', label: 'اتصال WebSocket', icon: '🔌', category: 'connection' },
+  wsConnected: { id: 'wsConnected', label: 'متصل', icon: '✅', category: 'connection' },
+  liveListening: { id: 'liveListening', label: 'گوش دادن', icon: '👂', category: 'input' },
+  liveStreaming: { id: 'liveStreaming', label: 'ارسال صوت زنده', icon: '📡', category: 'api' },
+  liveReceiving: { id: 'liveReceiving', label: 'دریافت صوت زنده', icon: '📻', category: 'api' },
+  liveSpeaking: { id: 'liveSpeaking', label: 'استاد صحبت می‌کند', icon: '🗣️', category: 'output' },
+
+  // File analysis flow
+  fileUploading: { id: 'fileUploading', label: 'آپلود فایل', icon: '📤', category: 'input' },
+  fileProcessing: { id: 'fileProcessing', label: 'پردازش فایل', icon: '⚙️', category: 'processing' },
+  fileAnalyzing: { id: 'fileAnalyzing', label: 'تحلیل محتوا', icon: '🔍', category: 'api' },
+  mergingContent: { id: 'mergingContent', label: 'ادغام محتوا', icon: '🔀', category: 'processing' },
+  categorizingItems: { id: 'categorizingItems', label: 'دسته‌بندی', icon: '📊', category: 'processing' },
+  savingToLesson: { id: 'savingToLesson', label: 'ذخیره در درس', icon: '💾', category: 'output' },
+
+  // Quiz flow
+  generatingQuiz: { id: 'generatingQuiz', label: 'ساخت آزمون', icon: '📝', category: 'api' },
+  showingQuiz: { id: 'showingQuiz', label: 'نمایش آزمون', icon: '❓', category: 'output' },
+  checkingAnswer: { id: 'checkingAnswer', label: 'بررسی پاسخ', icon: '✔️', category: 'processing' },
+
+  // Common
+  error: { id: 'error', label: 'خطا', icon: '❌', category: 'error' },
+  complete: { id: 'complete', label: 'تکمیل', icon: '✅', category: 'end' }
+};
+
+// Flow categories with colors
+const FLOW_CATEGORIES = {
+  start: { color: '#64748b', label: 'شروع' },
+  input: { color: '#3b82f6', label: 'ورودی' },
+  processing: { color: '#f59e0b', label: 'پردازش' },
+  api: { color: '#8b5cf6', label: 'API' },
+  output: { color: '#10b981', label: 'خروجی' },
+  connection: { color: '#06b6d4', label: 'اتصال' },
+  error: { color: '#ef4444', label: 'خطا' },
+  end: { color: '#22c55e', label: 'پایان' }
+};
+
+// Context for execution flow
+const ExecutionFlowContext = createContext(null);
+
+// Custom hook for using execution flow
+function useExecutionFlow() {
+  const context = useContext(ExecutionFlowContext);
+  if (!context) {
+    // Return dummy functions if not in provider (for components that may render outside)
+    return {
+      setCurrentNode: () => {},
+      addToHistory: () => {},
+      clearHistory: () => {},
+      currentNode: 'idle',
+      flowHistory: [],
+      activeFlow: null
+    };
+  }
+  return context;
+}
+
+// Provider component
+function ExecutionFlowProvider({ children }) {
+  const [currentNode, setCurrentNodeState] = useState('idle');
+  const [flowHistory, setFlowHistory] = useState([]);
+  const [activeFlow, setActiveFlow] = useState(null); // 'chat', 'liveVoice', 'fileAnalysis', 'quiz'
+  const maxHistoryLength = 50;
+
+  const setCurrentNode = useCallback((nodeId, flowType = null) => {
+    const timestamp = Date.now();
+    setCurrentNodeState(nodeId);
+    if (flowType) setActiveFlow(flowType);
+
+    setFlowHistory(prev => {
+      const newEntry = { nodeId, timestamp, flowType: flowType || activeFlow };
+      const updated = [...prev, newEntry];
+      // Keep only last N entries
+      return updated.slice(-maxHistoryLength);
+    });
+  }, [activeFlow]);
+
+  const addToHistory = useCallback((nodeId, flowType = null) => {
+    const timestamp = Date.now();
+    setFlowHistory(prev => {
+      const newEntry = { nodeId, timestamp, flowType: flowType || activeFlow };
+      const updated = [...prev, newEntry];
+      return updated.slice(-maxHistoryLength);
+    });
+  }, [activeFlow]);
+
+  const clearHistory = useCallback(() => {
+    setFlowHistory([]);
+    setCurrentNodeState('idle');
+    setActiveFlow(null);
+  }, []);
+
+  const value = {
+    currentNode,
+    setCurrentNode,
+    flowHistory,
+    addToHistory,
+    clearHistory,
+    activeFlow,
+    setActiveFlow
+  };
+
+  return (
+    <ExecutionFlowContext.Provider value={value}>
+      {children}
+    </ExecutionFlowContext.Provider>
+  );
+}
 
 
 // --- Google Fonts ---
@@ -753,7 +880,7 @@ export default function App() {
   };
 
   return (
-    <>
+    <ExecutionFlowProvider>
       <Fonts />
       <div className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
         <div className="flex flex-col md:flex-row min-h-screen">
@@ -766,7 +893,7 @@ export default function App() {
           </button>
           {isAssistantOpen && <GlobalAssistant onClose={() => setIsAssistantOpen(false)} updateKnowledgeBase={updateKnowledgeBase} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />}
           {globalSelectionPopup && (
-              <button 
+              <button
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={() => {
                       openSaveModal(globalSelectionPopup.text);
@@ -778,16 +905,16 @@ export default function App() {
                   <Plus size={16}/> افزودن به مرکز دانش
               </button>
           )}
-          <SaveToKnowledgeBaseModal 
-              isOpen={isSaveModalOpen} 
-              onClose={() => setIsSaveModalOpen(false)} 
-              item={itemToSave} 
+          <SaveToKnowledgeBaseModal
+              isOpen={isSaveModalOpen}
+              onClose={() => setIsSaveModalOpen(false)}
+              item={itemToSave}
               updateKnowledgeBase={updateKnowledgeBase}
               addJournalEntry={addJournalEntry}
           />
         </div>
       </div>
-    </>
+    </ExecutionFlowProvider>
   );
 }
 
@@ -882,7 +1009,8 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
 
     const tabs = [
         { id: 'general', label: '⚙️ عمومی', icon: Settings },
-        { id: 'prompts', label: '🧠 مدیریت پرامپت‌ها', icon: MessageSquare }
+        { id: 'prompts', label: '🧠 پرامپت‌ها', icon: MessageSquare },
+        { id: 'flow', label: '📊 جریان الگوریتم', icon: Activity }
     ];
 
     return (
@@ -983,6 +1111,11 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
                     resetPrompt={resetPrompt}
                     resetAllPrompts={resetAllPrompts}
                 />
+            )}
+
+            {/* Flow Visualization Tab */}
+            {activeTab === 'flow' && (
+                <FlowVisualization />
             )}
         </div>
     );
@@ -1175,6 +1308,318 @@ function PromptManagement({ customPrompts, handlePromptChange, resetPrompt, rese
     );
 }
 
+// ============================================
+// FLOW VISUALIZATION COMPONENT
+// ============================================
+
+function FlowVisualization() {
+    const { currentNode, flowHistory, activeFlow, clearHistory } = useExecutionFlow();
+    const [selectedFlow, setSelectedFlow] = useState('all');
+
+    // Define flow diagrams for different operations
+    const flowDiagrams = {
+        chat: {
+            title: '💬 چت متنی',
+            nodes: ['idle', 'userInput', 'buildingPrompt', 'callingGemini', 'receivingResponse', 'generatingTTS', 'playingAudio', 'complete'],
+            color: '#3b82f6'
+        },
+        chatVoice: {
+            title: '🎤 چت صوتی',
+            nodes: ['idle', 'audioRecording', 'audioTranscription', 'buildingPrompt', 'callingGemini', 'receivingResponse', 'generatingTTS', 'playingAudio', 'complete'],
+            color: '#8b5cf6'
+        },
+        liveVoice: {
+            title: '📞 تماس زنده',
+            nodes: ['idle', 'wsConnecting', 'wsConnected', 'liveListening', 'liveStreaming', 'liveReceiving', 'liveSpeaking', 'liveListening'],
+            color: '#06b6d4'
+        },
+        fileAnalysis: {
+            title: '📁 تحلیل فایل',
+            nodes: ['idle', 'fileUploading', 'fileProcessing', 'fileAnalyzing', 'mergingContent', 'categorizingItems', 'savingToLesson', 'complete'],
+            color: '#f59e0b'
+        },
+        quiz: {
+            title: '📝 آزمون',
+            nodes: ['idle', 'generatingQuiz', 'showingQuiz', 'checkingAnswer', 'complete'],
+            color: '#10b981'
+        }
+    };
+
+    // Filter history by selected flow
+    const filteredHistory = selectedFlow === 'all'
+        ? flowHistory
+        : flowHistory.filter(h => h.flowType === selectedFlow);
+
+    // Get recent activity (last 10)
+    const recentActivity = filteredHistory.slice(-10).reverse();
+
+    // Check if a node is in the current flow path
+    const isNodeActive = (nodeId) => currentNode === nodeId;
+    const wasNodeVisited = (nodeId) => flowHistory.some(h => h.nodeId === nodeId);
+
+    // Render a single flow node
+    const FlowNode = ({ nodeId, isActive, wasVisited, color }) => {
+        const node = FLOW_NODES[nodeId];
+        if (!node) return null;
+
+        const categoryColor = FLOW_CATEGORIES[node.category]?.color || '#64748b';
+
+        return (
+            <div className={`relative flex flex-col items-center transition-all duration-300 ${isActive ? 'scale-110' : ''}`}>
+                {/* Glow effect for active node */}
+                {isActive && (
+                    <div
+                        className="absolute inset-0 rounded-full blur-xl opacity-50 animate-pulse"
+                        style={{ backgroundColor: color, transform: 'scale(1.5)' }}
+                    />
+                )}
+
+                {/* Node circle */}
+                <div
+                    className={`relative z-10 w-14 h-14 rounded-full flex items-center justify-center text-2xl border-4 transition-all duration-300 ${
+                        isActive
+                            ? 'border-white shadow-lg'
+                            : wasVisited
+                                ? 'border-white/50 opacity-70'
+                                : 'border-slate-300 opacity-40'
+                    }`}
+                    style={{
+                        backgroundColor: isActive ? color : wasVisited ? `${color}80` : '#e2e8f0',
+                        boxShadow: isActive ? `0 0 20px ${color}, 0 0 40px ${color}50` : 'none'
+                    }}
+                >
+                    {node.icon}
+                </div>
+
+                {/* Label */}
+                <span className={`mt-2 text-xs font-bold text-center max-w-[80px] transition-all ${
+                    isActive ? 'text-slate-900' : 'text-slate-500'
+                }`}>
+                    {node.label}
+                </span>
+
+                {/* Active indicator */}
+                {isActive && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-ping" />
+                )}
+            </div>
+        );
+    };
+
+    // Render connection line between nodes
+    const ConnectionLine = ({ isActive, color }) => (
+        <div className="flex items-center mx-1">
+            <div className={`relative h-1 w-8 rounded transition-all duration-300`}>
+                {/* Background line */}
+                <div className="absolute inset-0 bg-slate-200 rounded" />
+
+                {/* Active line with animation */}
+                {isActive && (
+                    <div
+                        className="absolute inset-0 rounded animate-pulse"
+                        style={{ backgroundColor: color }}
+                    >
+                        {/* Flowing light effect */}
+                        <div
+                            className="absolute h-full w-4 rounded"
+                            style={{
+                                background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+                                animation: 'flowLight 1s ease-in-out infinite'
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
+            <ArrowRight size={14} className={isActive ? 'text-slate-700' : 'text-slate-300'} />
+        </div>
+    );
+
+    // Render a complete flow diagram
+    const FlowDiagram = ({ flowKey, diagram }) => {
+        const isCurrentFlow = activeFlow === flowKey || activeFlow?.startsWith(flowKey);
+        const nodeIndex = diagram.nodes.indexOf(currentNode);
+
+        return (
+            <div className={`p-4 rounded-xl border-2 transition-all ${
+                isCurrentFlow ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200 bg-white'
+            }`}>
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-bold text-lg" style={{ color: diagram.color }}>
+                        {diagram.title}
+                    </h4>
+                    {isCurrentFlow && (
+                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold animate-pulse">
+                            در حال اجرا
+                        </span>
+                    )}
+                </div>
+
+                {/* Flow nodes */}
+                <div className="flex items-center justify-start overflow-x-auto pb-2">
+                    {diagram.nodes.map((nodeId, idx) => {
+                        const isActive = isCurrentFlow && nodeIndex === idx;
+                        const wasVisited = isCurrentFlow && nodeIndex > idx;
+
+                        return (
+                            <React.Fragment key={`${nodeId}-${idx}`}>
+                                <FlowNode
+                                    nodeId={nodeId}
+                                    isActive={isActive}
+                                    wasVisited={wasVisited}
+                                    color={diagram.color}
+                                />
+                                {idx < diagram.nodes.length - 1 && (
+                                    <ConnectionLine
+                                        isActive={isCurrentFlow && (nodeIndex > idx || (nodeIndex === idx && isActive))}
+                                        color={diagram.color}
+                                    />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white p-6 rounded-2xl">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-2xl font-bold flex items-center gap-3">
+                            <Activity size={28} className="animate-pulse" />
+                            جریان اجرای الگوریتم
+                        </h3>
+                        <p className="text-indigo-100 mt-1">
+                            مشاهده زنده عملیات‌های در حال اجرا
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={clearHistory}
+                            className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-all"
+                        >
+                            پاک کردن تاریخچه
+                        </button>
+                    </div>
+                </div>
+
+                {/* Current status */}
+                <div className="mt-4 p-4 bg-white/10 rounded-xl">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm opacity-75">وضعیت فعلی:</span>
+                            <span className="px-3 py-1 bg-white/20 rounded-full font-bold flex items-center gap-2">
+                                <span className="text-lg">{FLOW_NODES[currentNode]?.icon || '⏸️'}</span>
+                                {FLOW_NODES[currentNode]?.label || 'نامشخص'}
+                            </span>
+                        </div>
+                        {activeFlow && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm opacity-75">جریان:</span>
+                                <span className="px-3 py-1 bg-green-500/30 rounded-full font-bold">
+                                    {flowDiagrams[activeFlow]?.title || activeFlow}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Flow diagrams */}
+            <div className="space-y-4">
+                <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2">
+                    <Zap size={20} className="text-amber-500" />
+                    نمودارهای جریان
+                </h4>
+
+                <div className="grid gap-4">
+                    {Object.entries(flowDiagrams).map(([key, diagram]) => (
+                        <FlowDiagram key={key} flowKey={key} diagram={diagram} />
+                    ))}
+                </div>
+            </div>
+
+            {/* Activity log */}
+            <div className="bg-slate-900 text-slate-100 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-bold flex items-center gap-2">
+                        <Circle size={12} className="text-green-400 animate-pulse" />
+                        تاریخچه فعالیت
+                    </h4>
+                    <select
+                        value={selectedFlow}
+                        onChange={e => setSelectedFlow(e.target.value)}
+                        className="bg-slate-800 text-white text-sm px-3 py-1 rounded border border-slate-700"
+                    >
+                        <option value="all">همه</option>
+                        {Object.entries(flowDiagrams).map(([key, d]) => (
+                            <option key={key} value={key}>{d.title}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="space-y-2 max-h-64 overflow-y-auto font-mono text-sm">
+                    {recentActivity.length === 0 ? (
+                        <p className="text-slate-500 text-center py-4">هنوز فعالیتی ثبت نشده</p>
+                    ) : (
+                        recentActivity.map((entry, idx) => {
+                            const node = FLOW_NODES[entry.nodeId];
+                            const time = new Date(entry.timestamp).toLocaleTimeString('fa-IR');
+                            const categoryColor = FLOW_CATEGORIES[node?.category]?.color || '#64748b';
+
+                            return (
+                                <div
+                                    key={`${entry.timestamp}-${idx}`}
+                                    className="flex items-center gap-3 py-1 border-b border-slate-800"
+                                >
+                                    <span className="text-slate-500 w-20">{time}</span>
+                                    <span
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm"
+                                        style={{ backgroundColor: categoryColor }}
+                                    >
+                                        {node?.icon || '?'}
+                                    </span>
+                                    <span className="flex-1">{node?.label || entry.nodeId}</span>
+                                    {entry.flowType && (
+                                        <span className="text-xs px-2 py-0.5 bg-slate-800 rounded">
+                                            {flowDiagrams[entry.flowType]?.title || entry.flowType}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+
+            {/* Legend */}
+            <Card title="🔑 راهنمای رنگ‌ها">
+                <div className="flex flex-wrap gap-3">
+                    {Object.entries(FLOW_CATEGORIES).map(([key, cat]) => (
+                        <div key={key} className="flex items-center gap-2">
+                            <div
+                                className="w-4 h-4 rounded-full"
+                                style={{ backgroundColor: cat.color }}
+                            />
+                            <span className="text-sm text-slate-600">{cat.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </Card>
+
+            {/* CSS for animations */}
+            <style>{`
+                @keyframes flowLight {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(200%); }
+                }
+            `}</style>
+        </div>
+    );
+}
 
 function CustomVoiceCreator({ customVoices, setCustomVoices, setModalConfig }) {
     const [name, setName] = useState('');
@@ -1504,6 +1949,9 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState(lesson.archivedNotes || '');
 
+  // Flow tracking
+  const { setCurrentNode } = useExecutionFlow();
+
   // Sync editedNotes when lesson changes
   useEffect(() => {
     setEditedNotes(lesson.archivedNotes || '');
@@ -1548,6 +1996,7 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   const addAnalyzedContentToLesson = async () => {
       if (!analyzedContent) return;
       setIsProcessing(true);
+      setCurrentNode('mergingContent', 'fileAnalysis');
 
       let mergedNotes = analyzedContent;
       const customPrompts = data.customPrompts || {};
@@ -1599,6 +2048,7 @@ ${analyzedContent}
       addJournalEntry(`نکات درس "${lesson.title}" به‌روزرسانی شد.`);
 
       // Categorize items for knowledge base
+      setCurrentNode('categorizingItems', 'fileAnalysis');
       const categorizationPrompt = `از متن زیر که جزوه درس عربی لبنانی است، موارد را استخراج و دسته‌بندی کن.
 
 دسته‌بندی‌ها:
@@ -1650,6 +2100,7 @@ ${analyzedContent}
           let itemsAdded = 0;
           const validCategories = ['vocabulary', 'grammar', 'phrases', 'verbs', 'pronouns', 'adjectives'];
 
+          setCurrentNode('savingToLesson', 'fileAnalysis');
           for (const category of validCategories) {
             const items = categorizedItems[category];
             if (items && Array.isArray(items)) {
@@ -1678,12 +2129,15 @@ ${analyzedContent}
                 totalItems: currentProgress.totalItems + itemsAdded
               }
             });
+            setCurrentNode('complete', 'fileAnalysis');
             setModalConfig({ title: "موفقیت", message: `${itemsAdded} مورد با موفقیت به مرکز دانش اضافه شد.` });
           } else {
+            setCurrentNode('complete', 'fileAnalysis');
             setModalConfig({ title: "توجه", message: "موردی برای افزودن به مرکز دانش یافت نشد. محتوا ذخیره شد." });
           }
       } catch (e) {
           console.error("Failed to auto-categorize:", e);
+          setCurrentNode('error', 'fileAnalysis');
           // Still save the notes even if categorization fails
           setModalConfig({ title: "توجه", message: "نکات ذخیره شد. دسته‌بندی خودکار موفق نبود، اما می‌توانید از طریق چت با استاد هوش مصنوعی موارد را یاد بگیرید." });
       }
@@ -1691,6 +2145,7 @@ ${analyzedContent}
       setAnalyzedContent(null);
       setPastedText('');
       setIsProcessing(false);
+      setTimeout(() => setCurrentNode('idle'), 1500);
   };
 
   const handleAnalysis = async () => {
@@ -1706,6 +2161,7 @@ ${analyzedContent}
     setIsProcessing(true);
     setAnalyzedContent(null);
     setProcessingStatus('در حال آماده‌سازی فایل‌ها...');
+    setCurrentNode('fileUploading', 'fileAnalysis');
     addJournalEntry(`پردازش محتوا برای درس "${lesson.title}" شروع شد.`);
 
     try {
@@ -1723,6 +2179,7 @@ ${analyzedContent}
       formData.append('userInstructions', userInstructions);
 
       setProcessingStatus('در حال تحلیل محتوا (ممکن است چند دقیقه طول بکشد)...');
+      setCurrentNode('fileAnalyzing', 'fileAnalysis');
 
       const response = await fetch('/api/analyze-files', {
         method: 'POST',
@@ -1737,6 +2194,7 @@ ${analyzedContent}
       const result = await response.json();
 
       setAnalyzedContent(result.analysis);
+      setCurrentNode('complete', 'fileAnalysis');
 
       // Store media items in lesson for embedding
       if (result.mediaItems && result.mediaItems.length > 0) {
@@ -1750,10 +2208,12 @@ ${analyzedContent}
 
     } catch (error) {
       console.error('Analysis error:', error);
+      setCurrentNode('error', 'fileAnalysis');
       setModalConfig({ title: "خطای تحلیل", message: error.message || "خطا در تحلیل محتوا." });
       setProcessingStatus('');
     } finally {
       setIsProcessing(false);
+      setTimeout(() => setCurrentNode('idle'), 1500);
     }
   };
 
@@ -3213,6 +3673,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const [chatHistory, setChatHistory] = useState(initialHistory || []);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Execution flow tracking
+  const { setCurrentNode } = useExecutionFlow();
   const chatWindowRef = useRef(null);
   const [customScenarioName, setCustomScenarioName] = useState('');
   const [customScenarioDetails, setCustomScenarioDetails] = useState('');
@@ -3374,6 +3837,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     const messageText = textToSend || input;
     if ((!messageText.trim() && !attachedFile && !audioBlobUrl) || isLoading) return;
 
+    // Track flow: User input received
+    setCurrentNode(audioBlobUrl ? 'audioRecording' : 'userInput', audioBlobUrl ? 'chatVoice' : 'chat');
+
     let fullMessage = messageText;
     if (attachedFile) {
         fullMessage = `[User has attached a file named: ${attachedFile.name}]\n${messageText}`;
@@ -3388,6 +3854,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     setInput('');
     setAttachedFile(null);
     setIsLoading(true);
+
+    // Track flow: Building prompt
+    setCurrentNode('buildingPrompt');
 
     // Build system prompt using customPrompts (from settings) or defaults
     const customPrompts = data.customPrompts || {};
@@ -3431,6 +3900,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     for (const m of newHistory) {
       if (m.parts[0].type === 'audio' && m.parts[0].audioUrl) {
         // Transcribe audio to text first
+        setCurrentNode('audioTranscription');
         try {
           const response = await fetch(m.parts[0].audioUrl);
           const blob = await response.blob();
@@ -3481,8 +3951,20 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     const payload = { contents: contentsForApi, systemInstruction: { parts: [{ text: systemPrompt }] } };
 
     try {
+        // Track flow: Calling Gemini API
+        setCurrentNode('callingGemini');
         const aiResponseText = await callGeminiAPI(payload);
+
+        // Track flow: Received response
+        setCurrentNode('receivingResponse');
+
         let ttsPrompt = `Say in a clear, ${accentMode === 'standard' ? 'standard' : 'authentic, colloquial Beirut'} Lebanese accent: ${aiResponseText.split('TRANSLATION:')[0]}`;
+
+        // Track flow: Generating TTS (if needed)
+        if (aiResponseType === 'audio' || voiceConversationMode) {
+            setCurrentNode('generatingTTS');
+        }
+
         const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
         const audioResult = await audioPromise;
         const audioUrl = audioResult ? getWavUrl(audioResult.audioData, audioResult.mimeType) : null;
@@ -3493,6 +3975,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
         // Play audio and handle voice conversation mode
         if ((aiResponseType === 'audio' || voiceConversationMode) && audioUrl) {
+            // Track flow: Playing audio
+            setCurrentNode('playingAudio');
             const audio = new Audio(audioUrl);
             currentAudioRef.current = audio;
 
@@ -3527,6 +4011,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             });
         }
     } catch(error) {
+        // Track flow: Error occurred
+        setCurrentNode('error');
         const errorAiMessage = { role: 'model', parts: [{ text: "متاسفانه مشکلی پیش آمد.", type: 'text', isError: true }] };
         setChatHistory(prev => [...prev, errorAiMessage]);
         // Stop voice conversation mode on error
@@ -3536,6 +4022,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         }
     } finally {
         setIsLoading(false);
+        // Track flow: Back to idle (after a short delay to show complete)
+        setTimeout(() => setCurrentNode('idle'), 1500);
     }
   };
 
@@ -4260,6 +4748,9 @@ function LiveVoiceChat({
   const [correctionWrong, setCorrectionWrong] = useState('');
   const [correctionCorrect, setCorrectionCorrect] = useState('');
 
+  // Flow tracking
+  const { setCurrentNode } = useExecutionFlow();
+
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
   const streamRef = useRef(null);
@@ -4343,6 +4834,7 @@ function LiveVoiceChat({
     isPlayingRef.current = false;
 
     setConnectionStatus('connecting');
+    setCurrentNode('wsConnecting', 'liveVoice');
     setTranscript([]);
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -4361,15 +4853,18 @@ function LiveVoiceChat({
       wsRef.current.onerror = (e) => {
         console.error('WebSocket error:', e);
         setConnectionStatus('error');
+        setCurrentNode('error', 'liveVoice');
       };
       wsRef.current.onclose = (e) => {
         console.log('WebSocket closed:', e.code, e.reason);
         setConnectionStatus('disconnected');
+        setCurrentNode('idle', 'liveVoice');
         stopListening();
       };
     } catch (error) {
       console.error('Connection error:', error);
       setConnectionStatus('error');
+      setCurrentNode('error', 'liveVoice');
     }
   };
 
@@ -4424,6 +4919,7 @@ function LiveVoiceChat({
       wsRef.current = null;
     }
     setConnectionStatus('disconnected');
+    setCurrentNode('idle', 'liveVoice');
     setTranscript([]);
   };
 
@@ -4742,6 +5238,7 @@ ${conversationSummary}
 
     if (message.type === 'connected') {
       setConnectionStatus('connected');
+      setCurrentNode('wsConnected', 'liveVoice');
       const connectMsg = pronunciationCorrections && pronunciationCorrections.length > 0
         ? `متصل شدم! ${pronunciationCorrections.length} اصلاح تلفظی اعمال شد. دکمه رو نگه دارید.`
         : 'متصل شدم! دکمه رو نگه دارید و صحبت کنید';
@@ -4751,6 +5248,7 @@ ${conversationSummary}
 
     if (message.type === 'disconnected' || message.error) {
       setConnectionStatus(message.error ? 'error' : 'disconnected');
+      setCurrentNode(message.error ? 'error' : 'idle', 'liveVoice');
       if (message.error) setTranscript(prev => [...prev, { role: 'error', text: message.error }]);
       return;
     }
@@ -4768,6 +5266,7 @@ ${conversationSummary}
       if (message.serverContent.inputTranscription?.text) {
         const userText = message.serverContent.inputTranscription.text;
         console.log('🎤 User transcript:', userText);
+        setCurrentNode('liveStreaming', 'liveVoice');
         // Update the last user message if exists, or add new one
         const lastUserIndex = conversationRef.current.length - 1;
         if (lastUserIndex >= 0 && conversationRef.current[lastUserIndex].role === 'user') {
@@ -4779,6 +5278,7 @@ ${conversationSummary}
       const parts = message.serverContent.modelTurn?.parts || [];
       for (const part of parts) {
         if (part.inlineData?.mimeType?.startsWith('audio/')) {
+          setCurrentNode('liveSpeaking', 'liveVoice');
           playAudioChunk(part.inlineData.data, part.inlineData.mimeType);
           // Store audio chunk for recording
           currentAiAudioChunksRef.current.push({
@@ -4788,6 +5288,7 @@ ${conversationSummary}
           setIsSpeaking(true);
         }
         if (part.text) {
+          setCurrentNode('liveReceiving', 'liveVoice');
           currentAiTextRef.current += part.text;
           setTranscript(prev => [...prev, { role: 'ai', text: part.text }]);
         }
@@ -4800,6 +5301,7 @@ ${conversationSummary}
 
       if (shouldSave || message.serverContent.turnComplete) {
         setIsSpeaking(false);
+        setCurrentNode('wsConnected', 'liveVoice');
         // Save completed AI response to conversation
         if (currentAiAudioChunksRef.current.length > 0 || currentAiTextRef.current) {
           const combinedAudio = combineAudioChunks(currentAiAudioChunksRef.current);
@@ -4858,6 +5360,7 @@ ${conversationSummary}
   const startListening = async () => {
     if (connectionStatus !== 'connected') return;
     try {
+      setCurrentNode('liveListening', 'liveVoice');
       // Enhanced audio settings for better voice recognition
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -4902,6 +5405,7 @@ ${conversationSummary}
       processor.connect(audioContext.destination);
       setIsListening(true);
     } catch (error) {
+      setCurrentNode('error', 'liveVoice');
       setTranscript(prev => [...prev, { role: 'error', text: 'خطا در میکروفون' }]);
     }
   };
@@ -4938,6 +5442,7 @@ ${conversationSummary}
       mimeType: null
     });
 
+    setCurrentNode('wsConnected', 'liveVoice');
     setIsListening(false);
   };
 
