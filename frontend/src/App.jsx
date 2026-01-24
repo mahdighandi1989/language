@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -24,6 +24,300 @@ const Fonts = () => (
 
 // --- Initial Data ---
 // Defines the initial state structure for the application for a new user.
+// Default prompts for AI system - can be customized via Settings
+const defaultPrompts = {
+  // Chat prompts
+  chatBase: `You are "Jad", a friendly Lebanese Arabic tutor for a Persian beginner. Your entire response MUST be in simple Lebanese Arabic.`,
+  chatFinglish: `Write your responses using Arabizi (Lebanese chat alphabet). For example: 'Mni7 ktir! Shu 3melt lyoum?'. Use numbers for specific letters: 7 for ح, 3 for ع, 2 for ء, 6 for ط, 9 for ص.`,
+  chatTashkeel: `Write your responses in Arabic script with full Lebanese dialect vowel markings (Tashkeel) to aid pronunciation.`,
+  chatLessonContext: `Your conversation MUST be based on the provided lesson notes (ONLY the correct content):`,
+  chatScenario: `You are role-playing.`,
+  chatTopicFocus: `Focus the conversation on these items:`,
+
+  // Live voice prompts (Arabic)
+  liveVoiceIntro: `انت جاد، شب لبناني من بيروت عمرك 28 سنة. انت معلم لهجة لبنانية لطالب أجنبي.`,
+  liveVoiceRules: `مهم كتير كتير: لازم تحكي باللهجة اللبنانية البيروتية بس! ممنوع الفصحى نهائياً!`,
+  liveVoiceSimplified: `حاول تحكي ببطء وبوضوح حتى الطالب يفهم.`,
+  liveVoiceAuthentic: `احكي بطريقة طبيعية متل شب لبناني حقيقي.`,
+  liveVoicePronunciation: `=== قواعد النطق اللبناني الأساسية ===
+
+1. تحويل الحروف - مهم جداً للهجة:
+   - القاف → همزة: قال=آل، قلب=ألب، قهوة=أهوة، قمر=أمر
+   - الثاء → ت أو س: ثلاثة=تلاتة، ثاني=تاني، كثير=كتير
+   - الذال → د أو ز: هذا=هيدا، ذهب=دهب، لذيذ=لزيز
+   - الضاد أحياناً → ظ أو د: بيضة=بيظة
+
+2. تقصير وإيقاع الكلام:
+   - احذف الحركات القصيرة: كِتاب=كتاب (بسكون)
+   - مدّ الألفات: آه، هلأ، شو، ليش
+   - الكلام سريع وخفيف مش ثقيل`,
+  liveVoiceVocabulary: `=== المفردات اللبنانية الأساسية - استخدمها دائماً ===
+
+بدل "ماذا/ما": شو
+بدل "كيف حالك": كيفك
+بدل "الآن": هلأ، هلق
+بدل "جيد/حسن": منيح، تمام
+بدل "جداً/كثيراً": كتير
+بدل "لماذا": ليش
+بدل "أين": وين
+بدل "أريد": بدّي
+بدل "تريد": بدّك
+بدل "هذا": هيدا
+بدل "هذه": هيدي
+بدل "هؤلاء": هودي، هول
+بدل "أستطيع": فيّي
+بدل "تستطيع": فيك
+بدل "لا أستطيع": ما فيّي
+بدل "لا أعرف": ما بعرف
+بدل "نعم": إي، أي
+بدل "لا": لأ`,
+  liveVoiceVerbs: `=== الأفعال بالطريقة اللبنانية ===
+
+المضارع المستمر = عم + فعل:
+"شو عم تعمل؟" "عم بحكي" "عم ناكل"
+
+المستقبل = رح + فعل:
+"رح روح" "رح نحكي" "رح تتعلم"
+
+النفي = ما + فعل:
+"ما بعرف" "ما فهمت" "ما فيي"`,
+  liveVoiceExpressions: `=== تعابير لبنانية شائعة - استخدمها بكثرة ===
+
+يلا = هيا، تشجيع
+خلص = انتهى، كفى
+بس = فقط، لكن
+كمان = أيضاً
+شي = شيء
+هيك = هكذا
+طيب = حسناً
+ماشي = موافق
+عنجد = حقاً
+أكيد = بالتأكيد
+والله = للتأكيد
+يعني = للتوضيح
+متل = مثل
+أحسن = أفضل`,
+  liveVoiceExamples: `=== نماذج جمل لبنانية صحيحة ===
+
+"أهلا فيك! كيفك اليوم؟"
+"شو اسمك؟ من وين انت؟"
+"كتير منيح! برافو عليك!"
+"ما فهمت، فيك تعيد؟"
+"يلا نكمل"
+"شو بدك تتعلم؟"
+"هيدي كلمة جديدة"
+"طيب، رح نحكي شوي"
+"عنجد كتير شاطر!"
+"إي هيك، تمام!"`,
+  liveVoiceStyle: `=== أسلوب المحادثة ===
+
+- ردودك قصيرة وطبيعية (جملة أو جملتين)
+- استخدم "يا" للنداء: "كيفك يا صديقي؟"
+- كن ودود ومشجع
+- اضحك وامزح أحياناً
+- استخدم التعابير العامية كثيراً`,
+  liveVoiceImportantRules: `=== قواعد مهمة جداً ===
+
+- ممنوع تقول "خلصنا" أو "كفاية لليوم" أو "تعبت" - استمر بالمحادثة دائماً!
+- ممنوع تنهي المحادثة من عندك - الطالب هو يلي بيقرر متى يخلص
+- دائماً اسأل سؤال جديد أو كمّل الحديث
+- لا تفترض إنو الطالب تعبان أو بدو يوقف`,
+  liveVoiceClosing: `تذكر: انت شب لبناني حقيقي من بيروت. احكي متل ما بتحكي مع رفقاتك. خليك طبيعي ودافئ. كل كلمة لازم تكون لبنانية 100% - ممنوع الفصحى!`,
+
+  // Analysis prompts (Persian)
+  analysisLebaneseCorrection: `=== قواعد تصحیح عربی لبنانی ===
+هنگام تحلیل محتوا، اشتباهات رایج را بر اساس این قواعد تصحیح کن:
+
+1. تبدیل حروف لبنانی:
+   - قاف → همزه: قال=آل، قلب=ألب، قهوة=أهوة
+   - ثاء → ت یا س: ثلاثة=تلاتة، كثير=كتير
+   - ذال → د یا ز: هذا=هيدا، لذيذ=لزيز
+
+2. واژگان صحیح لبنانی:
+   - "ماذا" → "شو"
+   - "كيف حالك" → "كيفك"
+   - "الآن" → "هلأ/هلق"
+   - "جيد" → "منيح"
+   - "كثيراً" → "كتير"
+   - "لماذا" → "ليش"
+   - "أين" → "وين"
+   - "أريد" → "بدّي"
+   - "هذا/هذه" → "هيدا/هيدي"
+
+3. ساختار فعل لبنانی:
+   - مضارع مستمر: عم + فعل (عم بحكي)
+   - آینده: رح + فعل (رح روح)
+   - نفی: ما + فعل (ما بعرف)`,
+  analysisSystem: `تو یک تحلیلگر زبان‌شناسی متخصص برای دانش‌آموز فارسی‌زبانی هستی که عربی لبنانی یاد می‌گیرد.`,
+  analysisOutputFormat: `=== فرمت خروجی ===
+خروجی باید به فارسی و با ساختار زیر باشد. از فرمت markdown استفاده کن:
+
+---
+
+## 📚 لغات و واژگان
+
+| کلمه لبنانی | تلفظ فینگلیش | معنی فارسی | مثال در جمله |
+|------------|--------------|-----------|--------------|
+| كيفك | kifak | چطوری؟ | كيفك اليوم؟ |
+
+---
+
+## 💬 عبارات و اصطلاحات کاربردی
+
+### 🗣️ سلام و احوالپرسی
+- **مرحبا** (marhaba) → سلام
+  - 💡 استفاده: غیررسمی، روزمره
+
+---
+
+## 📝 نکات گرامری
+
+### 🔹 ضمایر متصل
+| ضمیر | مثال | معنی |
+|------|------|------|
+| ـي | كتابي | کتابم |
+
+---
+
+## ✏️ تصحیحات لهجه
+
+| ✅ صحیح (لبنانی) | ❌ غلط (فصیح/اشتباه) | توضیح |
+|-----------------|---------------------|-------|
+
+---
+
+## 📌 نکات فرهنگی و مهم
+
+- 💡 [نکته مهم]
+- ⚠️ [هشدار]`,
+  analysisInstructions: `⚠️ نکات مهم:
+- همه لغات و عبارات موجود در محتوا را استخراج کن
+- تصحیحات را مشخص کن: اول صحیح، بعد غلط
+- برای هر بخش که محتوایی ندارد، آن بخش را ننویس
+- زبان خروجی: فارسی (با عبارات عربی در جدول‌ها)`,
+
+  // Merge prompts
+  mergeSystem: `تو یک ویراستار متخصص هستی که جزوات آموزشی عربی لبنانی را ادغام می‌کنی.
+
+⚠️ قوانین حیاتی:
+1. **هرگز محتوای قبلی را حذف نکن** - همه لغات، عبارات و نکات قبلی باید کامل حفظ شوند
+2. فقط موارد **کاملاً یکسان** (کلمه به کلمه) را تکراری در نظر بگیر
+3. موارد مشابه ولی متفاوت را نگه دار (مثلاً دو جمله مختلف با یک کلمه)
+4. محتوای جدید را به **انتهای** هر بخش مربوطه اضافه کن
+5. ساختار و فرمت markdown را حفظ کن
+
+⚡ خروجی نهایی باید شامل 100% موارد قبلی + موارد جدید باشد.`,
+
+  // Quiz prompts
+  quizSystem: `تو یک سازنده آزمون عربی لبنانی هستی.`,
+  quizQuestionTypes: `انواع سوالات:
+- mcq: چهارگزینه‌ای
+- fill_in_blank: جای خالی
+- translate_to_persian: ترجمه به فارسی
+- translate_to_arabic: ترجمه به عربی
+- word_order: مرتب کردن کلمات
+- matching: تطابق`,
+  quizInstructions: `سوالات را بر اساس محتوای درس و سطح دشواری انتخاب‌شده بساز.
+از تنوع در انواع سوالات استفاده کن.
+پاسخ‌های صحیح باید دقیق و مطابق با محتوای درس باشند.`,
+
+  // Study plan prompts
+  studyPlanSystem: `تو یک مربی زبان عربی لبنانی برای فارسی‌زبانان هستی.
+بر اساس دروس و آمار کاربر، یک برنامه مطالعه هفتگی شخصی‌سازی شده بساز.`,
+  studyPlanFormat: `فرمت خروجی:
+- برنامه روزانه با زمان‌بندی پیشنهادی
+- اولویت‌بندی دروس بر اساس پیشرفت
+- تمرینات پیشنهادی
+- اهداف هفتگی`,
+
+  // General assistant prompt
+  generalAssistant: `You are a helpful AI assistant for a student learning Lebanese Arabic. You can answer questions, analyze text for learning points, or provide general help.`,
+
+  // TTS prompt template
+  ttsPromptTemplate: `Say in a clear, {accentMode} Lebanese accent:`,
+};
+
+// Helper function to get a prompt (checks customPrompts first, falls back to defaultPrompts)
+function getPrompt(customPrompts, key) {
+  return customPrompts?.[key] || defaultPrompts[key] || '';
+}
+
+// Prompt categories for UI organization
+const promptCategories = {
+  chat: {
+    title: '💬 چت متنی با استاد',
+    description: 'پرامپت‌های مربوط به چت متنی با استاد جاد',
+    prompts: ['chatBase', 'chatFinglish', 'chatTashkeel', 'chatLessonContext', 'chatScenario', 'chatTopicFocus']
+  },
+  liveVoice: {
+    title: '🎤 مکالمه صوتی زنده',
+    description: 'پرامپت‌های مربوط به مکالمه صوتی Real-time با استاد',
+    prompts: ['liveVoiceIntro', 'liveVoiceRules', 'liveVoiceSimplified', 'liveVoiceAuthentic',
+              'liveVoicePronunciation', 'liveVoiceVocabulary', 'liveVoiceVerbs',
+              'liveVoiceExpressions', 'liveVoiceExamples', 'liveVoiceStyle',
+              'liveVoiceImportantRules', 'liveVoiceClosing']
+  },
+  analysis: {
+    title: '📊 تحلیل محتوا',
+    description: 'پرامپت‌های مربوط به تحلیل فایل‌ها و استخراج محتوای آموزشی',
+    prompts: ['analysisSystem', 'analysisLebaneseCorrection', 'analysisOutputFormat', 'analysisInstructions']
+  },
+  merge: {
+    title: '🔀 ادغام جزوات',
+    description: 'پرامپت مربوط به ادغام محتوای جدید با محتوای قبلی',
+    prompts: ['mergeSystem']
+  },
+  quiz: {
+    title: '📝 ساخت آزمون',
+    description: 'پرامپت‌های مربوط به تولید سوالات آزمون',
+    prompts: ['quizSystem', 'quizQuestionTypes', 'quizInstructions']
+  },
+  studyPlan: {
+    title: '📅 برنامه‌ریزی',
+    description: 'پرامپت‌های مربوط به ساخت برنامه مطالعه',
+    prompts: ['studyPlanSystem', 'studyPlanFormat']
+  },
+  other: {
+    title: '⚙️ سایر',
+    description: 'سایر پرامپت‌ها',
+    prompts: ['generalAssistant', 'ttsPromptTemplate']
+  }
+};
+
+// Prompt labels for display (Persian names)
+const promptLabels = {
+  chatBase: 'پرامپت پایه چت',
+  chatFinglish: 'دستور نوشتن فینگلیش',
+  chatTashkeel: 'دستور نوشتن با اعراب',
+  chatLessonContext: 'معرفی محتوای درس',
+  chatScenario: 'معرفی سناریو نقش‌آفرینی',
+  chatTopicFocus: 'تمرکز روی موضوع',
+  liveVoiceIntro: 'معرفی شخصیت جاد',
+  liveVoiceRules: 'قوانین اصلی لهجه',
+  liveVoiceSimplified: 'حالت ساده‌شده',
+  liveVoiceAuthentic: 'حالت اصیل',
+  liveVoicePronunciation: 'قواعد تلفظ',
+  liveVoiceVocabulary: 'لغات لبنانی',
+  liveVoiceVerbs: 'ساختار افعال',
+  liveVoiceExpressions: 'عبارات رایج',
+  liveVoiceExamples: 'نمونه جملات',
+  liveVoiceStyle: 'سبک مکالمه',
+  liveVoiceImportantRules: 'قوانین مهم',
+  liveVoiceClosing: 'پیام پایانی',
+  analysisSystem: 'پرامپت سیستم تحلیل',
+  analysisLebaneseCorrection: 'قواعد تصحیح لبنانی',
+  analysisOutputFormat: 'فرمت خروجی',
+  analysisInstructions: 'دستورات نهایی',
+  mergeSystem: 'پرامپت ادغام',
+  quizSystem: 'پرامپت سیستم آزمون',
+  quizQuestionTypes: 'انواع سوالات',
+  quizInstructions: 'دستورات آزمون',
+  studyPlanSystem: 'پرامپت برنامه‌ریزی',
+  studyPlanFormat: 'فرمت برنامه',
+  generalAssistant: 'دستیار عمومی',
+  ttsPromptTemplate: 'قالب TTS'
+};
+
 const initialData = {
   lessons: [],
   knowledgeBase: {
@@ -62,6 +356,8 @@ const initialData = {
     voiceConversationSilenceThreshold: 2000, // ms - silence duration to auto-send
   },
   archivedConversations: [],
+  // Custom prompts (overrides defaultPrompts when set)
+  customPrompts: {},
 };
 
 // --- Gemini API Helpers ---
@@ -538,7 +834,9 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
 }
 
 function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection }) {
+    const [activeTab, setActiveTab] = useState('general');
     const pronunciationCorrections = data.pronunciationCorrections || [];
+    const customPrompts = data.customPrompts || {};
 
     const handleSettingChange = (key, value) => {
         setData(prev => ({
@@ -549,99 +847,328 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
             }
         }));
     };
+
+    const handlePromptChange = (promptKey, value) => {
+        setData(prev => ({
+            ...prev,
+            customPrompts: {
+                ...prev.customPrompts,
+                [promptKey]: value
+            }
+        }));
+    };
+
+    const resetPrompt = (promptKey) => {
+        setData(prev => {
+            const newCustomPrompts = { ...prev.customPrompts };
+            delete newCustomPrompts[promptKey];
+            return { ...prev, customPrompts: newCustomPrompts };
+        });
+    };
+
+    const resetAllPrompts = () => {
+        setModalConfig({
+            title: '⚠️ بازنشانی همه پرامپت‌ها',
+            message: 'آیا مطمئن هستید؟ همه تغییرات پرامپت‌ها به حالت پیش‌فرض برمی‌گردند.',
+            buttons: [
+                { label: 'انصراف', onClick: () => setModalConfig(null), className: 'bg-slate-200' },
+                { label: 'بازنشانی', onClick: () => { setData(prev => ({ ...prev, customPrompts: {} })); setModalConfig(null); }, className: 'bg-red-500 text-white' }
+            ]
+        });
+    };
+
     const { defaultChatSettings = initialData.defaultChatSettings } = data;
     const availableVoices = { 'Charon': 'مرد - استاندارد', 'Kore': 'زن - محکم', 'Zephyr': 'زن - روشن', 'Puck': 'مرد - شاد', 'Leda': 'زن - جوان', 'Fenrir': 'مرد - هیجان‌زده' };
 
+    const tabs = [
+        { id: 'general', label: '⚙️ عمومی', icon: Settings },
+        { id: 'prompts', label: '🧠 مدیریت پرامپت‌ها', icon: MessageSquare }
+    ];
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             <h2 className="text-4xl font-bold text-slate-800">تنظیمات</h2>
-            <Card title="تنظیمات پیش‌فرض مکالمه">
-                <div className="space-y-4 text-sm">
-                    <div><label className="font-bold">صدای استاد:</label><select value={defaultChatSettings.aiVoice} onChange={e => handleSettingChange('aiVoice', e.target.value)} className="w-full p-2 border rounded mt-1">{Object.entries(availableVoices).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></div>
-                    <div className="border-t pt-3"><label className="font-bold">لهجه استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="accent" value="standard" checked={defaultChatSettings.accentMode === 'standard'} onChange={() => handleSettingChange('accentMode', 'standard')} /> استاندارد</label><label><input type="radio" name="accent" value="authentic" checked={defaultChatSettings.accentMode === 'authentic'} onChange={() => handleSettingChange('accentMode', 'authentic')} /> محاوره‌ای</label></div></div>
-                    <div className="border-t pt-3"><label className="font-bold">سبک نوشتار:</label><select value={defaultChatSettings.writingStyle} onChange={e => handleSettingChange('writingStyle', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="simple_arabic">عربی ساده</option><option value="finglish">فینگلیش (Arabizi)</option><option value="tashkeel">عربی با اعراب</option></select></div>
-                    <div className="border-t pt-3"><label className="font-bold">نمایش ترجمه:</label><select value={defaultChatSettings.translationLanguage} onChange={e => handleSettingChange('translationLanguage', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="none">بدون ترجمه</option><option value="persian">فارسی</option><option value="english">انگلیسی</option></select></div>
-                    <div className="border-t pt-3"><label className="font-bold">پاسخ استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="receiveAs" value="audio" checked={defaultChatSettings.aiResponseType === 'audio'} onChange={() => handleSettingChange('aiResponseType', 'audio')} /> صدا</label><label><input type="radio" name="receiveAs" value="text" checked={defaultChatSettings.aiResponseType === 'text'} onChange={() => handleSettingChange('aiResponseType', 'text')} /> فقط متن</label></div></div>
-                </div>
-            </Card>
 
-            <Card title="⚙️ تنظیمات حالت مکالمه صوتی">
-                <div className="space-y-4 text-sm">
-                    <p className="text-slate-600 text-xs">این تنظیمات فقط روی حالت مکالمه صوتی (دکمه تلفن بنفش) اعمال میشن.</p>
-                    <div>
-                        <label className="font-bold">تاخیر قبل از بوق (میلی‌ثانیه):</label>
-                        <p className="text-xs text-slate-500 mb-1">بعد از پاسخ استاد، چند میلی‌ثانیه صبر کنه تا بوق بزنه</p>
-                        <input
-                            type="range"
-                            min="0"
-                            max="2000"
-                            step="100"
-                            value={defaultChatSettings.voiceConversationBeepDelay || 500}
-                            onChange={e => handleSettingChange('voiceConversationBeepDelay', parseInt(e.target.value))}
-                            className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-slate-400">
-                            <span>0</span>
-                            <span className="font-bold text-teal-600">{defaultChatSettings.voiceConversationBeepDelay || 500} ms</span>
-                            <span>2000</span>
-                        </div>
-                    </div>
-                    <div className="border-t pt-3">
-                        <label className="font-bold">آستانه سکوت برای ارسال (ثانیه):</label>
-                        <p className="text-xs text-slate-500 mb-1">اگر این مدت سکوت کنید، صدا خودکار ارسال میشه</p>
-                        <input
-                            type="range"
-                            min="1000"
-                            max="5000"
-                            step="500"
-                            value={defaultChatSettings.voiceConversationSilenceThreshold || 2000}
-                            onChange={e => handleSettingChange('voiceConversationSilenceThreshold', parseInt(e.target.value))}
-                            className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-slate-400">
-                            <span>1 ثانیه</span>
-                            <span className="font-bold text-teal-600">{(defaultChatSettings.voiceConversationSilenceThreshold || 2000) / 1000} ثانیه</span>
-                            <span>5 ثانیه</span>
-                        </div>
-                    </div>
-                </div>
-            </Card>
+            {/* Tab Navigation */}
+            <div className="flex gap-2 border-b pb-2">
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`px-4 py-2 rounded-t-lg font-bold transition-all ${
+                            activeTab === tab.id
+                                ? 'bg-teal-500 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
 
-            <Card title="📝 اصلاحات تلفظی یادگرفته شده">
-                <div className="space-y-3">
-                    <p className="text-sm text-slate-600">
-                        این اصلاحات از آنالیز تماس‌های قبلی استخراج شدن و در تماس‌های بعدی به Live API ارسال میشن.
-                    </p>
-                    {pronunciationCorrections.length === 0 ? (
-                        <p className="text-center text-slate-400 py-4">هنوز اصلاحی ثبت نشده. بعد از هر تماس، سیستم خودکار آنالیز میکنه.</p>
-                    ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {pronunciationCorrections.map((c, i) => (
-                                <div key={c.id || i} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-red-500 line-through">{c.wrong}</span>
-                                            <span className="text-slate-400">←</span>
-                                            <span className="text-green-600 font-bold">{c.correct}</span>
-                                        </div>
-                                        {c.date && <p className="text-xs text-slate-400 mt-1">{new Date(c.date).toLocaleDateString('fa-IR')}</p>}
-                                    </div>
-                                    <button
-                                        onClick={() => removePronunciationCorrection && removePronunciationCorrection(c.id)}
-                                        className="text-red-400 hover:text-red-600 p-1"
-                                        title="حذف"
-                                    >
-                                        <X size={16} />
-                                    </button>
+            {/* General Settings Tab */}
+            {activeTab === 'general' && (
+                <div className="space-y-6">
+                    <Card title="تنظیمات پیش‌فرض مکالمه">
+                        <div className="space-y-4 text-sm">
+                            <div><label className="font-bold">صدای استاد:</label><select value={defaultChatSettings.aiVoice} onChange={e => handleSettingChange('aiVoice', e.target.value)} className="w-full p-2 border rounded mt-1">{Object.entries(availableVoices).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></div>
+                            <div className="border-t pt-3"><label className="font-bold">لهجه استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="accent" value="standard" checked={defaultChatSettings.accentMode === 'standard'} onChange={() => handleSettingChange('accentMode', 'standard')} /> استاندارد</label><label><input type="radio" name="accent" value="authentic" checked={defaultChatSettings.accentMode === 'authentic'} onChange={() => handleSettingChange('accentMode', 'authentic')} /> محاوره‌ای</label></div></div>
+                            <div className="border-t pt-3"><label className="font-bold">سبک نوشتار:</label><select value={defaultChatSettings.writingStyle} onChange={e => handleSettingChange('writingStyle', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="simple_arabic">عربی ساده</option><option value="finglish">فینگلیش (Arabizi)</option><option value="tashkeel">عربی با اعراب</option></select></div>
+                            <div className="border-t pt-3"><label className="font-bold">نمایش ترجمه:</label><select value={defaultChatSettings.translationLanguage} onChange={e => handleSettingChange('translationLanguage', e.target.value)} className="w-full p-2 border rounded mt-1"><option value="none">بدون ترجمه</option><option value="persian">فارسی</option><option value="english">انگلیسی</option></select></div>
+                            <div className="border-t pt-3"><label className="font-bold">پاسخ استاد:</label><div className="flex gap-4 mt-2"><label><input type="radio" name="receiveAs" value="audio" checked={defaultChatSettings.aiResponseType === 'audio'} onChange={() => handleSettingChange('aiResponseType', 'audio')} /> صدا</label><label><input type="radio" name="receiveAs" value="text" checked={defaultChatSettings.aiResponseType === 'text'} onChange={() => handleSettingChange('aiResponseType', 'text')} /> فقط متن</label></div></div>
+                        </div>
+                    </Card>
+
+                    <Card title="⚙️ تنظیمات حالت مکالمه صوتی">
+                        <div className="space-y-4 text-sm">
+                            <p className="text-slate-600 text-xs">این تنظیمات فقط روی حالت مکالمه صوتی (دکمه تلفن بنفش) اعمال میشن.</p>
+                            <div>
+                                <label className="font-bold">تاخیر قبل از بوق (میلی‌ثانیه):</label>
+                                <p className="text-xs text-slate-500 mb-1">بعد از پاسخ استاد، چند میلی‌ثانیه صبر کنه تا بوق بزنه</p>
+                                <input type="range" min="0" max="2000" step="100" value={defaultChatSettings.voiceConversationBeepDelay || 500} onChange={e => handleSettingChange('voiceConversationBeepDelay', parseInt(e.target.value))} className="w-full" />
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>0</span>
+                                    <span className="font-bold text-teal-600">{defaultChatSettings.voiceConversationBeepDelay || 500} ms</span>
+                                    <span>2000</span>
                                 </div>
-                            ))}
+                            </div>
+                            <div className="border-t pt-3">
+                                <label className="font-bold">آستانه سکوت برای ارسال (ثانیه):</label>
+                                <p className="text-xs text-slate-500 mb-1">اگر این مدت سکوت کنید، صدا خودکار ارسال میشه</p>
+                                <input type="range" min="1000" max="5000" step="500" value={defaultChatSettings.voiceConversationSilenceThreshold || 2000} onChange={e => handleSettingChange('voiceConversationSilenceThreshold', parseInt(e.target.value))} className="w-full" />
+                                <div className="flex justify-between text-xs text-slate-400">
+                                    <span>1 ثانیه</span>
+                                    <span className="font-bold text-teal-600">{(defaultChatSettings.voiceConversationSilenceThreshold || 2000) / 1000} ثانیه</span>
+                                    <span>5 ثانیه</span>
+                                </div>
+                            </div>
                         </div>
-                    )}
-                    <div className="border-t pt-3 mt-3">
-                        <p className="text-xs text-slate-500">
-                            💡 <strong>نحوه کار:</strong> وقتی تماس تموم میشه → آنالیز خودکار → اصلاحات ذخیره میشن → در تماس بعدی به Live API گفته میشه
-                        </p>
+                    </Card>
+
+                    <Card title="📝 اصلاحات تلفظی یادگرفته شده">
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-600">این اصلاحات از آنالیز تماس‌های قبلی استخراج شدن و در تماس‌های بعدی به Live API ارسال میشن.</p>
+                            {pronunciationCorrections.length === 0 ? (
+                                <p className="text-center text-slate-400 py-4">هنوز اصلاحی ثبت نشده. بعد از هر تماس، سیستم خودکار آنالیز میکنه.</p>
+                            ) : (
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
+                                    {pronunciationCorrections.map((c, i) => (
+                                        <div key={c.id || i} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-red-500 line-through">{c.wrong}</span>
+                                                    <span className="text-slate-400">←</span>
+                                                    <span className="text-green-600 font-bold">{c.correct}</span>
+                                                </div>
+                                                {c.date && <p className="text-xs text-slate-400 mt-1">{new Date(c.date).toLocaleDateString('fa-IR')}</p>}
+                                            </div>
+                                            <button onClick={() => removePronunciationCorrection && removePronunciationCorrection(c.id)} className="text-red-400 hover:text-red-600 p-1" title="حذف"><X size={16} /></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="border-t pt-3 mt-3">
+                                <p className="text-xs text-slate-500">💡 <strong>نحوه کار:</strong> وقتی تماس تموم میشه → آنالیز خودکار → اصلاحات ذخیره میشن → در تماس بعدی به Live API گفته میشه</p>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* Prompt Management Tab */}
+            {activeTab === 'prompts' && (
+                <PromptManagement
+                    customPrompts={customPrompts}
+                    handlePromptChange={handlePromptChange}
+                    resetPrompt={resetPrompt}
+                    resetAllPrompts={resetAllPrompts}
+                />
+            )}
+        </div>
+    );
+}
+
+// Prompt Management Component
+function PromptManagement({ customPrompts, handlePromptChange, resetPrompt, resetAllPrompts }) {
+    const [expandedCategory, setExpandedCategory] = useState('chat');
+    const [editingPrompt, setEditingPrompt] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const getPromptValue = (key) => customPrompts[key] !== undefined ? customPrompts[key] : defaultPrompts[key];
+    const isModified = (key) => customPrompts[key] !== undefined;
+
+    const filteredCategories = Object.entries(promptCategories).filter(([catKey, cat]) => {
+        if (!searchTerm) return true;
+        const searchLower = searchTerm.toLowerCase();
+        if (cat.title.toLowerCase().includes(searchLower)) return true;
+        return cat.prompts.some(promptKey =>
+            promptLabels[promptKey]?.toLowerCase().includes(searchLower) ||
+            getPromptValue(promptKey).toLowerCase().includes(searchLower)
+        );
+    });
+
+    return (
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-4 rounded-xl">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                    <Brain size={24} /> مدیریت پرامپت‌های هوش مصنوعی
+                </h3>
+                <p className="text-purple-100 text-sm mt-1">
+                    در این بخش می‌توانید تمام دستورات و پرامپت‌های استاد هوش مصنوعی را مشاهده و ویرایش کنید.
+                </p>
+            </div>
+
+            {/* Search and Actions */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1 relative">
+                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                        type="text"
+                        placeholder="جستجو در پرامپت‌ها..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full pr-10 pl-4 py-2 border rounded-lg"
+                    />
+                </div>
+                <button
+                    onClick={resetAllPrompts}
+                    className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 flex items-center gap-2 font-bold"
+                >
+                    <RotateCcw size={16} /> بازنشانی همه
+                </button>
+            </div>
+
+            {/* Modified Count */}
+            {Object.keys(customPrompts).length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg text-sm">
+                    <strong>{Object.keys(customPrompts).length}</strong> پرامپت تغییر یافته
+                </div>
+            )}
+
+            {/* Categories */}
+            <div className="space-y-3">
+                {filteredCategories.map(([catKey, category]) => (
+                    <div key={catKey} className="border rounded-xl overflow-hidden">
+                        {/* Category Header */}
+                        <button
+                            onClick={() => setExpandedCategory(expandedCategory === catKey ? null : catKey)}
+                            className={`w-full px-4 py-3 flex items-center justify-between transition-colors ${
+                                expandedCategory === catKey ? 'bg-slate-100' : 'bg-white hover:bg-slate-50'
+                            }`}
+                        >
+                            <div className="text-right">
+                                <h4 className="font-bold text-lg">{category.title}</h4>
+                                <p className="text-xs text-slate-500">{category.description}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {category.prompts.some(p => isModified(p)) && (
+                                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full">ویرایش شده</span>
+                                )}
+                                <ChevronDown
+                                    size={20}
+                                    className={`transition-transform ${expandedCategory === catKey ? 'rotate-180' : ''}`}
+                                />
+                            </div>
+                        </button>
+
+                        {/* Category Content */}
+                        {expandedCategory === catKey && (
+                            <div className="p-4 bg-slate-50 space-y-4">
+                                {category.prompts.map(promptKey => {
+                                    const isExpanded = editingPrompt === promptKey;
+                                    const modified = isModified(promptKey);
+                                    const value = getPromptValue(promptKey);
+
+                                    return (
+                                        <div
+                                            key={promptKey}
+                                            className={`bg-white rounded-lg border ${modified ? 'border-amber-300' : 'border-slate-200'} overflow-hidden`}
+                                        >
+                                            {/* Prompt Header */}
+                                            <div
+                                                className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+                                                onClick={() => setEditingPrompt(isExpanded ? null : promptKey)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-700">
+                                                        {promptLabels[promptKey] || promptKey}
+                                                    </span>
+                                                    {modified && (
+                                                        <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded">
+                                                            تغییر یافته
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {modified && (
+                                                        <button
+                                                            onClick={e => { e.stopPropagation(); resetPrompt(promptKey); }}
+                                                            className="text-slate-400 hover:text-red-500 p-1"
+                                                            title="بازگشت به پیش‌فرض"
+                                                        >
+                                                            <RotateCcw size={14} />
+                                                        </button>
+                                                    )}
+                                                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                                </div>
+                                            </div>
+
+                                            {/* Prompt Editor */}
+                                            {isExpanded && (
+                                                <div className="px-4 pb-4 space-y-3">
+                                                    <textarea
+                                                        value={value}
+                                                        onChange={e => handlePromptChange(promptKey, e.target.value)}
+                                                        className="w-full h-48 p-3 border rounded-lg font-mono text-sm resize-y focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                                        dir="auto"
+                                                        placeholder="پرامپت را وارد کنید..."
+                                                    />
+                                                    <div className="flex justify-between items-center text-xs text-slate-500">
+                                                        <span>{value.length} کاراکتر</span>
+                                                        <div className="flex gap-2">
+                                                            {modified && (
+                                                                <button
+                                                                    onClick={() => resetPrompt(promptKey)}
+                                                                    className="text-red-500 hover:text-red-700"
+                                                                >
+                                                                    بازنشانی به پیش‌فرض
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Show default if modified */}
+                                                    {modified && (
+                                                        <details className="text-xs">
+                                                            <summary className="cursor-pointer text-slate-500 hover:text-slate-700">
+                                                                مشاهده مقدار پیش‌فرض
+                                                            </summary>
+                                                            <pre className="mt-2 p-3 bg-slate-100 rounded-lg overflow-auto max-h-32 whitespace-pre-wrap text-slate-600" dir="auto">
+                                                                {defaultPrompts[promptKey]}
+                                                            </pre>
+                                                        </details>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
+                ))}
+            </div>
+
+            {/* Help Section */}
+            <Card title="💡 راهنما">
+                <div className="text-sm space-y-2 text-slate-600">
+                    <p><strong>چت متنی:</strong> دستورات برای مکالمه متنی با استاد در صفحه درس‌ها</p>
+                    <p><strong>مکالمه صوتی:</strong> دستورات برای تماس صوتی Real-time (دکمه تلفن)</p>
+                    <p><strong>تحلیل محتوا:</strong> دستورات برای استخراج محتوا از فایل‌های آموزشی</p>
+                    <p><strong>ادغام جزوات:</strong> دستور نحوه ترکیب محتوای جدید با قبلی</p>
+                    <p><strong>ساخت آزمون:</strong> دستورات برای تولید سوالات آزمون</p>
+                    <p className="text-amber-600 mt-3">⚠️ تغییرات بلافاصله ذخیره می‌شوند و در تمام بخش‌های برنامه اعمال می‌شوند.</p>
                 </div>
             </Card>
         </div>
@@ -1023,14 +1550,10 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
       setIsProcessing(true);
 
       let mergedNotes = analyzedContent;
+      const customPrompts = data.customPrompts || {};
       if (lesson.archivedNotes && lesson.archivedNotes.trim().length > 0) {
-          const systemPrompt = `تو یک ویراستار متخصص هستی که جزوات آموزشی عربی لبنانی را ادغام می‌کنی.
-
-⚠️ قوانین حیاتی:
-1. **هرگز محتوای قبلی را حذف نکن** - همه لغات، عبارات و نکات قبلی باید کامل حفظ شوند
-2. فقط موارد **کاملاً یکسان** (کلمه به کلمه) را تکراری در نظر بگیر، نه موارد مشابه
-3. اگر یک لغت با معانی یا مثال‌های مختلف وجود دارد، همه را نگه دار
-4. محتوای جدید را به بخش‌های مربوطه اضافه کن
+          const mergeSystemPrompt = getPrompt(customPrompts, 'mergeSystem');
+          const systemPrompt = `${mergeSystemPrompt}
 
 📋 ساختار خروجی نهایی:
 
@@ -1062,7 +1585,7 @@ ${lesson.archivedNotes}
 📥 **محتوای جدید برای افزودن:**
 ${analyzedContent}
 
-⚡ خروجی نهایی باید شامل 100% موارد قبلی + موارد جدید باشد. زبان: فارسی (با عبارات عربی در جدول‌ها).`;
+⚡ زبان: فارسی (با عبارات عربی در جدول‌ها).`;
           try {
               mergedNotes = await callGeminiAPI({ contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } });
           } catch (error) {
@@ -1402,7 +1925,7 @@ ${analyzedContent}
   );
 }
 
-function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData }) {
+function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data }) {
     const [selectedLessonId, setSelectedLessonId] = useState(lessons[0]?.id?.toString() || '');
     const [quiz, setQuiz] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -1480,12 +2003,18 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData }) {
             matching: 'تطبیق کلمات عربی با معانی فارسی (5 جفت)'
         };
 
-        const systemPrompt = `تو یک سازنده آزمون عربی لبنانی هستی. بر اساس محتوای درس زیر، یک آزمون ${questionCount} سوالی بساز.
+        const customPrompts = data?.customPrompts || {};
+        const quizSystemPrompt = getPrompt(customPrompts, 'quizSystem');
+        const quizInstructions = getPrompt(customPrompts, 'quizInstructions');
+
+        const systemPrompt = `${quizSystemPrompt} بر اساس محتوای درس زیر، یک آزمون ${questionCount} سوالی بساز.
 
 سطح سختی: ${difficultyLabels[difficulty].label} (${difficultyLabels[difficulty].desc})
 
 انواع سوالات مورد نیاز:
 ${selectedTypes.map(t => `- ${t}: ${typeDescriptions[t]}`).join('\n')}
+
+${quizInstructions}
 
 قوانین مهم:
 1. سوالات باید از محتوای درس باشند
@@ -2860,11 +3389,13 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     setAttachedFile(null);
     setIsLoading(true);
 
-    let systemPrompt = `You are "Jad", a friendly Lebanese Arabic tutor for a Persian beginner. Your entire response MUST be in simple Lebanese Arabic.`;
+    // Build system prompt using customPrompts (from settings) or defaults
+    const customPrompts = data.customPrompts || {};
+    let systemPrompt = getPrompt(customPrompts, 'chatBase');
     if (writingStyle === 'finglish') {
-        systemPrompt += ` Write your responses using Arabizi (Lebanese chat alphabet). For example: 'Mni7 ktir! Shu 3melt lyoum?'. Use numbers for specific letters: 7 for ح, 3 for ع, 2 for ء, 6 for ط, 9 for ص.`;
+        systemPrompt += ` ${getPrompt(customPrompts, 'chatFinglish')}`;
     } else if (writingStyle === 'tashkeel') {
-        systemPrompt += ` Write your responses in Arabic script with full Lebanese dialect vowel markings (Tashkeel) to aid pronunciation.`;
+        systemPrompt += ` ${getPrompt(customPrompts, 'chatTashkeel')}`;
     }
     if (translationLanguage !== 'none') {
         systemPrompt += ` After your Lebanese Arabic response, provide a ${translationLanguage} translation on a new line, formatted as 'TRANSLATION: [text]'.`;
@@ -2884,14 +3415,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             // Clean up extra whitespace and empty lines
             cleanedNotes = cleanedNotes.replace(/\n{3,}/g, '\n\n').trim();
         }
-        systemPrompt += `\nYour conversation MUST be based on the provided lesson notes (ONLY the correct content): \n---\n${cleanedNotes}\n---`;
+        systemPrompt += `\n${getPrompt(customPrompts, 'chatLessonContext')} \n---\n${cleanedNotes}\n---`;
     } else {
         const currentTopic = selectedTopics[0];
         if (currentTopic === 'custom_scenario') {
-            systemPrompt += `\nYou are role-playing. Scenario: "${customScenarioName}". Details: "${customScenarioDetails}". Act out your role.`;
+            systemPrompt += `\n${getPrompt(customPrompts, 'chatScenario')} Scenario: "${customScenarioName}". Details: "${customScenarioDetails}". Act out your role.`;
         } else if (currentTopic !== 'general') {
             const itemsToPractice = selectedTopics.flatMap(topic => knowledgeBase[topic]?.map(item => `${item.term}: ${item.definition}`) || []).join(', ');
-            systemPrompt += `\nFocus the conversation on these items: [${itemsToPractice}].`;
+            systemPrompt += `\n${getPrompt(customPrompts, 'chatTopicFocus')} [${itemsToPractice}].`;
         }
     }
 
@@ -3353,6 +3884,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         knowledgeBase={knowledgeBase}
         pronunciationCorrections={data.pronunciationCorrections || []}
         addPronunciationCorrection={addPronunciationCorrection}
+        customPrompts={data.customPrompts || {}}
       />
     </>
   );
@@ -3716,7 +4248,8 @@ function LiveVoiceChat({
   addJournalEntry,
   knowledgeBase,
   pronunciationCorrections = [],
-  addPronunciationCorrection
+  addPronunciationCorrection,
+  customPrompts = {}
 }) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isListening, setIsListening] = useState(false);
@@ -4175,11 +4708,23 @@ ${conversationSummary}
           '\n\nانتبه للحركات (فتحة، ضمة، كسرة، سكون) وقولها بالضبط!';
       }
 
+      // Build custom live voice prompts if any
+      const liveVoicePrompts = {};
+      const liveVoiceKeys = ['liveVoiceIntro', 'liveVoiceRules', 'liveVoiceSimplified', 'liveVoiceAuthentic',
+                             'liveVoicePronunciation', 'liveVoiceVocabulary', 'liveVoiceVerbs',
+                             'liveVoiceExpressions', 'liveVoiceExamples', 'liveVoiceStyle',
+                             'liveVoiceImportantRules', 'liveVoiceClosing'];
+      liveVoiceKeys.forEach(key => {
+        if (customPrompts[key]) liveVoicePrompts[key] = customPrompts[key];
+      });
+
       wsRef.current?.send(JSON.stringify({
         type: 'setup',
         voice: selectedVoice,
         context: contextInfo + chatHistorySummary,
-        corrections: correctionsInfo
+        corrections: correctionsInfo,
+        accentMode: accentMode,
+        customPrompts: Object.keys(liveVoicePrompts).length > 0 ? liveVoicePrompts : null
       }));
 
       // Show what corrections are being applied
