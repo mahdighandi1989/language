@@ -1337,6 +1337,13 @@ function PromptManagement({ customPrompts, handlePromptChange, resetPrompt, rese
 function FlowVisualization() {
     const { currentNode, flowHistory, activeFlow, clearHistory } = useExecutionFlow();
     const [selectedFlow, setSelectedFlow] = useState('all');
+    const [tick, setTick] = useState(0);
+
+    // Force re-render every 500ms to update recent nodes trail
+    useEffect(() => {
+        const interval = setInterval(() => setTick(t => t + 1), 500);
+        return () => clearInterval(interval);
+    }, []);
 
     // Flow colors
     const flowColors = {
@@ -1360,6 +1367,28 @@ function FlowVisualization() {
         ? flowHistory
         : flowHistory.filter(h => h.flowType === selectedFlow);
     const recentActivity = filteredHistory.slice(-10).reverse();
+
+    // Calculate recently active nodes (within last 5 seconds) with their age
+    const now = Date.now();
+    const TRAIL_DURATION = 5000; // 5 seconds
+    const recentNodes = useMemo(() => {
+        const recent = {};
+        flowHistory.forEach(entry => {
+            const age = now - entry.timestamp;
+            if (age < TRAIL_DURATION && entry.nodeId !== 'idle') {
+                // Store the most recent timestamp for each node
+                if (!recent[entry.nodeId] || entry.timestamp > recent[entry.nodeId].timestamp) {
+                    recent[entry.nodeId] = {
+                        timestamp: entry.timestamp,
+                        age,
+                        flowType: entry.flowType,
+                        opacity: Math.max(0.2, 1 - (age / TRAIL_DURATION))
+                    };
+                }
+            }
+        });
+        return recent;
+    }, [flowHistory, tick]); // tick forces recalculation
 
     // Check if a node is active
     const isNodeActive = (nodeId, flowType) => {
@@ -1464,9 +1493,29 @@ function FlowVisualization() {
         const renderNode = (nodeId, node) => {
             const isActive = currentNode === nodeId;
             const isInActiveFlow = node.flow === activeFlow || !node.flow;
+            const recentInfo = recentNodes[nodeId];
+            const isRecent = !isActive && recentInfo;
             const color = node.flow ? flowColors[node.flow] : '#64748b';
-            const fillColor = isActive ? color : (isInActiveFlow && isRunning ? `${color}40` : '#f1f5f9');
-            const strokeColor = isActive ? color : (isInActiveFlow && isRunning ? color : '#cbd5e1');
+
+            // Determine fill color based on active/recent/flow state
+            let fillColor = '#f1f5f9'; // default
+            let strokeColor = '#cbd5e1'; // default
+            let strokeWidth = 1.5;
+
+            if (isActive) {
+                fillColor = color;
+                strokeColor = color;
+                strokeWidth = 3;
+            } else if (isRecent) {
+                // Recently active node - show with fading effect
+                const recentColor = recentInfo.flowType ? flowColors[recentInfo.flowType] : color;
+                fillColor = `${recentColor}${Math.round(recentInfo.opacity * 60).toString(16).padStart(2, '0')}`;
+                strokeColor = recentColor;
+                strokeWidth = 2;
+            } else if (isInActiveFlow && isRunning) {
+                fillColor = `${color}40`;
+                strokeColor = color;
+            }
 
             return (
                 <g key={nodeId} transform={`translate(${node.x - 50}, ${node.y - 18})`}>
@@ -1477,17 +1526,25 @@ function FlowVisualization() {
                         />
                     )}
 
+                    {/* Trail glow for recently active */}
+                    {isRecent && (
+                        <ellipse cx="50" cy="18" rx="52" ry="20"
+                            fill={flowColors[recentInfo.flowType] || color}
+                            opacity={recentInfo.opacity * 0.2}
+                        />
+                    )}
+
                     {/* Node shape */}
                     <rect x="0" y="0" width="100" height="36" rx="8"
                         fill={fillColor}
                         stroke={strokeColor}
-                        strokeWidth={isActive ? 3 : 1.5}
+                        strokeWidth={strokeWidth}
                         className="transition-all duration-300"
                     />
 
                     {/* Icon and label */}
                     <text x="20" y="24" fontSize="14" textAnchor="middle">{node.icon}</text>
-                    <text x="60" y="24" fontSize="10" fill={isActive ? '#1e293b' : '#64748b'}
+                    <text x="60" y="24" fontSize="10" fill={isActive || isRecent ? '#1e293b' : '#64748b'}
                           textAnchor="middle" fontWeight={isActive ? 'bold' : 'normal'}
                           style={{ fontFamily: 'Vazirmatn, sans-serif' }}>
                         {node.label}
@@ -1496,6 +1553,14 @@ function FlowVisualization() {
                     {/* Active indicator */}
                     {isActive && (
                         <circle cx="95" cy="5" r="5" fill="#22c55e" className="animate-ping" />
+                    )}
+
+                    {/* Recent indicator - smaller, fading */}
+                    {isRecent && (
+                        <circle cx="95" cy="5" r="4"
+                            fill={flowColors[recentInfo.flowType] || '#22c55e'}
+                            opacity={recentInfo.opacity}
+                        />
                     )}
                 </g>
             );
@@ -1510,6 +1575,15 @@ function FlowVisualization() {
             const color = flowColors[flowType] || '#94a3b8';
             const isActiveConn = activeFlow === flowType && isRunning &&
                 (currentNode === fromId || currentNode === toId);
+
+            // Check if this connection was recently active
+            const fromRecent = recentNodes[fromId];
+            const toRecent = recentNodes[toId];
+            const isRecentConn = !isActiveConn && (
+                (fromRecent && fromRecent.flowType === flowType) ||
+                (toRecent && toRecent.flowType === flowType)
+            );
+            const recentOpacity = isRecentConn ? Math.max(fromRecent?.opacity || 0, toRecent?.opacity || 0) : 0;
 
             // Calculate path
             const x1 = from.x;
@@ -1530,6 +1604,13 @@ function FlowVisualization() {
             return (
                 <g key={idx}>
                     <path d={pathD} fill="none" stroke="#e2e8f0" strokeWidth="2" />
+                    {/* Recent connection trail */}
+                    {isRecentConn && (
+                        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5"
+                              opacity={recentOpacity * 0.7}
+                        />
+                    )}
+                    {/* Active connection with animation */}
                     {isActiveConn && (
                         <path d={pathD} fill="none" stroke={color} strokeWidth="3"
                               strokeDasharray="8,4"
@@ -1538,7 +1619,8 @@ function FlowVisualization() {
                     )}
                     {/* Arrow */}
                     <circle cx={x2} cy={y2 - 3} r="3"
-                        fill={isActiveConn ? color : '#cbd5e1'}
+                        fill={isActiveConn ? color : (isRecentConn ? color : '#cbd5e1')}
+                        opacity={isActiveConn ? 1 : (isRecentConn ? recentOpacity : 1)}
                     />
                 </g>
             );
@@ -1607,6 +1689,19 @@ function FlowVisualization() {
                             <span className="w-2 h-2 rounded-full animate-ping"
                                   style={{ backgroundColor: flowColors[activeFlow] }}></span>
                             <span className="font-bold">{flowTitles[activeFlow]}</span>
+                        </div>
+                    )}
+                    {/* Show recent nodes count */}
+                    {Object.keys(recentNodes).length > 0 && (
+                        <div className="px-4 py-2 bg-white/10 rounded-xl flex items-center gap-3">
+                            <span className="text-sm opacity-80">نودهای اخیر:</span>
+                            <div className="flex gap-1">
+                                {Object.entries(recentNodes).slice(0, 5).map(([nodeId, info]) => (
+                                    <span key={nodeId} className="text-lg" style={{ opacity: info.opacity }}>
+                                        {FLOW_NODES[nodeId]?.icon || '?'}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
