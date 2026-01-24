@@ -92,7 +92,23 @@ function ExecutionFlowProvider({ children }) {
   const setCurrentNode = useCallback((nodeId, flowType = null) => {
     const timestamp = Date.now();
     setCurrentNodeState(nodeId);
-    if (flowType) setActiveFlow(flowType);
+
+    // If going to idle, complete, or error - clear active flow after a delay
+    if (nodeId === 'idle' || nodeId === 'complete' || nodeId === 'error') {
+      // Don't immediately clear - let animation finish
+      setTimeout(() => {
+        setActiveFlow(prev => {
+          // Only clear if still in idle/complete/error state
+          return prev;
+        });
+      }, 2000);
+      // But do clear activeFlow when explicitly going to idle
+      if (nodeId === 'idle' && !flowType) {
+        setActiveFlow(null);
+      }
+    } else if (flowType) {
+      setActiveFlow(flowType);
+    }
 
     setFlowHistory(prev => {
       const newEntry = { nodeId, timestamp, flowType: flowType || activeFlow };
@@ -1459,7 +1475,9 @@ function FlowVisualization() {
 
     // SVG Flowchart component
     const FlowchartSVG = ({ flowKey, diagram }) => {
-        const isCurrentFlow = activeFlow === flowKey;
+        // Only consider as current flow if actively running (not idle/complete/error)
+        const isCurrentFlow = activeFlow === flowKey &&
+            currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error';
         const svgWidth = 320;
         const svgHeight = diagram.isCyclic ? 420 : Math.max(...diagram.nodes.map(n => n.y)) + 70;
 
@@ -1574,12 +1592,16 @@ function FlowVisualization() {
 
     // Flowchart Card component
     const FlowchartCard = ({ flowKey, diagram }) => {
-        const isCurrentFlow = activeFlow === flowKey;
+        // Only show as current if activeFlow matches AND we're not in idle/complete state
+        const isActuallyRunning = activeFlow === flowKey &&
+            currentNode !== 'idle' &&
+            currentNode !== 'complete' &&
+            currentNode !== 'error';
         const isExpanded = expandedFlow === flowKey;
 
         return (
             <div className={`rounded-xl border-2 transition-all overflow-hidden ${
-                isCurrentFlow
+                isActuallyRunning
                     ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg'
                     : 'border-slate-200 bg-white hover:border-slate-300'
             }`}>
@@ -1599,7 +1621,7 @@ function FlowVisualization() {
                             <h4 className="font-bold text-lg" style={{ color: diagram.color }}>
                                 {diagram.title.split(' ').slice(1).join(' ')}
                             </h4>
-                            {isCurrentFlow && (
+                            {isActuallyRunning && (
                                 <span className="text-xs text-green-600 font-bold flex items-center gap-1">
                                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                                     در حال اجرا: {FLOW_NODES[currentNode]?.label}
@@ -1656,7 +1678,9 @@ function FlowVisualization() {
                             <span className="font-bold">{FLOW_NODES[currentNode]?.label || 'آماده'}</span>
                         </div>
                     </div>
-                    {activeFlow && flowDiagrams[activeFlow] && (
+                    {/* Only show active flow badge when actually running (not idle/complete/error) */}
+                    {activeFlow && flowDiagrams[activeFlow] &&
+                     currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error' && (
                         <div className="px-4 py-2 bg-green-500/30 rounded-xl flex items-center gap-3">
                             <span className="w-2 h-2 bg-green-400 rounded-full animate-ping"></span>
                             <span className="font-bold">{flowDiagrams[activeFlow].title}</span>
