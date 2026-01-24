@@ -1337,318 +1337,237 @@ function PromptManagement({ customPrompts, handlePromptChange, resetPrompt, rese
 function FlowVisualization() {
     const { currentNode, flowHistory, activeFlow, clearHistory } = useExecutionFlow();
     const [selectedFlow, setSelectedFlow] = useState('all');
-    const [expandedFlow, setExpandedFlow] = useState(null);
 
-    // Define flow diagrams for different operations with proper flowchart structure
-    const flowDiagrams = {
-        chat: {
-            title: '💬 چت متنی',
-            color: '#3b82f6',
-            nodes: [
-                { id: 'idle', x: 150, y: 30, type: 'start' },
-                { id: 'userInput', x: 150, y: 100, type: 'input' },
-                { id: 'buildingPrompt', x: 150, y: 170, type: 'process' },
-                { id: 'callingGemini', x: 150, y: 240, type: 'api' },
-                { id: 'receivingResponse', x: 150, y: 310, type: 'api' },
-                { id: 'generatingTTS', x: 150, y: 380, type: 'process' },
-                { id: 'playingAudio', x: 150, y: 450, type: 'output' },
-                { id: 'complete', x: 150, y: 520, type: 'end' }
-            ],
-            connections: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7]]
-        },
-        chatVoice: {
-            title: '🎤 چت صوتی',
-            color: '#8b5cf6',
-            nodes: [
-                { id: 'idle', x: 150, y: 30, type: 'start' },
-                { id: 'audioRecording', x: 150, y: 100, type: 'input' },
-                { id: 'audioTranscription', x: 150, y: 170, type: 'process' },
-                { id: 'buildingPrompt', x: 150, y: 240, type: 'process' },
-                { id: 'callingGemini', x: 150, y: 310, type: 'api' },
-                { id: 'receivingResponse', x: 150, y: 380, type: 'api' },
-                { id: 'generatingTTS', x: 150, y: 450, type: 'process' },
-                { id: 'playingAudio', x: 150, y: 520, type: 'output' },
-                { id: 'complete', x: 150, y: 590, type: 'end' }
-            ],
-            connections: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8]]
-        },
-        liveVoice: {
-            title: '📞 تماس زنده',
-            color: '#06b6d4',
-            nodes: [
-                { id: 'idle', x: 150, y: 30, type: 'start' },
-                { id: 'wsConnecting', x: 150, y: 100, type: 'process' },
-                { id: 'wsConnected', x: 150, y: 170, type: 'api' },
-                { id: 'liveListening', x: 70, y: 260, type: 'input' },
-                { id: 'liveStreaming', x: 70, y: 340, type: 'process' },
-                { id: 'liveReceiving', x: 230, y: 260, type: 'api' },
-                { id: 'liveSpeaking', x: 230, y: 340, type: 'output' }
-            ],
-            connections: [[0,1],[1,2],[2,3],[3,4],[4,2],[2,5],[5,6],[6,2]],
-            isCyclic: true
-        },
-        fileAnalysis: {
-            title: '📁 تحلیل فایل',
-            color: '#f59e0b',
-            nodes: [
-                { id: 'idle', x: 150, y: 30, type: 'start' },
-                { id: 'fileUploading', x: 150, y: 100, type: 'input' },
-                { id: 'fileAnalyzing', x: 150, y: 170, type: 'api' },
-                { id: 'mergingContent', x: 150, y: 240, type: 'process' },
-                { id: 'categorizingItems', x: 150, y: 310, type: 'process' },
-                { id: 'savingToLesson', x: 150, y: 380, type: 'output' },
-                { id: 'complete', x: 150, y: 450, type: 'end' }
-            ],
-            connections: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]]
-        },
-        quiz: {
-            title: '📝 آزمون',
-            color: '#10b981',
-            nodes: [
-                { id: 'idle', x: 150, y: 30, type: 'start' },
-                { id: 'generatingQuiz', x: 150, y: 100, type: 'api' },
-                { id: 'showingQuiz', x: 150, y: 170, type: 'output' },
-                { id: 'checkingAnswer', x: 150, y: 240, type: 'process' },
-                { id: 'complete', x: 150, y: 310, type: 'end' }
-            ],
-            connections: [[0,1],[1,2],[2,3],[3,4]]
-        }
+    // Flow colors
+    const flowColors = {
+        chat: '#3b82f6',
+        chatVoice: '#8b5cf6',
+        liveVoice: '#06b6d4',
+        fileAnalysis: '#f59e0b',
+        quiz: '#10b981'
     };
 
-    // Filter history by selected flow
+    const flowTitles = {
+        chat: '💬 چت متنی',
+        chatVoice: '🎤 چت صوتی',
+        liveVoice: '📞 تماس زنده',
+        fileAnalysis: '📁 تحلیل فایل',
+        quiz: '📝 آزمون'
+    };
+
+    // Filter history
     const filteredHistory = selectedFlow === 'all'
         ? flowHistory
         : flowHistory.filter(h => h.flowType === selectedFlow);
-
     const recentActivity = filteredHistory.slice(-10).reverse();
 
-    // Get node shape based on type (flowchart standard)
-    const getNodeShape = (type, isActive, color) => {
-        const baseClass = `transition-all duration-300 ${isActive ? 'filter drop-shadow-lg' : ''}`;
-        const fillColor = isActive ? color : '#e2e8f0';
-        const strokeColor = isActive ? color : '#94a3b8';
-        const strokeWidth = isActive ? 3 : 1.5;
-
-        switch(type) {
-            case 'start':
-            case 'end':
-                // Oval/rounded rectangle for start/end
-                return (
-                    <ellipse cx="60" cy="20" rx="55" ry="18"
-                        fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth}
-                        className={baseClass}
-                    />
-                );
-            case 'input':
-            case 'output':
-                // Parallelogram for input/output
-                return (
-                    <polygon points="15,0 105,0 120,40 0,40"
-                        fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth}
-                        className={baseClass}
-                    />
-                );
-            case 'decision':
-                // Diamond for decision
-                return (
-                    <polygon points="60,0 120,25 60,50 0,25"
-                        fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth}
-                        className={baseClass}
-                    />
-                );
-            case 'api':
-                // Cylinder-like for API/database
-                return (
-                    <g className={baseClass}>
-                        <rect x="5" y="8" width="110" height="28" rx="4"
-                            fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth}
-                        />
-                        <ellipse cx="60" cy="10" rx="55" ry="8"
-                            fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth}
-                        />
-                    </g>
-                );
-            default:
-                // Rectangle for process
-                return (
-                    <rect x="5" y="2" width="110" height="36" rx="4"
-                        fill={fillColor} stroke={strokeColor} strokeWidth={strokeWidth}
-                        className={baseClass}
-                    />
-                );
-        }
+    // Check if a node is active
+    const isNodeActive = (nodeId, flowType) => {
+        return activeFlow === flowType && currentNode === nodeId;
     };
 
-    // SVG Flowchart component
-    const FlowchartSVG = ({ flowKey, diagram }) => {
-        // Only consider as current flow if actively running (not idle/complete/error)
-        const isCurrentFlow = activeFlow === flowKey &&
-            currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error';
-        const svgWidth = 320;
-        const svgHeight = diagram.isCyclic ? 420 : Math.max(...diagram.nodes.map(n => n.y)) + 70;
+    // Get color for current active flow
+    const getActiveColor = () => flowColors[activeFlow] || '#64748b';
 
-        // Find current node index
-        const currentNodeIdx = diagram.nodes.findIndex(n => n.id === currentNode);
+    // Unified Flowchart SVG
+    const UnifiedFlowchart = () => {
+        const svgWidth = 900;
+        const svgHeight = 550;
+        const isRunning = activeFlow && currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error';
 
-        return (
-            <svg width={svgWidth} height={svgHeight} className="mx-auto">
-                <defs>
-                    {/* Arrow marker */}
-                    <marker id={`arrow-${flowKey}`} markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-                        <path d="M0,0 L0,6 L9,3 z" fill={isCurrentFlow ? diagram.color : '#94a3b8'} />
-                    </marker>
-                    {/* Glow filter */}
-                    <filter id={`glow-${flowKey}`}>
-                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                        <feMerge>
-                            <feMergeNode in="coloredBlur"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                    {/* Animated dash for active connection */}
-                    <linearGradient id={`flow-gradient-${flowKey}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor={diagram.color} stopOpacity="0" />
-                        <stop offset="50%" stopColor={diagram.color} stopOpacity="1" />
-                        <stop offset="100%" stopColor={diagram.color} stopOpacity="0" />
-                    </linearGradient>
-                </defs>
+        // Node positions for unified diagram
+        const nodes = {
+            // Central idle state
+            idle: { x: 400, y: 30, label: 'آماده', icon: '⏸️', type: 'start' },
 
-                {/* Draw connections */}
-                {diagram.connections.map(([fromIdx, toIdx], idx) => {
-                    const from = diagram.nodes[fromIdx];
-                    const to = diagram.nodes[toIdx];
-                    const isActiveConnection = isCurrentFlow && (currentNodeIdx === fromIdx || currentNodeIdx === toIdx);
+            // Chat branch (left)
+            userInput: { x: 80, y: 120, label: 'ورودی متن', icon: '✍️', flow: 'chat' },
+            buildingPrompt: { x: 80, y: 190, label: 'ساخت پرامپت', icon: '🔧', flow: 'chat' },
+            callingGemini: { x: 80, y: 260, label: 'ارسال به AI', icon: '🤖', flow: 'chat' },
+            receivingResponse: { x: 80, y: 330, label: 'دریافت پاسخ', icon: '📥', flow: 'chat' },
+            generatingTTS: { x: 80, y: 400, label: 'ساخت صوت', icon: '🔊', flow: 'chat' },
+            playingAudio: { x: 80, y: 470, label: 'پخش صدا', icon: '▶️', flow: 'chat' },
 
-                    // Calculate path
-                    const fromY = from.y + 20;
-                    const toY = to.y;
-                    const isSameColumn = Math.abs(from.x - to.x) < 10;
+            // Voice Chat branch
+            audioRecording: { x: 240, y: 120, label: 'ضبط صدا', icon: '🎤', flow: 'chatVoice' },
+            audioTranscription: { x: 240, y: 190, label: 'تبدیل به متن', icon: '📝', flow: 'chatVoice' },
 
-                    let pathD;
-                    if (isSameColumn) {
-                        pathD = `M${from.x + 60},${fromY + 20} L${to.x + 60},${toY}`;
-                    } else {
-                        // Curved path for different columns
-                        const midY = (fromY + toY) / 2 + 20;
-                        pathD = `M${from.x + 60},${fromY + 20} C${from.x + 60},${midY} ${to.x + 60},${midY} ${to.x + 60},${toY}`;
-                    }
+            // Live Voice branch (center-left)
+            wsConnecting: { x: 400, y: 120, label: 'اتصال', icon: '🔌', flow: 'liveVoice' },
+            wsConnected: { x: 400, y: 190, label: 'متصل', icon: '✅', flow: 'liveVoice' },
+            liveListening: { x: 340, y: 270, label: 'گوش دادن', icon: '👂', flow: 'liveVoice' },
+            liveStreaming: { x: 340, y: 350, label: 'ارسال صوت', icon: '📤', flow: 'liveVoice' },
+            liveReceiving: { x: 460, y: 270, label: 'دریافت', icon: '📥', flow: 'liveVoice' },
+            liveSpeaking: { x: 460, y: 350, label: 'پاسخ صوتی', icon: '🔊', flow: 'liveVoice' },
 
-                    return (
-                        <g key={idx}>
-                            {/* Background line */}
-                            <path
-                                d={pathD}
-                                fill="none"
-                                stroke="#cbd5e1"
-                                strokeWidth="2"
-                                markerEnd={`url(#arrow-${flowKey})`}
-                            />
-                            {/* Active animated line */}
-                            {isActiveConnection && (
-                                <path
-                                    d={pathD}
-                                    fill="none"
-                                    stroke={diagram.color}
-                                    strokeWidth="3"
-                                    strokeDasharray="8,4"
-                                    markerEnd={`url(#arrow-${flowKey})`}
-                                    style={{ animation: 'flowDash 1s linear infinite' }}
-                                />
-                            )}
-                        </g>
-                    );
-                })}
+            // File Analysis branch (center-right)
+            fileUploading: { x: 560, y: 120, label: 'آپلود فایل', icon: '📤', flow: 'fileAnalysis' },
+            fileAnalyzing: { x: 560, y: 190, label: 'تحلیل', icon: '🔍', flow: 'fileAnalysis' },
+            mergingContent: { x: 560, y: 260, label: 'ادغام', icon: '🔗', flow: 'fileAnalysis' },
+            categorizingItems: { x: 560, y: 330, label: 'دسته‌بندی', icon: '📊', flow: 'fileAnalysis' },
+            savingToLesson: { x: 560, y: 400, label: 'ذخیره', icon: '💾', flow: 'fileAnalysis' },
 
-                {/* Draw nodes */}
-                {diagram.nodes.map((node, idx) => {
-                    const flowNode = FLOW_NODES[node.id];
-                    if (!flowNode) return null;
+            // Quiz branch (right)
+            generatingQuiz: { x: 720, y: 120, label: 'ساخت آزمون', icon: '📝', flow: 'quiz' },
+            showingQuiz: { x: 720, y: 190, label: 'نمایش سوال', icon: '❓', flow: 'quiz' },
+            checkingAnswer: { x: 720, y: 260, label: 'بررسی پاسخ', icon: '✔️', flow: 'quiz' },
 
-                    const isActive = isCurrentFlow && currentNode === node.id;
-                    const wasVisited = isCurrentFlow && currentNodeIdx > idx;
+            // End states
+            complete: { x: 400, y: 500, label: 'تکمیل', icon: '✅', type: 'end' },
+            error: { x: 560, y: 500, label: 'خطا', icon: '❌', type: 'error' }
+        };
 
-                    return (
-                        <g key={node.id} transform={`translate(${node.x}, ${node.y})`}
-                           style={{ filter: isActive ? `url(#glow-${flowKey})` : 'none' }}>
-                            {/* Node shape */}
-                            {getNodeShape(node.type, isActive || wasVisited, diagram.color)}
+        // Connections: [fromNode, toNode, flowType]
+        const connections = [
+            // From idle to all branches
+            ['idle', 'userInput', 'chat'],
+            ['idle', 'audioRecording', 'chatVoice'],
+            ['idle', 'wsConnecting', 'liveVoice'],
+            ['idle', 'fileUploading', 'fileAnalysis'],
+            ['idle', 'generatingQuiz', 'quiz'],
 
-                            {/* Icon */}
-                            <text x="25" y="26" fontSize="16" textAnchor="middle">
-                                {flowNode.icon}
-                            </text>
+            // Chat flow
+            ['userInput', 'buildingPrompt', 'chat'],
+            ['buildingPrompt', 'callingGemini', 'chat'],
+            ['callingGemini', 'receivingResponse', 'chat'],
+            ['receivingResponse', 'generatingTTS', 'chat'],
+            ['generatingTTS', 'playingAudio', 'chat'],
+            ['playingAudio', 'complete', 'chat'],
 
-                            {/* Label */}
-                            <text x="75" y="26" fontSize="11" fontWeight={isActive ? 'bold' : 'normal'}
-                                  fill={isActive ? '#1e293b' : '#64748b'} textAnchor="middle"
-                                  style={{ fontFamily: 'Vazirmatn, sans-serif' }}>
-                                {flowNode.label}
-                            </text>
+            // Voice chat flow
+            ['audioRecording', 'audioTranscription', 'chatVoice'],
+            ['audioTranscription', 'buildingPrompt', 'chatVoice'],
 
-                            {/* Active pulse indicator */}
-                            {isActive && (
-                                <circle cx="110" cy="20" r="6" fill="#22c55e" className="animate-ping" />
-                            )}
-                        </g>
-                    );
-                })}
-            </svg>
-        );
-    };
+            // Live voice flow (cyclic)
+            ['wsConnecting', 'wsConnected', 'liveVoice'],
+            ['wsConnected', 'liveListening', 'liveVoice'],
+            ['liveListening', 'liveStreaming', 'liveVoice'],
+            ['liveStreaming', 'wsConnected', 'liveVoice'],
+            ['wsConnected', 'liveReceiving', 'liveVoice'],
+            ['liveReceiving', 'liveSpeaking', 'liveVoice'],
+            ['liveSpeaking', 'wsConnected', 'liveVoice'],
 
-    // Flowchart Card component
-    const FlowchartCard = ({ flowKey, diagram }) => {
-        // Only show as current if activeFlow matches AND we're not in idle/complete state
-        const isActuallyRunning = activeFlow === flowKey &&
-            currentNode !== 'idle' &&
-            currentNode !== 'complete' &&
-            currentNode !== 'error';
-        const isExpanded = expandedFlow === flowKey;
+            // File analysis flow
+            ['fileUploading', 'fileAnalyzing', 'fileAnalysis'],
+            ['fileAnalyzing', 'mergingContent', 'fileAnalysis'],
+            ['mergingContent', 'categorizingItems', 'fileAnalysis'],
+            ['categorizingItems', 'savingToLesson', 'fileAnalysis'],
+            ['savingToLesson', 'complete', 'fileAnalysis'],
 
-        return (
-            <div className={`rounded-xl border-2 transition-all overflow-hidden ${
-                isActuallyRunning
-                    ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-            }`}>
-                {/* Header - always visible */}
-                <button
-                    onClick={() => setExpandedFlow(isExpanded ? null : flowKey)}
-                    className="w-full p-4 flex items-center justify-between text-right"
-                >
-                    <div className="flex items-center gap-3">
-                        <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
-                            style={{ backgroundColor: `${diagram.color}20` }}
-                        >
-                            {diagram.title.split(' ')[0]}
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-lg" style={{ color: diagram.color }}>
-                                {diagram.title.split(' ').slice(1).join(' ')}
-                            </h4>
-                            {isActuallyRunning && (
-                                <span className="text-xs text-green-600 font-bold flex items-center gap-1">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                    در حال اجرا: {FLOW_NODES[currentNode]?.label}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                    <ChevronDown
-                        size={20}
-                        className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            // Quiz flow
+            ['generatingQuiz', 'showingQuiz', 'quiz'],
+            ['showingQuiz', 'checkingAnswer', 'quiz'],
+            ['checkingAnswer', 'complete', 'quiz']
+        ];
+
+        // Draw a node
+        const renderNode = (nodeId, node) => {
+            const isActive = currentNode === nodeId;
+            const isInActiveFlow = node.flow === activeFlow || !node.flow;
+            const color = node.flow ? flowColors[node.flow] : '#64748b';
+            const fillColor = isActive ? color : (isInActiveFlow && isRunning ? `${color}40` : '#f1f5f9');
+            const strokeColor = isActive ? color : (isInActiveFlow && isRunning ? color : '#cbd5e1');
+
+            return (
+                <g key={nodeId} transform={`translate(${node.x - 50}, ${node.y - 18})`}>
+                    {/* Glow effect for active */}
+                    {isActive && (
+                        <ellipse cx="50" cy="18" rx="55" ry="22"
+                            fill={color} opacity="0.3" className="animate-pulse"
+                        />
+                    )}
+
+                    {/* Node shape */}
+                    <rect x="0" y="0" width="100" height="36" rx="8"
+                        fill={fillColor}
+                        stroke={strokeColor}
+                        strokeWidth={isActive ? 3 : 1.5}
+                        className="transition-all duration-300"
                     />
-                </button>
 
-                {/* Expandable flowchart */}
-                {isExpanded && (
-                    <div className="px-4 pb-4 border-t border-slate-100">
-                        <div className="bg-slate-50 rounded-lg p-4 mt-3 overflow-x-auto">
-                            <FlowchartSVG flowKey={flowKey} diagram={diagram} />
-                        </div>
-                    </div>
-                )}
+                    {/* Icon and label */}
+                    <text x="20" y="24" fontSize="14" textAnchor="middle">{node.icon}</text>
+                    <text x="60" y="24" fontSize="10" fill={isActive ? '#1e293b' : '#64748b'}
+                          textAnchor="middle" fontWeight={isActive ? 'bold' : 'normal'}
+                          style={{ fontFamily: 'Vazirmatn, sans-serif' }}>
+                        {node.label}
+                    </text>
+
+                    {/* Active indicator */}
+                    {isActive && (
+                        <circle cx="95" cy="5" r="5" fill="#22c55e" className="animate-ping" />
+                    )}
+                </g>
+            );
+        };
+
+        // Draw a connection
+        const renderConnection = ([fromId, toId, flowType], idx) => {
+            const from = nodes[fromId];
+            const to = nodes[toId];
+            if (!from || !to) return null;
+
+            const color = flowColors[flowType] || '#94a3b8';
+            const isActiveConn = activeFlow === flowType && isRunning &&
+                (currentNode === fromId || currentNode === toId);
+
+            // Calculate path
+            const x1 = from.x;
+            const y1 = from.y + 18;
+            const x2 = to.x;
+            const y2 = to.y - 18;
+
+            let pathD;
+            if (Math.abs(x1 - x2) < 10) {
+                // Vertical line
+                pathD = `M${x1},${y1} L${x2},${y2}`;
+            } else {
+                // Curved line
+                const midY = (y1 + y2) / 2;
+                pathD = `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`;
+            }
+
+            return (
+                <g key={idx}>
+                    <path d={pathD} fill="none" stroke="#e2e8f0" strokeWidth="2" />
+                    {isActiveConn && (
+                        <path d={pathD} fill="none" stroke={color} strokeWidth="3"
+                              strokeDasharray="8,4"
+                              style={{ animation: 'flowDash 1s linear infinite' }}
+                        />
+                    )}
+                    {/* Arrow */}
+                    <circle cx={x2} cy={y2 - 3} r="3"
+                        fill={isActiveConn ? color : '#cbd5e1'}
+                    />
+                </g>
+            );
+        };
+
+        return (
+            <div className="bg-white rounded-xl border-2 border-slate-200 p-4 overflow-x-auto">
+                <svg width={svgWidth} height={svgHeight} className="mx-auto" style={{ minWidth: svgWidth }}>
+                    {/* Background grid */}
+                    <defs>
+                        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" strokeWidth="1"/>
+                        </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+
+                    {/* Flow labels */}
+                    <text x="80" y="85" fontSize="12" fill={flowColors.chat} fontWeight="bold" textAnchor="middle">چت متنی</text>
+                    <text x="240" y="85" fontSize="12" fill={flowColors.chatVoice} fontWeight="bold" textAnchor="middle">چت صوتی</text>
+                    <text x="400" y="85" fontSize="12" fill={flowColors.liveVoice} fontWeight="bold" textAnchor="middle">تماس زنده</text>
+                    <text x="560" y="85" fontSize="12" fill={flowColors.fileAnalysis} fontWeight="bold" textAnchor="middle">تحلیل فایل</text>
+                    <text x="720" y="85" fontSize="12" fill={flowColors.quiz} fontWeight="bold" textAnchor="middle">آزمون</text>
+
+                    {/* Connections */}
+                    {connections.map((conn, idx) => renderConnection(conn, idx))}
+
+                    {/* Nodes */}
+                    {Object.entries(nodes).map(([id, node]) => renderNode(id, node))}
+                </svg>
             </div>
         );
     };
@@ -1661,21 +1580,19 @@ function FlowVisualization() {
                     <div>
                         <h3 className="text-2xl font-bold flex items-center gap-3">
                             <Activity size={28} className="animate-pulse" />
-                            فلوچارت جریان الگوریتم
+                            فلوچارت یکپارچه جریان الگوریتم
                         </h3>
                         <p className="text-indigo-100 mt-1 text-sm">
-                            مشاهده زنده عملیات‌ها - می‌توانید بین صفحات جابجا شوید، عملیات متوقف نمی‌شود
+                            مشاهده زنده تمام عملیات‌ها در یک نمودار
                         </p>
                     </div>
-                    <button
-                        onClick={clearHistory}
-                        className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold transition-all"
-                    >
+                    <button onClick={clearHistory}
+                        className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-bold">
                         پاک کردن تاریخچه
                     </button>
                 </div>
 
-                {/* Live status indicator */}
+                {/* Live status */}
                 <div className="mt-4 flex flex-wrap gap-3">
                     <div className="px-4 py-2 bg-white/15 rounded-xl flex items-center gap-3">
                         <span className="text-sm opacity-80">وضعیت:</span>
@@ -1684,29 +1601,19 @@ function FlowVisualization() {
                             <span className="font-bold">{FLOW_NODES[currentNode]?.label || 'آماده'}</span>
                         </div>
                     </div>
-                    {/* Only show active flow badge when actually running (not idle/complete/error) */}
-                    {activeFlow && flowDiagrams[activeFlow] &&
-                     currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error' && (
-                        <div className="px-4 py-2 bg-green-500/30 rounded-xl flex items-center gap-3">
-                            <span className="w-2 h-2 bg-green-400 rounded-full animate-ping"></span>
-                            <span className="font-bold">{flowDiagrams[activeFlow].title}</span>
+                    {activeFlow && currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error' && (
+                        <div className="px-4 py-2 rounded-xl flex items-center gap-3"
+                             style={{ backgroundColor: `${flowColors[activeFlow]}50` }}>
+                            <span className="w-2 h-2 rounded-full animate-ping"
+                                  style={{ backgroundColor: flowColors[activeFlow] }}></span>
+                            <span className="font-bold">{flowTitles[activeFlow]}</span>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Flowchart cards */}
-            <div className="space-y-3">
-                <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2">
-                    <Zap size={20} className="text-amber-500" />
-                    دیاگرام‌های جریان
-                    <span className="text-sm font-normal text-slate-500">(برای باز شدن کلیک کنید)</span>
-                </h4>
-
-                {Object.entries(flowDiagrams).map(([key, diagram]) => (
-                    <FlowchartCard key={key} flowKey={key} diagram={diagram} />
-                ))}
-            </div>
+            {/* Unified Flowchart */}
+            <UnifiedFlowchart />
 
             {/* Activity log */}
             <div className="bg-slate-900 text-slate-100 rounded-xl p-4">
@@ -1715,14 +1622,11 @@ function FlowVisualization() {
                         <Circle size={12} className="text-green-400 animate-pulse" />
                         تاریخچه فعالیت
                     </h4>
-                    <select
-                        value={selectedFlow}
-                        onChange={e => setSelectedFlow(e.target.value)}
-                        className="bg-slate-800 text-white text-sm px-3 py-1 rounded border border-slate-700"
-                    >
+                    <select value={selectedFlow} onChange={e => setSelectedFlow(e.target.value)}
+                        className="bg-slate-800 text-white text-sm px-3 py-1 rounded border border-slate-700">
                         <option value="all">همه</option>
-                        {Object.entries(flowDiagrams).map(([key, d]) => (
-                            <option key={key} value={key}>{d.title}</option>
+                        {Object.entries(flowTitles).map(([key, title]) => (
+                            <option key={key} value={key}>{title}</option>
                         ))}
                     </select>
                 </div>
@@ -1734,7 +1638,8 @@ function FlowVisualization() {
                         recentActivity.map((entry, idx) => {
                             const node = FLOW_NODES[entry.nodeId];
                             const time = new Date(entry.timestamp).toLocaleTimeString('fa-IR');
-                            const flow = flowDiagrams[entry.flowType];
+                            const color = flowColors[entry.flowType];
+                            const title = flowTitles[entry.flowType];
 
                             return (
                                 <div
@@ -1744,12 +1649,12 @@ function FlowVisualization() {
                                     <span className="text-slate-500 text-xs">{time}</span>
                                     <span className="text-lg">{node?.icon || '?'}</span>
                                     <span className="flex-1 text-sm">{node?.label || entry.nodeId}</span>
-                                    {flow && (
+                                    {color && title && (
                                         <span
                                             className="text-xs px-2 py-0.5 rounded"
-                                            style={{ backgroundColor: `${flow.color}30`, color: flow.color }}
+                                            style={{ backgroundColor: `${color}30`, color: color }}
                                         >
-                                            {flow.title}
+                                            {title}
                                         </span>
                                     )}
                                 </div>
@@ -1760,27 +1665,14 @@ function FlowVisualization() {
             </div>
 
             {/* Legend */}
-            <Card title="🔑 راهنمای شکل‌ها">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-3">
-                        <svg width="50" height="30"><ellipse cx="25" cy="15" rx="22" ry="12" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5"/></svg>
-                        <span className="text-sm text-slate-600">شروع/پایان</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <svg width="50" height="30"><rect x="2" y="3" width="46" height="24" rx="3" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5"/></svg>
-                        <span className="text-sm text-slate-600">پردازش</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <svg width="50" height="30"><polygon points="8,0 42,0 50,30 0,30" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5"/></svg>
-                        <span className="text-sm text-slate-600">ورودی/خروجی</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <svg width="50" height="35">
-                            <rect x="2" y="8" width="46" height="20" rx="3" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5"/>
-                            <ellipse cx="25" cy="10" rx="23" ry="6" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1.5"/>
-                        </svg>
-                        <span className="text-sm text-slate-600">API/سرور</span>
-                    </div>
+            <Card title="🔑 راهنمای رنگ‌ها">
+                <div className="flex flex-wrap gap-4">
+                    {Object.entries(flowTitles).map(([key, title]) => (
+                        <div key={key} className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: flowColors[key] }} />
+                            <span className="text-sm text-slate-600">{title}</span>
+                        </div>
+                    ))}
                 </div>
             </Card>
 
@@ -2137,6 +2029,18 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
     setIsEditingNotes(false);
   }, [lesson.id]);
 
+  // Load pending analysis if exists (persisted when user navigated away)
+  useEffect(() => {
+    if (lesson.pendingAnalysis && !analyzedContent) {
+      setAnalyzedContent(lesson.pendingAnalysis);
+      const timeSince = lesson.pendingAnalysisTime ? Math.round((Date.now() - lesson.pendingAnalysisTime) / 60000) : 0;
+      setModalConfig({
+        title: "تحلیل در انتظار",
+        message: `یک تحلیل ${timeSince > 0 ? `از ${timeSince} دقیقه پیش` : ''} در انتظار تأیید شماست. می‌توانید آن را به درس اضافه کنید یا رد کنید.`
+      });
+    }
+  }, [lesson.id, lesson.pendingAnalysis]);
+
   const handleSaveNotes = () => {
     updateLesson(lesson.id, { archivedNotes: editedNotes });
     setIsEditingNotes(false);
@@ -2321,9 +2225,11 @@ ${analyzedContent}
           setModalConfig({ title: "توجه", message: "نکات ذخیره شد. دسته‌بندی خودکار موفق نبود، اما می‌توانید از طریق چت با استاد هوش مصنوعی موارد را یاد بگیرید." });
       }
 
+      // Clear both local state and persisted pending analysis
       setAnalyzedContent(null);
       setPastedText('');
       setIsProcessing(false);
+      updateLesson(lesson.id, { pendingAnalysis: null, pendingAnalysisTime: null });
       setTimeout(() => setCurrentNode('idle'), 1500);
   };
 
@@ -2374,6 +2280,12 @@ ${analyzedContent}
 
       const result = await response.json();
 
+      // IMPORTANT: Save analysis result to lesson immediately so it persists even if user navigates away
+      updateLesson(lesson.id, {
+        pendingAnalysis: result.analysis,
+        pendingAnalysisTime: Date.now()
+      });
+
       setAnalyzedContent(result.analysis);
       setCurrentNode('complete', 'fileAnalysis');
 
@@ -2385,7 +2297,7 @@ ${analyzedContent}
       }
 
       setProcessingStatus('');
-      setModalConfig({ title: "تحلیل کامل شد", message: `${result.processedFiles?.length || 0} فایل با موفقیت تحلیل شد.` });
+      setModalConfig({ title: "تحلیل کامل شد", message: `${result.processedFiles?.length || 0} فایل با موفقیت تحلیل شد. نتیجه در درس ذخیره شد.` });
 
     } catch (error) {
       console.error('Analysis error:', error);
