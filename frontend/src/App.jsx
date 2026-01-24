@@ -1957,11 +1957,6 @@ ${lesson.archivedNotes}`;
         </Card>
     );
 }
-                </div>
-            )}
-        </Card>
-    );
-}
 
 function MarkdownRenderer({ text }) {
     const sections = text.split('---');
