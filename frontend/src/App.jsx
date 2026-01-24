@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -892,6 +892,26 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   const [analyzedContent, setAnalyzedContent] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]); // Store actual files for upload
   const [processingStatus, setProcessingStatus] = useState(''); // Show progress messages
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editedNotes, setEditedNotes] = useState(lesson.archivedNotes || '');
+
+  // Sync editedNotes when lesson changes
+  useEffect(() => {
+    setEditedNotes(lesson.archivedNotes || '');
+    setIsEditingNotes(false);
+  }, [lesson.id]);
+
+  const handleSaveNotes = () => {
+    updateLesson(lesson.id, { archivedNotes: editedNotes });
+    setIsEditingNotes(false);
+    addJournalEntry(`نکات درس "${lesson.title}" ویرایش شد.`);
+    setModalConfig({ title: "ذخیره شد", message: "نکات درس با موفقیت ذخیره شد." });
+  };
+
+  const handleCancelEdit = () => {
+    setEditedNotes(lesson.archivedNotes || '');
+    setIsEditingNotes(false);
+  };
 
   const handleFileChange = (event) => {
       const newFiles = Array.from(event.target.files);
@@ -1215,10 +1235,55 @@ ${analyzedContent}
                     </div>
                 </Card>
             )}
-            <Card title="نکات ذخیره شده درس">
-                <div className="max-h-96 overflow-y-auto p-4 border rounded-lg bg-slate-50">
-                    {lesson.archivedNotes && lesson.archivedNotes.trim() ? <MarkdownRenderer text={lesson.archivedNotes} /> : <p className="text-slate-500 text-center py-4">هنوز نکته‌ای به این درس اضافه نشده است.</p>}
-                </div>
+            <Card
+                title="📝 نکات ذخیره شده درس"
+                actionButton={
+                    !isEditingNotes ? (
+                        <button
+                            onClick={() => setIsEditingNotes(true)}
+                            className="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600 flex items-center gap-2"
+                        >
+                            <Edit size={16}/> ویرایش
+                        </button>
+                    ) : null
+                }
+            >
+                {isEditingNotes ? (
+                    <div className="space-y-4">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                            💡 نکته: می‌توانید از فرمت Markdown استفاده کنید (## برای عنوان، ** برای بولد، ~~ برای خط‌خورده)
+                        </div>
+                        <textarea
+                            value={editedNotes}
+                            onChange={(e) => setEditedNotes(e.target.value)}
+                            className="w-full h-96 p-4 border-2 border-slate-300 rounded-xl font-mono text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
+                            placeholder="نکات درس را اینجا بنویسید..."
+                            dir="rtl"
+                        />
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={handleCancelEdit}
+                                className="px-4 py-2 border-2 border-slate-300 rounded-lg hover:bg-slate-100 font-medium"
+                            >
+                                انصراف
+                            </button>
+                            <button
+                                onClick={handleSaveNotes}
+                                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 font-medium flex items-center gap-2"
+                            >
+                                <Check size={18}/> ذخیره تغییرات
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="max-h-96 overflow-y-auto p-4 border rounded-lg bg-slate-50">
+                        {lesson.archivedNotes && lesson.archivedNotes.trim() ? (
+                            <MarkdownRenderer text={lesson.archivedNotes} />
+                        ) : (
+                            <p className="text-slate-500 text-center py-4">هنوز نکته‌ای به این درس اضافه نشده است.</p>
+                        )}
+                    </div>
+                )}
             </Card>
             {(lesson.mediaItems || []).length > 0 && (
               <Card title="رسانه‌های استخراج شده">
