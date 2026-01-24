@@ -1256,75 +1256,260 @@ ${analyzedContent}
 }
 
 function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData }) {
-    const [selectedLessonId, setSelectedLessonId] = useState(lessons[0]?.id || '');
+    const [selectedLessonId, setSelectedLessonId] = useState(lessons[0]?.id?.toString() || '');
     const [quiz, setQuiz] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [userAnswers, setUserAnswers] = useState({});
     const [submitted, setSubmitted] = useState(false);
     const [questionCount, setQuestionCount] = useState(5);
-    const [timeLimit, setTimeLimit] = useState(0); // Now in minutes
-    const [questionTypes, setQuestionTypes] = useState({ mcq: true, fillInBlank: false });
-    const [timeLeft, setTimeLeft] = useState(0); // Now in seconds
+    const [timeLimit, setTimeLimit] = useState(0);
+    const [difficulty, setDifficulty] = useState('medium');
+    const [questionTypes, setQuestionTypes] = useState({
+        mcq: true,
+        fillInBlank: false,
+        translateToPersian: false,
+        translateToArabic: false,
+        wordOrder: false,
+        matching: false
+    });
+    const [timeLeft, setTimeLeft] = useState(0);
+    const [matchingAnswers, setMatchingAnswers] = useState({});
     const timerRef = useRef(null);
+
+    const difficultyLabels = {
+        easy: { label: 'آسان', desc: 'لغات و عبارات ساده' },
+        medium: { label: 'متوسط', desc: 'ترکیب لغات و گرامر' },
+        hard: { label: 'سخت', desc: 'جملات پیچیده و اصطلاحات' }
+    };
+
+    const questionTypeLabels = {
+        mcq: { label: 'چهارگزینه‌ای', icon: '📝' },
+        fillInBlank: { label: 'جای خالی', icon: '✏️' },
+        translateToPersian: { label: 'ترجمه به فارسی', icon: '🇮🇷' },
+        translateToArabic: { label: 'ترجمه به عربی', icon: '🇱🇧' },
+        wordOrder: { label: 'مرتب‌سازی کلمات', icon: '🔤' },
+        matching: { label: 'تطبیق', icon: '🔗' }
+    };
 
     useEffect(() => {
         if (timeLeft > 0 && !submitted) {
             timerRef.current = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-        } else if (timeLeft === 0 && quiz && !submitted) {
+        } else if (timeLeft === 0 && quiz && !submitted && timeLimit > 0) {
             handleSubmit();
         }
         return () => clearTimeout(timerRef.current);
     }, [timeLeft, quiz, submitted]);
 
     const generateQuiz = async () => {
-        setIsLoading(true); setQuiz(null); setUserAnswers({}); setSubmitted(false); clearTimeout(timerRef.current);
-        const lesson = lessons.find(l => l.id == selectedLessonId);
-        if (!lesson || !lesson.archivedNotes?.trim()) {
-            setModalConfig({ title: "خطا", message: "محتوای این درس برای ساخت آزمون کافی نیست." });
+        const selectedTypes = Object.entries(questionTypes).filter(([, val]) => val).map(([key]) => key);
+        if (selectedTypes.length === 0) {
+            setModalConfig({ title: "خطا", message: "لطفاً حداقل یک نوع سوال انتخاب کنید." });
+            return;
+        }
+
+        setIsLoading(true); setQuiz(null); setUserAnswers({}); setMatchingAnswers({}); setSubmitted(false); clearTimeout(timerRef.current);
+
+        const lessonId = parseInt(selectedLessonId);
+        const lesson = lessons.find(l => l.id === lessonId);
+
+        if (!lesson) {
+            setModalConfig({ title: "خطا", message: "لطفاً یک درس انتخاب کنید." });
             setIsLoading(false); return;
         }
-        addJournalEntry(`ایجاد آزمون برای درس "${lesson.title}"`);
-        const selectedTypes = Object.entries(questionTypes).filter(([, val]) => val).map(([key]) => key).join(', ');
-        const systemPrompt = `Create a ${questionCount}-question quiz in Lebanese Arabic based on lesson notes for a Persian speaker. Include these question types: [${selectedTypes}]. Return ONLY a valid JSON array of objects, each with 'type' ('mcq' or 'fill_in_blank'), 'question', 'options' (for mcq), and 'correctAnswer'. For fill_in_blank, use "___" for the blank.`;
-        const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING" }, question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, correctAnswer: { type: "STRING" } } } };
-        const payload = { contents: [{ parts: [{ text: `Lesson Notes: ${lesson.archivedNotes}` }] }], systemInstruction: { parts: [{ text: systemPrompt }] }, generationConfig: { responseMimeType: "application/json", responseSchema: schema } };
-        
+
+        if (!lesson.archivedNotes?.trim() || lesson.archivedNotes.length < 50) {
+            setModalConfig({ title: "خطا", message: "محتوای این درس برای ساخت آزمون کافی نیست. حداقل باید چند لغت و عبارت در درس وجود داشته باشد." });
+            setIsLoading(false); return;
+        }
+
+        addJournalEntry(`ایجاد آزمون ${difficultyLabels[difficulty].label} برای درس "${lesson.title}"`);
+
+        const typeDescriptions = {
+            mcq: 'سوال چهارگزینه‌ای با یک پاسخ صحیح',
+            fillInBlank: 'جمله با جای خالی که باید کلمه صحیح نوشته شود',
+            translateToPersian: 'ترجمه جمله عربی لبنانی به فارسی',
+            translateToArabic: 'ترجمه جمله فارسی به عربی لبنانی',
+            wordOrder: 'مرتب کردن کلمات برای ساختن جمله صحیح',
+            matching: 'تطبیق کلمات عربی با معانی فارسی (5 جفت)'
+        };
+
+        const systemPrompt = `تو یک سازنده آزمون عربی لبنانی هستی. بر اساس محتوای درس زیر، یک آزمون ${questionCount} سوالی بساز.
+
+سطح سختی: ${difficultyLabels[difficulty].label} (${difficultyLabels[difficulty].desc})
+
+انواع سوالات مورد نیاز:
+${selectedTypes.map(t => `- ${t}: ${typeDescriptions[t]}`).join('\n')}
+
+قوانین مهم:
+1. سوالات باید از محتوای درس باشند
+2. هر سوال باید پاسخ مشخص داشته باشد
+3. برای mcq دقیقاً 4 گزینه بده
+4. برای matching دقیقاً 5 جفت کلمه-معنی بده
+5. برای wordOrder کلمات را به صورت آرایه بده
+
+فرمت JSON خروجی:
+[
+  {
+    "type": "mcq",
+    "question": "سوال به فارسی یا عربی",
+    "options": ["گزینه1", "گزینه2", "گزینه3", "گزینه4"],
+    "correctAnswer": "گزینه صحیح"
+  },
+  {
+    "type": "fill_in_blank",
+    "question": "جمله با ___ برای جای خالی",
+    "correctAnswer": "کلمه صحیح"
+  },
+  {
+    "type": "translate_to_persian",
+    "question": "جمله عربی لبنانی",
+    "correctAnswer": "ترجمه فارسی"
+  },
+  {
+    "type": "translate_to_arabic",
+    "question": "جمله فارسی",
+    "correctAnswer": "ترجمه عربی لبنانی"
+  },
+  {
+    "type": "word_order",
+    "words": ["کلمه1", "کلمه2", "کلمه3"],
+    "correctAnswer": "جمله صحیح مرتب شده"
+  },
+  {
+    "type": "matching",
+    "pairs": [
+      {"arabic": "کلمه عربی", "persian": "معنی فارسی"},
+      ...
+    ]
+  }
+]
+
+محتوای درس:
+${lesson.archivedNotes}`;
+
+        const schema = {
+            type: "ARRAY",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    type: { type: "STRING" },
+                    question: { type: "STRING" },
+                    options: { type: "ARRAY", items: { type: "STRING" } },
+                    correctAnswer: { type: "STRING" },
+                    words: { type: "ARRAY", items: { type: "STRING" } },
+                    pairs: { type: "ARRAY", items: { type: "OBJECT", properties: { arabic: { type: "STRING" }, persian: { type: "STRING" } } } }
+                }
+            }
+        };
+
+        const payload = {
+            contents: [{ parts: [{ text: "آزمون بساز" }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { responseMimeType: "application/json", responseSchema: schema }
+        };
+
         try {
-            const generatedQuiz = JSON.parse(await callGeminiAPI(payload));
-            setQuiz(generatedQuiz.filter(q => q && q.question && q.correctAnswer)); // Filter out invalid questions
+            const response = await callGeminiAPI(payload);
+            let generatedQuiz;
+
+            try {
+                generatedQuiz = JSON.parse(response);
+            } catch (parseError) {
+                // Try to extract JSON from response
+                const jsonMatch = response.match(/\[[\s\S]*\]/);
+                if (jsonMatch) {
+                    generatedQuiz = JSON.parse(jsonMatch[0]);
+                } else {
+                    throw new Error('Invalid JSON response');
+                }
+            }
+
+            if (!Array.isArray(generatedQuiz) || generatedQuiz.length === 0) {
+                throw new Error('Empty quiz');
+            }
+
+            // Filter and validate questions
+            const validQuiz = generatedQuiz.filter(q => {
+                if (!q || !q.type) return false;
+                if (q.type === 'matching') return q.pairs && q.pairs.length >= 3;
+                if (q.type === 'word_order') return q.words && q.words.length >= 2 && q.correctAnswer;
+                return q.question && q.correctAnswer;
+            });
+
+            if (validQuiz.length === 0) {
+                throw new Error('No valid questions');
+            }
+
+            setQuiz(validQuiz);
             if (timeLimit > 0) setTimeLeft(timeLimit * 60);
+
         } catch (error) {
-            setModalConfig({ title: "خطا", message: "خطا در ساخت آزمون." });
+            console.error('Quiz generation error:', error);
+            setModalConfig({ title: "خطا", message: "خطا در ساخت آزمون. لطفاً دوباره تلاش کنید یا محتوای بیشتری به درس اضافه کنید." });
         } finally {
             setIsLoading(false);
         }
     };
-    
+
     const handleAnswer = (qIndex, answer) => setUserAnswers(prev => ({...prev, [qIndex]: answer}));
+
+    const handleMatchingAnswer = (qIndex, arabicWord, persianWord) => {
+        setMatchingAnswers(prev => ({
+            ...prev,
+            [qIndex]: { ...(prev[qIndex] || {}), [arabicWord]: persianWord }
+        }));
+    };
+
+    const handleWordOrderDrag = (qIndex, newOrder) => {
+        setUserAnswers(prev => ({...prev, [qIndex]: newOrder.join(' ')}));
+    };
+
+    const calculateScore = () => {
+        if (!quiz) return { score: 0, total: 0 };
+        let score = 0;
+
+        quiz.forEach((q, i) => {
+            if (q.type === 'matching') {
+                const userMatch = matchingAnswers[i] || {};
+                const correctPairs = q.pairs || [];
+                correctPairs.forEach(pair => {
+                    if (userMatch[pair.arabic] === pair.persian) score += 1 / correctPairs.length;
+                });
+            } else {
+                const userAns = (userAnswers[i] || '').trim().toLowerCase();
+                const correctAns = (q.correctAnswer || '').trim().toLowerCase();
+                if (userAns === correctAns) score++;
+            }
+        });
+
+        return { score: Math.round(score * 10) / 10, total: quiz.length };
+    };
+
     const handleSubmit = () => {
         if(!quiz) return;
         setSubmitted(true);
         clearTimeout(timerRef.current);
-        let score = quiz.reduce((acc, q, i) => acc + (userAnswers[i]?.toLowerCase() === q.correctAnswer.toLowerCase() ? 1 : 0), 0);
-        const finalScore = (score / quiz.length) * 100;
+
+        const { score, total } = calculateScore();
+        const finalScore = (score / total) * 100;
         addJournalEntry(`آزمون با امتیاز ${finalScore.toFixed(0)}% به پایان رسید.`);
 
         // Update lesson progress
-        const lesson = lessons.find(l => l.id === selectedLessonId);
+        const lessonId = parseInt(selectedLessonId);
+        const lesson = lessons.find(l => l.id === lessonId);
         if (lesson) {
             const currentProgress = lesson.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
             setData(prev => ({
                 ...prev,
-                lessons: prev.lessons.map(l => l.id === selectedLessonId ? {
+                lessons: prev.lessons.map(l => l.id === lessonId ? {
                     ...l,
                     progress: {
                         ...currentProgress,
                         quizzesTaken: currentProgress.quizzesTaken + 1,
-                        correctAnswers: currentProgress.correctAnswers + score,
-                        // Mark items as learned based on correct answers
+                        correctAnswers: currentProgress.correctAnswers + Math.round(score),
                         learnedItems: Math.min(
                             currentProgress.totalItems,
-                            currentProgress.learnedItems + score
+                            currentProgress.learnedItems + Math.round(score)
                         )
                     }
                 } : l)
@@ -1332,30 +1517,381 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData }) {
         }
     };
 
+    const renderQuestion = (q, qIndex) => {
+        const isCorrect = (userAns, correctAns) =>
+            (userAns || '').trim().toLowerCase() === (correctAns || '').trim().toLowerCase();
+
+        switch (q.type) {
+            case 'mcq':
+                return (
+                    <div className="space-y-2">
+                        {(q.options || []).map((opt, aIndex) => (
+                            <label key={aIndex} className={`block p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                submitted
+                                    ? (opt === q.correctAnswer ? 'border-green-500 bg-green-100' : (userAnswers[qIndex] === opt ? 'border-red-500 bg-red-100' : 'border-slate-200'))
+                                    : (userAnswers[qIndex] === opt ? 'border-teal-500 bg-teal-50' : 'border-slate-200 hover:border-teal-300')
+                            }`}>
+                                <input type="radio" name={`q${qIndex}`} onChange={() => handleAnswer(qIndex, opt)} disabled={submitted} className="ml-3"/>
+                                {opt}
+                            </label>
+                        ))}
+                    </div>
+                );
+
+            case 'fill_in_blank':
+                return (
+                    <input
+                        type="text"
+                        value={userAnswers[qIndex] || ''}
+                        onChange={e => handleAnswer(qIndex, e.target.value)}
+                        disabled={submitted}
+                        placeholder="پاسخ خود را بنویسید..."
+                        className={`w-full p-3 border-2 rounded-xl ${
+                            submitted
+                                ? (isCorrect(userAnswers[qIndex], q.correctAnswer) ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50')
+                                : 'border-slate-300 focus:border-teal-500'
+                        }`}
+                    />
+                );
+
+            case 'translate_to_persian':
+            case 'translate_to_arabic':
+                return (
+                    <div>
+                        <div className="bg-slate-100 p-3 rounded-lg mb-3 text-lg font-medium flex items-center gap-2">
+                            <span>{q.type === 'translate_to_persian' ? '🇱🇧' : '🇮🇷'}</span>
+                            {q.question}
+                            <TTSButton textToSpeak={q.question} />
+                        </div>
+                        <textarea
+                            value={userAnswers[qIndex] || ''}
+                            onChange={e => handleAnswer(qIndex, e.target.value)}
+                            disabled={submitted}
+                            placeholder={q.type === 'translate_to_persian' ? 'ترجمه فارسی...' : 'ترجمه عربی لبنانی...'}
+                            rows={2}
+                            className={`w-full p-3 border-2 rounded-xl ${
+                                submitted
+                                    ? (isCorrect(userAnswers[qIndex], q.correctAnswer) ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50')
+                                    : 'border-slate-300 focus:border-teal-500'
+                            }`}
+                        />
+                    </div>
+                );
+
+            case 'word_order':
+                const words = q.words || [];
+                const currentOrder = userAnswers[qIndex] ? userAnswers[qIndex].split(' ') : [...words].sort(() => Math.random() - 0.5);
+                return (
+                    <div>
+                        <p className="text-sm text-slate-500 mb-2">کلمات را به ترتیب صحیح مرتب کنید:</p>
+                        <div className="flex flex-wrap gap-2 mb-3">
+                            {currentOrder.map((word, wIndex) => (
+                                <button
+                                    key={wIndex}
+                                    onClick={() => {
+                                        if (submitted) return;
+                                        const newOrder = [...currentOrder];
+                                        if (wIndex > 0) {
+                                            [newOrder[wIndex], newOrder[wIndex-1]] = [newOrder[wIndex-1], newOrder[wIndex]];
+                                        }
+                                        handleAnswer(qIndex, newOrder.join(' '));
+                                    }}
+                                    disabled={submitted}
+                                    className={`px-4 py-2 rounded-lg border-2 font-medium ${
+                                        submitted
+                                            ? (isCorrect(userAnswers[qIndex], q.correctAnswer) ? 'border-green-500 bg-green-100' : 'border-red-500 bg-red-100')
+                                            : 'border-teal-500 bg-teal-50 hover:bg-teal-100 cursor-pointer'
+                                    }`}
+                                >
+                                    {word}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-400">💡 روی کلمات کلیک کنید تا جابجا شوند</p>
+                    </div>
+                );
+
+            case 'matching':
+                const pairs = q.pairs || [];
+                const arabicWords = pairs.map(p => p.arabic);
+                const persianWords = [...pairs.map(p => p.persian)].sort(() => Math.random() - 0.5);
+                const userMatch = matchingAnswers[qIndex] || {};
+
+                return (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <p className="font-bold text-sm text-slate-600 mb-2">🇱🇧 کلمات عربی</p>
+                            {arabicWords.map((arabic, aIndex) => {
+                                const selectedPersian = userMatch[arabic];
+                                const isMatchCorrect = submitted && selectedPersian === pairs.find(p => p.arabic === arabic)?.persian;
+                                const isMatchWrong = submitted && selectedPersian && !isMatchCorrect;
+
+                                return (
+                                    <div key={aIndex} className={`p-3 rounded-lg border-2 ${
+                                        isMatchCorrect ? 'border-green-500 bg-green-50' :
+                                        isMatchWrong ? 'border-red-500 bg-red-50' :
+                                        selectedPersian ? 'border-teal-500 bg-teal-50' : 'border-slate-200'
+                                    }`}>
+                                        <span className="font-medium">{arabic}</span>
+                                        {selectedPersian && <span className="text-sm text-slate-500 mr-2">← {selectedPersian}</span>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="space-y-2">
+                            <p className="font-bold text-sm text-slate-600 mb-2">🇮🇷 معانی فارسی</p>
+                            {persianWords.map((persian, pIndex) => {
+                                const isSelected = Object.values(userMatch).includes(persian);
+                                return (
+                                    <button
+                                        key={pIndex}
+                                        onClick={() => {
+                                            if (submitted) return;
+                                            // Find first unmatched arabic word
+                                            const unmatchedArabic = arabicWords.find(a => !userMatch[a]);
+                                            if (unmatchedArabic && !isSelected) {
+                                                handleMatchingAnswer(qIndex, unmatchedArabic, persian);
+                                            }
+                                        }}
+                                        disabled={submitted || isSelected}
+                                        className={`w-full p-3 rounded-lg border-2 text-right ${
+                                            isSelected ? 'border-slate-300 bg-slate-100 opacity-50' : 'border-slate-200 hover:border-teal-500 cursor-pointer'
+                                        }`}
+                                    >
+                                        {persian}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {!submitted && Object.keys(userMatch).length > 0 && (
+                            <button
+                                onClick={() => setMatchingAnswers(prev => ({ ...prev, [qIndex]: {} }))}
+                                className="col-span-2 text-sm text-red-500 hover:text-red-700"
+                            >
+                                🔄 پاک کردن انتخاب‌ها
+                            </button>
+                        )}
+                    </div>
+                );
+
+            default:
+                return <p className="text-red-500">نوع سوال نامشخص</p>;
+        }
+    };
+
+    const { score, total } = submitted ? calculateScore() : { score: 0, total: 0 };
+    const scorePercent = total > 0 ? (score / total) * 100 : 0;
+
     return (
-        <Card title="مرکز آزمون">
-            <div className="bg-slate-100 p-6 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="font-bold">درس:</label><select value={selectedLessonId} onChange={(e) => setSelectedLessonId(e.target.value)} className="w-full p-2 border rounded">{lessons.map(l => (<option key={l.id} value={l.id}>{l.title}</option>))}</select></div>
-                <div><label className="font-bold">تعداد سوالات:</label><input type="number" value={questionCount} onChange={(e) => setQuestionCount(e.target.value)} className="w-full p-2 border rounded" min="1" max="10"/></div>
-                <div><label className="font-bold">محدودیت زمانی (دقیقه):</label><input type="number" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value))} className="w-full p-2 border rounded" min="0" placeholder="0 برای نامحدود" /></div>
-                <div><label className="font-bold">نوع سوالات:</label><div className="flex gap-4 mt-2"><label><input type="checkbox" checked={questionTypes.mcq} onChange={e => setQuestionTypes(p => ({...p, mcq: e.target.checked}))}/> تستی</label><label><input type="checkbox" checked={questionTypes.fillInBlank} onChange={e => setQuestionTypes(p => ({...p, fillInBlank: e.target.checked}))}/> جای خالی</label></div></div>
-                <div className="md:col-span-2"><button onClick={generateQuiz} disabled={isLoading || lessons.length === 0} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold"><Sparkles size={18} />{isLoading ? 'در حال ساخت آزمون...' : '✨ ایجاد آزمون هوشمند'}</button></div>
+        <Card title="🎯 مرکز آزمون هوشمند">
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-xl space-y-6">
+                {/* Settings Row 1 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="font-bold text-slate-700 block mb-2">📚 انتخاب درس:</label>
+                        <select
+                            value={selectedLessonId}
+                            onChange={(e) => setSelectedLessonId(e.target.value)}
+                            className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-teal-500"
+                        >
+                            {lessons.length === 0 ? (
+                                <option value="">هیچ درسی وجود ندارد</option>
+                            ) : (
+                                lessons.map(l => (
+                                    <option key={l.id} value={l.id.toString()}>
+                                        {l.title} {l.archivedNotes?.length > 50 ? '✅' : '⚠️'}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="font-bold text-slate-700 block mb-2">🔢 تعداد سوالات:</label>
+                        <input
+                            type="number"
+                            value={questionCount}
+                            onChange={(e) => setQuestionCount(Math.max(1, Math.min(15, parseInt(e.target.value) || 5)))}
+                            className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-teal-500"
+                            min="1"
+                            max="15"
+                        />
+                    </div>
+                </div>
+
+                {/* Settings Row 2 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="font-bold text-slate-700 block mb-2">⏱️ محدودیت زمانی (دقیقه):</label>
+                        <input
+                            type="number"
+                            value={timeLimit}
+                            onChange={(e) => setTimeLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                            className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-teal-500"
+                            min="0"
+                            placeholder="0 = بدون محدودیت"
+                        />
+                    </div>
+                    <div>
+                        <label className="font-bold text-slate-700 block mb-2">📊 سطح سختی:</label>
+                        <div className="flex gap-2">
+                            {Object.entries(difficultyLabels).map(([key, { label }]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setDifficulty(key)}
+                                    className={`flex-1 p-3 rounded-xl border-2 font-medium transition-all ${
+                                        difficulty === key
+                                            ? 'border-teal-500 bg-teal-500 text-white'
+                                            : 'border-slate-300 hover:border-teal-300'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Question Types */}
+                <div>
+                    <label className="font-bold text-slate-700 block mb-3">📝 انواع سوالات:</label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {Object.entries(questionTypeLabels).map(([key, { label, icon }]) => (
+                            <label
+                                key={key}
+                                className={`flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                    questionTypes[key]
+                                        ? 'border-teal-500 bg-teal-50'
+                                        : 'border-slate-200 hover:border-teal-300'
+                                }`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={questionTypes[key]}
+                                    onChange={e => setQuestionTypes(p => ({...p, [key]: e.target.checked}))}
+                                    className="w-4 h-4"
+                                />
+                                <span>{icon}</span>
+                                <span className="text-sm font-medium">{label}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Generate Button */}
+                <button
+                    onClick={generateQuiz}
+                    disabled={isLoading || lessons.length === 0}
+                    className="w-full bg-gradient-to-r from-teal-500 to-teal-600 text-white px-6 py-4 rounded-xl hover:from-teal-600 hover:to-teal-700 disabled:from-slate-400 disabled:to-slate-500 flex items-center justify-center gap-3 font-bold text-lg shadow-lg transition-all"
+                >
+                    <Sparkles size={24} />
+                    {isLoading ? 'در حال ساخت آزمون...' : '✨ ایجاد آزمون هوشمند'}
+                </button>
             </div>
-            {isLoading && <div className="text-center p-10"><Loader className="animate-spin inline-block text-teal-500" size={40}/></div>}
+
+            {/* Loading */}
+            {isLoading && (
+                <div className="text-center p-10">
+                    <Loader className="animate-spin inline-block text-teal-500" size={48}/>
+                    <p className="mt-4 text-slate-600">در حال ساخت سوالات...</p>
+                </div>
+            )}
+
+            {/* Quiz Display */}
             {quiz && (
                 <div className="mt-8">
-                    <div className="flex justify-between items-center mb-6"><h3 className="text-2xl font-bold">آزمون: {lessons.find(l => l.id == selectedLessonId)?.title}</h3>{timeLimit > 0 && <div className="font-bold text-lg bg-slate-200 px-3 py-1 rounded-lg">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</div>}</div>
-                    <div className="space-y-6">
+                    <div className="flex justify-between items-center mb-6 p-4 bg-slate-100 rounded-xl">
+                        <div>
+                            <h3 className="text-2xl font-bold text-slate-800">
+                                📝 آزمون: {lessons.find(l => l.id === parseInt(selectedLessonId))?.title}
+                            </h3>
+                            <p className="text-sm text-slate-500 mt-1">
+                                {quiz.length} سوال | سطح {difficultyLabels[difficulty].label}
+                            </p>
+                        </div>
+                        {timeLimit > 0 && (
+                            <div className={`font-bold text-xl px-4 py-2 rounded-xl ${
+                                timeLeft < 60 ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                                ⏱️ {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-8">
                         {quiz.map((q, qIndex) => (
-                            <div key={qIndex}>
-                                <div className="flex items-center gap-2 mb-2"><p className="font-bold text-lg">{qIndex + 1}. {q.question.replace('___', '_____')}</p><TTSButton textToSpeak={q.question} /></div>
-                                {q.type === 'mcq' && <div className="space-y-3 pr-4">{q.options.map((opt, aIndex) => (<label key={aIndex} className={`block p-3 rounded-xl border-2 ${submitted ? (opt === q.correctAnswer ? 'border-green-500 bg-green-100' : (userAnswers[qIndex] === opt ? 'border-red-500 bg-red-100' : '')) : 'hover:border-teal-500'}`}><input type="radio" name={`q${qIndex}`} onChange={() => handleAnswer(qIndex, opt)} disabled={submitted} className="ml-3"/>{opt}</label>))}</div>}
-                                {q.type === 'fill_in_blank' && <input type="text" onChange={e => handleAnswer(qIndex, e.target.value)} disabled={submitted} className={`w-full p-2 border-2 rounded ${submitted ? (userAnswers[qIndex]?.toLowerCase() === q.correctAnswer.toLowerCase() ? 'border-green-500' : 'border-red-500') : ''}`} />}
-                                {submitted && <p className="text-sm text-green-700 mt-2 font-bold">پاسخ صحیح: {q.correctAnswer}</p>}
+                            <div key={qIndex} className="bg-white p-6 rounded-xl border-2 border-slate-200 shadow-sm">
+                                <div className="flex items-start gap-3 mb-4">
+                                    <span className="bg-teal-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">
+                                        {qIndex + 1}
+                                    </span>
+                                    <div className="flex-1">
+                                        <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">
+                                            {questionTypeLabels[q.type.replace('_', '')]?.label || questionTypeLabels[Object.keys(questionTypeLabels).find(k => k.toLowerCase().replace(/[^a-z]/g, '') === q.type.toLowerCase().replace(/[^a-z]/g, ''))]?.label || q.type}
+                                        </span>
+                                        {q.question && q.type !== 'matching' && (
+                                            <p className="font-bold text-lg mt-2 flex items-center gap-2">
+                                                {q.question.replace('___', '_____')}
+                                                {q.type !== 'translate_to_persian' && q.type !== 'translate_to_arabic' && (
+                                                    <TTSButton textToSpeak={q.question} />
+                                                )}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {renderQuestion(q, qIndex)}
+
+                                {submitted && q.correctAnswer && (
+                                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                        <p className="text-green-700 font-medium">✅ پاسخ صحیح: {q.correctAnswer}</p>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
-                    {!submitted ? (<button onClick={handleSubmit} className="mt-8 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 font-bold">ثبت پاسخ‌ها</button>) : (<div className="mt-8 p-4 bg-blue-100 rounded-xl text-center font-bold text-blue-800">آزمون تمام شد!</div>)}
+
+                    {!submitted ? (
+                        <button
+                            onClick={handleSubmit}
+                            className="mt-8 w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 font-bold text-lg shadow-lg"
+                        >
+                            ✅ ثبت پاسخ‌ها
+                        </button>
+                    ) : (
+                        <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl border-2 border-blue-200">
+                            <div className="text-center">
+                                <p className="text-3xl font-bold text-blue-800 mb-2">
+                                    🎉 آزمون تمام شد!
+                                </p>
+                                <p className="text-xl text-slate-600">
+                                    امتیاز شما: <span className="font-bold text-teal-600">{score}</span> از <span className="font-bold">{total}</span>
+                                </p>
+                                <div className="w-full bg-slate-200 rounded-full h-4 mt-4">
+                                    <div
+                                        className={`h-4 rounded-full transition-all ${
+                                            scorePercent >= 80 ? 'bg-green-500' :
+                                            scorePercent >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                                        }`}
+                                        style={{ width: `${scorePercent}%` }}
+                                    ></div>
+                                </div>
+                                <p className="text-lg font-bold mt-2" style={{ color: scorePercent >= 80 ? '#22c55e' : scorePercent >= 50 ? '#eab308' : '#ef4444' }}>
+                                    {scorePercent >= 80 ? '🌟 عالی!' : scorePercent >= 50 ? '👍 خوب' : '💪 تلاش بیشتر'}
+                                </p>
+                                <button
+                                    onClick={() => { setQuiz(null); setSubmitted(false); setUserAnswers({}); setMatchingAnswers({}); }}
+                                    className="mt-4 bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 font-medium"
+                                >
+                                    🔄 آزمون جدید
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </Card>
+    );
+}
                 </div>
             )}
         </Card>
