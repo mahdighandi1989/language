@@ -69,9 +69,10 @@ const ExecutionFlowContext = createContext(null);
 function useExecutionFlow() {
   const context = useContext(ExecutionFlowContext);
   if (!context) {
+    console.warn('⚠️ useExecutionFlow: No context available - using dummy functions');
     // Return dummy functions if not in provider (for components that may render outside)
     return {
-      setCurrentNode: () => {},
+      setCurrentNode: () => { console.log('⚠️ Dummy setCurrentNode called'); },
       addToHistory: () => {},
       clearHistory: () => {},
       currentNode: 'idle',
@@ -86,54 +87,59 @@ function useExecutionFlow() {
 function ExecutionFlowProvider({ children }) {
   const [currentNode, setCurrentNodeState] = useState('idle');
   const [flowHistory, setFlowHistory] = useState([]);
-  const [activeFlow, setActiveFlow] = useState(null); // 'chat', 'liveVoice', 'fileAnalysis', 'quiz'
+  const [activeFlow, setActiveFlowState] = useState(null);
+  const activeFlowRef = useRef(null);
   const maxHistoryLength = 50;
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeFlowRef.current = activeFlow;
+  }, [activeFlow]);
+
+  const setActiveFlow = useCallback((flowType) => {
+    activeFlowRef.current = flowType;
+    setActiveFlowState(flowType);
+  }, []);
+
   const setCurrentNode = useCallback((nodeId, flowType = null) => {
+    console.log('🔄 Flow Update:', nodeId, flowType); // Debug log
     const timestamp = Date.now();
     setCurrentNodeState(nodeId);
 
-    // If going to idle, complete, or error - clear active flow after a delay
-    if (nodeId === 'idle' || nodeId === 'complete' || nodeId === 'error') {
-      // Don't immediately clear - let animation finish
-      setTimeout(() => {
-        setActiveFlow(prev => {
-          // Only clear if still in idle/complete/error state
-          return prev;
-        });
-      }, 2000);
-      // But do clear activeFlow when explicitly going to idle
-      if (nodeId === 'idle' && !flowType) {
-        setActiveFlow(null);
-      }
-    } else if (flowType) {
+    // Set active flow if provided
+    if (flowType) {
       setActiveFlow(flowType);
     }
 
+    // Clear active flow when going to idle without flowType
+    if (nodeId === 'idle' && !flowType) {
+      setActiveFlow(null);
+    }
+
+    // Add to history
     setFlowHistory(prev => {
-      const newEntry = { nodeId, timestamp, flowType: flowType || activeFlow };
+      const newEntry = { nodeId, timestamp, flowType: flowType || activeFlowRef.current };
       const updated = [...prev, newEntry];
-      // Keep only last N entries
       return updated.slice(-maxHistoryLength);
     });
-  }, [activeFlow]);
+  }, [setActiveFlow]);
 
   const addToHistory = useCallback((nodeId, flowType = null) => {
     const timestamp = Date.now();
     setFlowHistory(prev => {
-      const newEntry = { nodeId, timestamp, flowType: flowType || activeFlow };
+      const newEntry = { nodeId, timestamp, flowType: flowType || activeFlowRef.current };
       const updated = [...prev, newEntry];
       return updated.slice(-maxHistoryLength);
     });
-  }, [activeFlow]);
+  }, []);
 
   const clearHistory = useCallback(() => {
     setFlowHistory([]);
     setCurrentNodeState('idle');
     setActiveFlow(null);
-  }, []);
+  }, [setActiveFlow]);
 
-  const value = {
+  const value = useMemo(() => ({
     currentNode,
     setCurrentNode,
     flowHistory,
@@ -141,7 +147,7 @@ function ExecutionFlowProvider({ children }) {
     clearHistory,
     activeFlow,
     setActiveFlow
-  };
+  }), [currentNode, setCurrentNode, flowHistory, addToHistory, clearHistory, activeFlow, setActiveFlow]);
 
   return (
     <ExecutionFlowContext.Provider value={value}>
@@ -2120,6 +2126,11 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   // Flow tracking
   const { setCurrentNode } = useExecutionFlow();
 
+  // Debug: Check if context is working
+  useEffect(() => {
+    console.log('📍 LessonDetail mounted, setCurrentNode:', typeof setCurrentNode);
+  }, [setCurrentNode]);
+
   // Sync editedNotes when lesson changes
   useEffect(() => {
     setEditedNotes(lesson.archivedNotes || '');
@@ -2317,6 +2328,7 @@ ${analyzedContent}
   };
 
   const handleAnalysis = async () => {
+    console.log('📤 handleAnalysis started');
     const userInstructions = pastedText.trim();
     const hasFiles = uploadedFiles.length > 0;
     const hasText = userInstructions.length > 0;
@@ -2329,6 +2341,7 @@ ${analyzedContent}
     setIsProcessing(true);
     setAnalyzedContent(null);
     setProcessingStatus('در حال آماده‌سازی فایل‌ها...');
+    console.log('📤 Calling setCurrentNode(fileUploading, fileAnalysis)');
     setCurrentNode('fileUploading', 'fileAnalysis');
     addJournalEntry(`پردازش محتوا برای درس "${lesson.title}" شروع شد.`);
 
