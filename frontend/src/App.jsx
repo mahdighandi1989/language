@@ -446,9 +446,9 @@ export default function App() {
       case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} />;
       case 'lesson': return selectedLesson ? <LessonDetail {...commonProps} key={selectedLesson.id} lesson={selectedLesson} updateLesson={updateLesson} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} knowledgeBase={data.knowledgeBase} /> : <div>درسی انتخاب نشده است.</div>;
       case 'quiz': return <QuizCenter {...commonProps} lessons={data.lessons} />;
-      case 'planner': return <StudyPlanner {...commonProps} lessons={data.lessons} />;
-      case 'cultural': return <CulturalInsights {...commonProps} />;
-      case 'stats': return <StatsReport {...commonProps} stats={data.stats} journal={data.journal} knowledgeBase={data.knowledgeBase} />;
+      case 'planner': return <ProgressCenter {...commonProps} lessons={data.lessons} journal={data.journal} knowledgeBase={data.knowledgeBase} />;
+      case 'cultural': return <CulturalInsights {...commonProps} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} />;
+      case 'stats': return <ProgressCenter {...commonProps} lessons={data.lessons} journal={data.journal} knowledgeBase={data.knowledgeBase} />;
       case 'journal': return <Journal {...commonProps} entries={data.journal} />;
       case 'settings': return <SettingsPage {...commonProps} />;
       case 'archivedConversations': return <ArchivedConversations {...commonProps} conversations={data.archivedConversations || []} />;
@@ -522,9 +522,8 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
                 <NavLink view="dashboard" icon={BarChart2} label="داشبورد" />
                 <NavLink view="lessons" icon={BookOpen} label="لیست دروس" />
                 <NavLink view="quiz" icon={Edit3} label="مرکز آزمون" />
-                <NavLink view="planner" icon={ClipboardList} label="برنامه ریزی هوشمند" />
-                <NavLink view="cultural" icon={LifeBuoy} label="نکات فرهنگی" />
-                <NavLink view="stats" icon={BarChart2} label="آمار و ارزیابی" />
+                <NavLink view="planner" icon={ClipboardList} label="مرکز پیشرفت" />
+                <NavLink view="cultural" icon={LifeBuoy} label="فرهنگ لبنان" />
                 <NavLink view="journal" icon={Edit3} label="ژورنال فعالیت‌ها" />
                 <NavLink view="archivedConversations" icon={Archive} label="مکالمات بایگانی شده" />
             </ul>
@@ -1979,83 +1978,38 @@ function MarkdownRenderer({ text }) {
     );
 }
 
-function StudyPlanner({ lessons, addJournalEntry, setModalConfig }) {
+function ProgressCenter({ lessons, journal, knowledgeBase, addJournalEntry, setModalConfig, data }) {
+    const [activeTab, setActiveTab] = useState('overview');
     const [goal, setGoal] = useState('');
     const [plan, setPlan] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [dailyChallenge, setDailyChallenge] = useState(null);
+    const [isLoadingChallenge, setIsLoadingChallenge] = useState(false);
 
-    const generatePlan = async () => {
-        if (!goal.trim()) return;
-        setIsLoading(true); setPlan('');
-        addJournalEntry(`ایجاد برنامه مطالعه برای هدف: "${goal}"`);
-        const lessonTitles = lessons.map(l => l.title).join(', ');
-        const systemPrompt = `You are a language learning coach for a Persian speaker learning Lebanese Arabic. Their goal is: "${goal}". Create a simple, actionable 1-week study plan in Persian. Use Markdown. Suggest which of these available lessons might be helpful: [${lessonTitles}].`;
-        const payload = { contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-        
-        try {
-            setPlan(await callGeminiAPI(payload));
-        } catch (error) {
-            setModalConfig({ title: "خطا", message: "خطا در ایجاد برنامه مطالعه." });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    // Calculate comprehensive stats
+    const stats = useMemo(() => {
+        const totalVocab = knowledgeBase.vocabulary.length;
+        const totalGrammar = knowledgeBase.grammar.length;
+        const totalPhrases = knowledgeBase.phrases.length;
+        const totalVerbs = knowledgeBase.verbs?.length || 0;
+        const totalItems = totalVocab + totalGrammar + totalPhrases + totalVerbs;
 
-    return (
-        <Card title="✨ برنامه ریزی هوشمند">
-            <div className="bg-slate-100 p-6 rounded-xl">
-                <label htmlFor="goal" className="block font-bold mb-2 text-slate-700">هدف یادگیری خود را اینجا بنویسید:</label>
-                <textarea id="goal" value={goal} onChange={(e) => setGoal(e.target.value)} rows="3" className="w-full p-3 border rounded-xl mb-4" placeholder="مثال: می‌خواهم تا دو هفته دیگر بتوانم در یک رستوران لبنانی به راحتی غذا سفارش دهم."></textarea>
-                <button onClick={generatePlan} disabled={isLoading} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold">
-                    <Sparkles size={18} />{isLoading ? 'در حال ایجاد برنامه...' : 'ایجاد برنامه مطالعه با Gemini'}
-                </button>
-            </div>
-            {isLoading && <div className="text-center p-10"><Loader className="animate-spin inline-block text-teal-500" size={40}/></div>}
-            {plan && (<div className="mt-8"><h3 className="text-2xl font-bold mb-4">برنامه مطالعه پیشنهادی شما:</h3><div className="bg-white p-6 rounded-xl border"><MarkdownRenderer text={plan} /></div></div>)}
-        </Card>
-    );
-}
+        // Lessons stats
+        const lessonsWithContent = lessons.filter(l => l.archivedNotes?.trim().length > 50).length;
+        const totalLessons = lessons.length;
 
-function CulturalInsights({ addJournalEntry, setModalConfig }) {
-    const [topic, setTopic] = useState('Food');
-    const [insight, setInsight] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+        // Progress from lessons
+        const totalProgress = lessons.reduce((acc, l) => {
+            const p = l.progress || {};
+            return {
+                quizzesTaken: acc.quizzesTaken + (p.quizzesTaken || 0),
+                correctAnswers: acc.correctAnswers + (p.correctAnswers || 0),
+                chatPractice: acc.chatPractice + (p.chatPracticeCount || 0),
+                learnedItems: acc.learnedItems + (p.learnedItems || 0)
+            };
+        }, { quizzesTaken: 0, correctAnswers: 0, chatPractice: 0, learnedItems: 0 });
 
-    const getInsight = async () => {
-        setIsLoading(true); setInsight('');
-        addJournalEntry(`درخواست نکته فرهنگی در مورد: ${topic}`);
-        const systemPrompt = `You are a cultural guide for Lebanon. Briefly explain the Lebanese cultural topic of "${topic}" in a simple, engaging way for a Persian-speaking learner. Respond in Persian using Markdown.`;
-        const payload = { contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
-        
-        try {
-            setInsight(await callGeminiAPI(payload));
-        } catch (error) {
-            setModalConfig({ title: "خطا", message: "خطا در دریافت اطلاعات فرهنگی." });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <Card title="✨ نکات فرهنگی">
-            <div className="bg-slate-100 p-6 rounded-xl">
-                <label htmlFor="topic" className="block font-bold mb-2 text-slate-700">یک موضوع فرهنگی انتخاب کنید:</label>
-                <select id="topic" value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full p-3 border rounded-xl mb-4">
-                    <option value="Food">غذا</option><option value="Music">موسیقی</option><option value="Social Etiquette">آداب اجتماعی</option><option value="Holidays">تعطیلات و جشن‌ها</option>
-                </select>
-                <button onClick={getInsight} disabled={isLoading} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold">
-                    <Sparkles size={18} />{isLoading ? 'در حال دریافت اطلاعات...' : 'دریافت نکات فرهنگی با Gemini'}
-                </button>
-            </div>
-            {isLoading && <div className="text-center p-10"><Loader className="animate-spin inline-block text-teal-500" size={40}/></div>}
-            {insight && (<div className="mt-8"><h3 className="text-2xl font-bold mb-4">درباره {topic}:</h3><div className="bg-white p-6 rounded-xl border"><MarkdownRenderer text={insight} /></div></div>)}
-        </Card>
-    );
-}
-
-function StatsReport({ journal, knowledgeBase }) {
-    const weeklyActivity = useMemo(() => {
-        const activity = {};
+        // Weekly activity
         const today = new Date();
         const last7Days = Array.from({ length: 7 }, (_, i) => {
             const d = new Date();
@@ -2063,46 +2017,583 @@ function StatsReport({ journal, knowledgeBase }) {
             return d.toISOString().split('T')[0];
         }).reverse();
 
-        last7Days.forEach(day => activity[day] = 0);
-
+        const weeklyActivity = {};
+        last7Days.forEach(day => weeklyActivity[day] = 0);
         journal.forEach(entry => {
             const entryDate = entry.date.split('T')[0];
-            if (activity[entryDate] !== undefined) {
-                activity[entryDate]++;
-            }
+            if (weeklyActivity[entryDate] !== undefined) weeklyActivity[entryDate]++;
         });
-        
-        const values = Object.values(activity);
-        const max = Math.max(...values);
-        return values.map(v => max > 0 ? (v / max) * 100 : 0);
-    }, [journal]);
+
+        const activeDays = Object.values(weeklyActivity).filter(v => v > 0).length;
+        const streak = calculateStreak(journal);
+
+        return {
+            totalVocab, totalGrammar, totalPhrases, totalVerbs, totalItems,
+            lessonsWithContent, totalLessons,
+            ...totalProgress,
+            weeklyActivity: Object.values(weeklyActivity),
+            weeklyLabels: last7Days.map(d => new Date(d).toLocaleDateString('fa-IR', { weekday: 'short' })),
+            activeDays, streak,
+            totalActivities: journal.length
+        };
+    }, [lessons, journal, knowledgeBase]);
+
+    function calculateStreak(journal) {
+        if (journal.length === 0) return 0;
+        const dates = [...new Set(journal.map(e => e.date.split('T')[0]))].sort().reverse();
+        let streak = 0;
+        const today = new Date().toISOString().split('T')[0];
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+        if (dates[0] !== today && dates[0] !== yesterday) return 0;
+
+        for (let i = 0; i < dates.length; i++) {
+            const expected = new Date(Date.now() - (i * 86400000)).toISOString().split('T')[0];
+            if (dates[i] === expected || (i === 0 && dates[i] === yesterday)) {
+                streak++;
+            } else break;
+        }
+        return streak;
+    }
+
+    const generatePlan = async () => {
+        if (!goal.trim()) {
+            setModalConfig({ title: "خطا", message: "لطفاً هدف یادگیری خود را وارد کنید." });
+            return;
+        }
+        setIsLoading(true); setPlan('');
+        addJournalEntry(`ایجاد برنامه مطالعه برای هدف: "${goal}"`);
+
+        const lessonInfo = lessons.map(l => `- ${l.title}: ${l.archivedNotes?.length > 50 ? 'دارای محتوا' : 'خالی'}`).join('\n');
+
+        const systemPrompt = `تو یک مربی زبان عربی لبنانی برای فارسی‌زبانان هستی.
+
+اطلاعات یادگیرنده:
+- لغات آموخته شده: ${stats.totalVocab}
+- نکات گرامری: ${stats.totalGrammar}
+- اصطلاحات: ${stats.totalPhrases}
+- آزمون‌های گذرانده: ${stats.quizzesTaken}
+- روزهای فعال در هفته: ${stats.activeDays}
+
+دروس موجود:
+${lessonInfo}
+
+هدف یادگیرنده: "${goal}"
+
+یک برنامه مطالعه ۷ روزه دقیق و عملی به فارسی بنویس که شامل:
+1. فعالیت‌های روزانه مشخص
+2. اهداف کوچک قابل اندازه‌گیری
+3. پیشنهاد دروس مرتبط
+4. تمرینات مکالمه
+5. نکات انگیزشی
+
+از Markdown استفاده کن.`;
+
+        try {
+            setPlan(await callGeminiAPI({ contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } }));
+        } catch (error) {
+            setModalConfig({ title: "خطا", message: "خطا در ایجاد برنامه مطالعه." });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const generateDailyChallenge = async () => {
+        setIsLoadingChallenge(true);
+        const systemPrompt = `یک چالش یادگیری روزانه برای عربی لبنانی بساز. خروجی JSON:
+{
+  "title": "عنوان چالش",
+  "description": "توضیح کوتاه",
+  "tasks": ["کار ۱", "کار ۲", "کار ۳"],
+  "reward": "پاداش/انگیزه",
+  "difficulty": "آسان|متوسط|سخت",
+  "estimatedTime": "۱۵ دقیقه"
+}`;
+
+        try {
+            const response = await callGeminiAPI({
+                contents: [{ parts: [{ text: "چالش روزانه" }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            });
+            setDailyChallenge(JSON.parse(response));
+            addJournalEntry("چالش روزانه دریافت شد");
+        } catch (error) {
+            setModalConfig({ title: "خطا", message: "خطا در دریافت چالش روزانه." });
+        } finally {
+            setIsLoadingChallenge(false);
+        }
+    };
+
+    const getAIRecommendation = async () => {
+        setIsLoading(true);
+        const systemPrompt = `بر اساس این آمار، ۳ توصیه شخصی‌سازی شده برای بهبود یادگیری بده:
+- لغات: ${stats.totalVocab}
+- گرامر: ${stats.totalGrammar}
+- آزمون‌ها: ${stats.quizzesTaken}
+- تمرین مکالمه: ${stats.chatPractice}
+- روزهای فعال: ${stats.activeDays}/7
+
+پاسخ به فارسی و کوتاه.`;
+
+        try {
+            const rec = await callGeminiAPI({ contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } });
+            setPlan(rec);
+            setActiveTab('plan');
+        } catch (error) {
+            setModalConfig({ title: "خطا", message: "خطا در دریافت توصیه." });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const tabs = [
+        { id: 'overview', label: '📊 نمای کلی', icon: BarChart2 },
+        { id: 'plan', label: '🎯 برنامه‌ریزی', icon: ClipboardList },
+        { id: 'challenges', label: '🏆 چالش‌ها', icon: GraduationCap }
+    ];
 
     return (
-        <Card title="آمار و ارزیابی عملکرد">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-slate-100 p-6 rounded-xl">
-                    <h3 className="font-bold mb-2 text-slate-700">خلاصه دانش</h3>
-                    <p><strong>لغات آموخته شده:</strong> {knowledgeBase.vocabulary.length}</p>
-                    <p><strong>نکات گرامری:</strong> {knowledgeBase.grammar.length}</p>
-                    <p><strong>اصطلاحات:</strong> {knowledgeBase.phrases.length}</p>
-                </div>
-                <div className="bg-slate-100 p-6 rounded-xl">
-                    <h3 className="font-bold mb-2 text-slate-700">فعالیت اخیر</h3>
-                    <p><strong>تعداد کل فعالیت‌ها:</strong> {journal.length}</p>
-                    <p><strong>فعالیت در ۷ روز گذشته:</strong> {Object.values(weeklyActivity).reduce((a, b) => a + (b > 0 ? 1 : 0), 0)} روز</p>
-                </div>
-            </div>
-            <div className="mt-8">
-                <h3 className="font-bold mb-4 text-lg">روند پیشرفت هفتگی</h3>
-                <div className="bg-slate-200 p-4 rounded-xl h-64 flex items-end justify-around">
-                    {weeklyActivity.map((height, index) => (
-                        <div key={index} className="w-8 bg-teal-500 rounded-t-lg transition-all duration-500" style={{ height: `${height}%` }}></div>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-bold text-slate-800">🚀 مرکز پیشرفت</h2>
+                <div className="flex gap-2">
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`px-4 py-2 rounded-xl font-medium transition-all flex items-center gap-2 ${
+                                activeTab === tab.id
+                                    ? 'bg-teal-500 text-white shadow-lg'
+                                    : 'bg-white text-slate-600 hover:bg-slate-100'
+                            }`}
+                        >
+                            <tab.icon size={18} />
+                            {tab.label}
+                        </button>
                     ))}
                 </div>
             </div>
-        </Card>
+
+            {activeTab === 'overview' && (
+                <div className="space-y-6">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-2xl shadow-lg">
+                            <p className="text-blue-100 text-sm">لغات آموخته</p>
+                            <p className="text-3xl font-bold">{stats.totalVocab}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-5 rounded-2xl shadow-lg">
+                            <p className="text-green-100 text-sm">نکات گرامری</p>
+                            <p className="text-3xl font-bold">{stats.totalGrammar}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-5 rounded-2xl shadow-lg">
+                            <p className="text-purple-100 text-sm">آزمون‌ها</p>
+                            <p className="text-3xl font-bold">{stats.quizzesTaken}</p>
+                        </div>
+                        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-5 rounded-2xl shadow-lg">
+                            <p className="text-orange-100 text-sm">🔥 روزهای متوالی</p>
+                            <p className="text-3xl font-bold">{stats.streak}</p>
+                        </div>
+                    </div>
+
+                    {/* Progress Overview */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card title="📈 روند فعالیت هفتگی">
+                            <div className="h-48 flex items-end justify-around gap-2 bg-slate-50 p-4 rounded-xl">
+                                {stats.weeklyActivity.map((height, index) => (
+                                    <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                                        <div
+                                            className="w-full bg-gradient-to-t from-teal-500 to-teal-400 rounded-t-lg transition-all duration-500 min-h-[4px]"
+                                            style={{ height: `${Math.max(height, 5)}%` }}
+                                        ></div>
+                                        <span className="text-xs text-slate-500">{stats.weeklyLabels[index]}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-center text-sm text-slate-500 mt-2">
+                                {stats.activeDays} روز فعال از ۷ روز گذشته
+                            </p>
+                        </Card>
+
+                        <Card title="📚 وضعیت دروس">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center">
+                                    <span>دروس با محتوا</span>
+                                    <span className="font-bold text-teal-600">{stats.lessonsWithContent} / {stats.totalLessons}</span>
+                                </div>
+                                <div className="w-full bg-slate-200 rounded-full h-3">
+                                    <div
+                                        className="bg-teal-500 h-3 rounded-full transition-all"
+                                        style={{ width: `${stats.totalLessons > 0 ? (stats.lessonsWithContent / stats.totalLessons) * 100 : 0}%` }}
+                                    ></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div className="bg-slate-50 p-3 rounded-lg text-center">
+                                        <p className="text-2xl font-bold text-teal-600">{stats.chatPractice}</p>
+                                        <p className="text-xs text-slate-500">تمرین مکالمه</p>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg text-center">
+                                        <p className="text-2xl font-bold text-blue-600">{stats.totalActivities}</p>
+                                        <p className="text-xs text-slate-500">کل فعالیت‌ها</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* AI Recommendation */}
+                    <button
+                        onClick={getAIRecommendation}
+                        disabled={isLoading}
+                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 rounded-xl hover:from-purple-600 hover:to-pink-600 font-bold flex items-center justify-center gap-2 shadow-lg"
+                    >
+                        <Sparkles size={20} />
+                        {isLoading ? 'در حال تحلیل...' : '✨ دریافت توصیه‌های شخصی‌سازی شده AI'}
+                    </button>
+                </div>
+            )}
+
+            {activeTab === 'plan' && (
+                <div className="space-y-6">
+                    <Card title="🎯 هدف‌گذاری و برنامه‌ریزی">
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block font-bold mb-2 text-slate-700">هدف یادگیری شما چیست؟</label>
+                                <textarea
+                                    value={goal}
+                                    onChange={(e) => setGoal(e.target.value)}
+                                    rows="3"
+                                    className="w-full p-4 border-2 border-slate-300 rounded-xl focus:border-teal-500"
+                                    placeholder="مثال: می‌خواهم بتوانم در رستوران غذا سفارش دهم و با راننده تاکسی صحبت کنم..."
+                                ></textarea>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={generatePlan}
+                                    disabled={isLoading}
+                                    className="bg-teal-500 text-white p-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold flex items-center justify-center gap-2"
+                                >
+                                    <Sparkles size={18} />
+                                    {isLoading ? 'در حال ایجاد...' : 'ایجاد برنامه هفتگی'}
+                                </button>
+                                <button
+                                    onClick={() => setGoal('')}
+                                    className="bg-slate-200 text-slate-700 p-3 rounded-xl hover:bg-slate-300 font-medium"
+                                >
+                                    پاک کردن
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {isLoading && (
+                        <div className="text-center p-10">
+                            <Loader className="animate-spin inline-block text-teal-500" size={48}/>
+                            <p className="mt-4 text-slate-600">در حال ایجاد برنامه شخصی‌سازی شده...</p>
+                        </div>
+                    )}
+
+                    {plan && (
+                        <Card title="📋 برنامه پیشنهادی شما">
+                            <div className="bg-gradient-to-br from-slate-50 to-white p-6 rounded-xl border">
+                                <MarkdownRenderer text={plan} />
+                            </div>
+                        </Card>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'challenges' && (
+                <div className="space-y-6">
+                    <Card title="🏆 چالش روزانه">
+                        {!dailyChallenge ? (
+                            <div className="text-center py-8">
+                                <p className="text-slate-500 mb-4">چالش روزانه خود را دریافت کنید و مهارت‌هایتان را تقویت کنید!</p>
+                                <button
+                                    onClick={generateDailyChallenge}
+                                    disabled={isLoadingChallenge}
+                                    className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 py-3 rounded-xl hover:from-yellow-600 hover:to-orange-600 font-bold flex items-center justify-center gap-2 mx-auto"
+                                >
+                                    {isLoadingChallenge ? <Loader className="animate-spin" size={20}/> : <Sparkles size={20}/>}
+                                    {isLoadingChallenge ? 'در حال ایجاد...' : 'دریافت چالش امروز'}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xl font-bold text-slate-800">{dailyChallenge.title}</h3>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        dailyChallenge.difficulty === 'آسان' ? 'bg-green-100 text-green-700' :
+                                        dailyChallenge.difficulty === 'متوسط' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-red-100 text-red-700'
+                                    }`}>
+                                        {dailyChallenge.difficulty}
+                                    </span>
+                                </div>
+                                <p className="text-slate-600">{dailyChallenge.description}</p>
+                                <div className="bg-slate-50 p-4 rounded-xl">
+                                    <p className="font-bold mb-2">📝 وظایف:</p>
+                                    <ul className="space-y-2">
+                                        {dailyChallenge.tasks?.map((task, i) => (
+                                            <li key={i} className="flex items-center gap-2">
+                                                <input type="checkbox" className="w-5 h-5 rounded"/>
+                                                <span>{task}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <div className="flex justify-between items-center text-sm text-slate-500">
+                                    <span>⏱️ زمان تقریبی: {dailyChallenge.estimatedTime}</span>
+                                    <span>🎁 {dailyChallenge.reward}</span>
+                                </div>
+                                <button
+                                    onClick={() => setDailyChallenge(null)}
+                                    className="w-full bg-slate-200 text-slate-700 p-2 rounded-lg hover:bg-slate-300 text-sm"
+                                >
+                                    چالش جدید
+                                </button>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Achievements */}
+                    <Card title="🏅 دستاوردها">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className={`p-4 rounded-xl text-center ${stats.totalVocab >= 10 ? 'bg-yellow-100' : 'bg-slate-100 opacity-50'}`}>
+                                <span className="text-3xl">📚</span>
+                                <p className="font-bold mt-2">۱۰ لغت اول</p>
+                                <p className="text-xs text-slate-500">{stats.totalVocab >= 10 ? '✅ کسب شد' : `${stats.totalVocab}/10`}</p>
+                            </div>
+                            <div className={`p-4 rounded-xl text-center ${stats.quizzesTaken >= 5 ? 'bg-blue-100' : 'bg-slate-100 opacity-50'}`}>
+                                <span className="text-3xl">🎯</span>
+                                <p className="font-bold mt-2">۵ آزمون</p>
+                                <p className="text-xs text-slate-500">{stats.quizzesTaken >= 5 ? '✅ کسب شد' : `${stats.quizzesTaken}/5`}</p>
+                            </div>
+                            <div className={`p-4 rounded-xl text-center ${stats.streak >= 7 ? 'bg-orange-100' : 'bg-slate-100 opacity-50'}`}>
+                                <span className="text-3xl">🔥</span>
+                                <p className="font-bold mt-2">۷ روز متوالی</p>
+                                <p className="text-xs text-slate-500">{stats.streak >= 7 ? '✅ کسب شد' : `${stats.streak}/7`}</p>
+                            </div>
+                            <div className={`p-4 rounded-xl text-center ${stats.chatPractice >= 10 ? 'bg-green-100' : 'bg-slate-100 opacity-50'}`}>
+                                <span className="text-3xl">💬</span>
+                                <p className="font-bold mt-2">۱۰ مکالمه</p>
+                                <p className="text-xs text-slate-500">{stats.chatPractice >= 10 ? '✅ کسب شد' : `${stats.chatPractice}/10`}</p>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            )}
+        </div>
     );
 }
+
+function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, updateKnowledgeBase }) {
+    const [selectedCategory, setSelectedCategory] = useState('food');
+    const [insight, setInsight] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [relatedPhrases, setRelatedPhrases] = useState([]);
+
+    const categories = {
+        food: { label: '🍽️ غذا و رستوران', icon: '🥙', topics: ['غذاهای معروف لبنانی', 'آداب غذا خوردن', 'سفارش در رستوران', 'چای و قهوه لبنانی'] },
+        social: { label: '🤝 آداب اجتماعی', icon: '👋', topics: ['سلام و احوالپرسی', 'تعارف لبنانی', 'مهمان‌نوازی', 'رفتار در مهمانی'] },
+        family: { label: '👨‍👩‍👧‍👦 خانواده', icon: '🏠', topics: ['ساختار خانواده', 'نقش بزرگترها', 'جشن‌های خانوادگی', 'ازدواج لبنانی'] },
+        religion: { label: '🕌 مذهب و سنت', icon: '⛪', topics: ['تنوع مذهبی', 'جشن‌های مذهبی', 'رمضان در لبنان', 'کریسمس لبنانی'] },
+        music: { label: '🎵 موسیقی و هنر', icon: '🎤', topics: ['فیروز و موسیقی لبنانی', 'دبکه (رقص سنتی)', 'هنر و معماری', 'سینمای لبنان'] },
+        business: { label: '💼 کسب‌وکار', icon: '🏢', topics: ['فرهنگ کاری', 'مذاکره تجاری', 'وقت‌شناسی', 'روابط کاری'] },
+        daily: { label: '🌅 زندگی روزمره', icon: '☕', topics: ['یک روز معمولی', 'خرید و بازار', 'حمل‌ونقل', 'تفریح و سرگرمی'] },
+        language: { label: '🗣️ زبان و لهجه', icon: '💬', topics: ['تفاوت لهجه‌ها', 'کلمات فرانسوی', 'اصطلاحات خاص', 'شوخی و طنز'] }
+    };
+
+    const getInsight = async (topic) => {
+        setIsLoading(true);
+        setInsight(null);
+        setRelatedPhrases([]);
+        addJournalEntry(`درخواست نکته فرهنگی: ${topic}`);
+
+        const systemPrompt = `تو یک راهنمای فرهنگی لبنان برای فارسی‌زبانان هستی.
+
+درباره موضوع "${topic}" توضیح بده. خروجی JSON:
+{
+  "title": "عنوان",
+  "content": "توضیح کامل به فارسی (حداقل ۲۰۰ کلمه)",
+  "funFacts": ["نکته جالب ۱", "نکته جالب ۲", "نکته جالب ۳"],
+  "doAndDont": {
+    "do": ["کار درست ۱", "کار درست ۲"],
+    "dont": ["کار نادرست ۱", "کار نادرست ۲"]
+  },
+  "relatedPhrases": [
+    {"arabic": "عبارت عربی", "pronunciation": "تلفظ", "persian": "معنی فارسی", "usage": "موقعیت استفاده"}
+  ],
+  "culturalTip": "یک نکته مهم فرهنگی"
+}`;
+
+        try {
+            const response = await callGeminiAPI({
+                contents: [{ parts: [{ text: topic }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const data = JSON.parse(response);
+            setInsight(data);
+            setRelatedPhrases(data.relatedPhrases || []);
+        } catch (error) {
+            console.error(error);
+            setModalConfig({ title: "خطا", message: "خطا در دریافت اطلاعات فرهنگی. لطفاً دوباره تلاش کنید." });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const savePhraseToKnowledge = (phrase) => {
+        updateKnowledgeBase('phrases', {
+            term: phrase.arabic,
+            definition: `${phrase.persian} (${phrase.usage})`,
+            source: 'نکات فرهنگی'
+        });
+        setModalConfig({ title: "ذخیره شد", message: `عبارت "${phrase.arabic}" به مرکز دانش اضافه شد.` });
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h2 className="text-3xl font-bold text-slate-800">🇱🇧 فرهنگ و آداب لبنان</h2>
+            </div>
+
+            {/* Category Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(categories).map(([key, cat]) => (
+                    <button
+                        key={key}
+                        onClick={() => setSelectedCategory(key)}
+                        className={`p-4 rounded-2xl text-center transition-all ${
+                            selectedCategory === key
+                                ? 'bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg scale-105'
+                                : 'bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-teal-300'
+                        }`}
+                    >
+                        <span className="text-3xl block mb-2">{cat.icon}</span>
+                        <span className="font-medium text-sm">{cat.label.split(' ').slice(1).join(' ')}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* Topics for Selected Category */}
+            <Card title={categories[selectedCategory].label}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {categories[selectedCategory].topics.map((topic, index) => (
+                        <button
+                            key={index}
+                            onClick={() => getInsight(topic)}
+                            disabled={isLoading}
+                            className="p-4 bg-gradient-to-r from-slate-50 to-white border-2 border-slate-200 rounded-xl hover:border-teal-400 hover:shadow-md transition-all text-right flex items-center justify-between group"
+                        >
+                            <span className="font-medium">{topic}</span>
+                            <span className="text-teal-500 opacity-0 group-hover:opacity-100 transition-opacity">←</span>
+                        </button>
+                    ))}
+                </div>
+            </Card>
+
+            {/* Loading */}
+            {isLoading && (
+                <div className="text-center p-10 bg-white rounded-2xl">
+                    <Loader className="animate-spin inline-block text-teal-500" size={48}/>
+                    <p className="mt-4 text-slate-600">در حال دریافت اطلاعات فرهنگی...</p>
+                </div>
+            )}
+
+            {/* Insight Display */}
+            {insight && (
+                <div className="space-y-6">
+                    <Card title={`📖 ${insight.title}`}>
+                        <div className="prose max-w-none">
+                            <p className="text-slate-700 leading-relaxed text-lg">{insight.content}</p>
+                        </div>
+                    </Card>
+
+                    {/* Fun Facts */}
+                    {insight.funFacts && (
+                        <Card title="💡 نکات جالب">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {insight.funFacts.map((fact, i) => (
+                                    <div key={i} className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 rounded-xl border border-yellow-200">
+                                        <span className="text-2xl">💡</span>
+                                        <p className="mt-2 text-slate-700">{fact}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Do and Don't */}
+                    {insight.doAndDont && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card title="✅ این کارها را انجام دهید">
+                                <ul className="space-y-3">
+                                    {insight.doAndDont.do?.map((item, i) => (
+                                        <li key={i} className="flex items-start gap-2 bg-green-50 p-3 rounded-lg">
+                                            <span className="text-green-500">✓</span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Card>
+                            <Card title="❌ این کارها را انجام ندهید">
+                                <ul className="space-y-3">
+                                    {insight.doAndDont.dont?.map((item, i) => (
+                                        <li key={i} className="flex items-start gap-2 bg-red-50 p-3 rounded-lg">
+                                            <span className="text-red-500">✗</span>
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Card>
+                        </div>
+                    )}
+
+                    {/* Related Phrases */}
+                    {relatedPhrases.length > 0 && (
+                        <Card title="🗣️ عبارات مرتبط">
+                            <div className="space-y-3">
+                                {relatedPhrases.map((phrase, i) => (
+                                    <div key={i} className="bg-gradient-to-r from-slate-50 to-white p-4 rounded-xl border flex items-center justify-between">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xl font-bold text-teal-600">{phrase.arabic}</span>
+                                                <TTSButton textToSpeak={phrase.arabic} />
+                                                <span className="text-sm text-slate-400">({phrase.pronunciation})</span>
+                                            </div>
+                                            <p className="text-slate-700 mt-1">{phrase.persian}</p>
+                                            <p className="text-xs text-slate-500 mt-1">💡 {phrase.usage}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => savePhraseToKnowledge(phrase)}
+                                            className="bg-teal-100 text-teal-700 px-3 py-2 rounded-lg hover:bg-teal-200 text-sm font-medium"
+                                        >
+                                            + ذخیره
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Cultural Tip */}
+                    {insight.culturalTip && (
+                        <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-2xl">
+                            <p className="text-lg font-bold mb-2">⭐ نکته مهم فرهنگی</p>
+                            <p className="text-purple-100">{insight.culturalTip}</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// StatsReport removed - merged into ProgressCenter
 function Journal({ entries }) { return (<Card title="ژورنال فعالیت‌ها"><div className="space-y-4 max-h-[600px] overflow-y-auto">{entries.map(entry => (<div key={entry.id} className="p-4 bg-slate-50 border-r-4 border-teal-500 rounded-r-lg"><p className="text-sm text-slate-500 mb-1">{new Date(entry.date).toLocaleString('fa-IR')}</p><p>{entry.entry}</p></div>))}</div></Card>); }
 
 function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJournalEntry, updateKnowledgeBase, knowledgeBase, saveChatHistory, initialHistory, setModalConfig, addPronunciationCorrection }) {
