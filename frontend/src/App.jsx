@@ -771,44 +771,113 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
 function LessonList({ lessons, navigateTo, deleteLesson, editLesson }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('newest');
+    const [filterBy, setFilterBy] = useState('all'); // all, withContent, empty
 
     const filteredAndSortedLessons = useMemo(() => {
         return lessons
-            .filter(lesson => 
-                lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                lesson.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (lesson.archivedNotes || '').toLowerCase().includes(searchTerm.toLowerCase())
-            )
+            .filter(lesson => {
+                // Text search
+                const matchesSearch =
+                    lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    lesson.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (lesson.archivedNotes || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+                // Filter by content status
+                const hasContent = lesson.archivedNotes && lesson.archivedNotes.trim().length > 50;
+                const matchesFilter =
+                    filterBy === 'all' ||
+                    (filterBy === 'withContent' && hasContent) ||
+                    (filterBy === 'empty' && !hasContent);
+
+                return matchesSearch && matchesFilter;
+            })
             .sort((a, b) => {
                 if (sortOrder === 'newest') return b.id - a.id;
                 if (sortOrder === 'oldest') return a.id - b.id;
                 if (sortOrder === 'title') return a.title.localeCompare(b.title);
+                if (sortOrder === 'progress') {
+                    const pA = (a.progress?.learnedItems || 0) + (a.progress?.quizzesTaken || 0);
+                    const pB = (b.progress?.learnedItems || 0) + (b.progress?.quizzesTaken || 0);
+                    return pB - pA;
+                }
                 return 0;
             });
-    }, [lessons, searchTerm, sortOrder]);
+    }, [lessons, searchTerm, sortOrder, filterBy]);
 
     return (
-        <Card title="لیست تمام دروس">
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-                <input 
-                    type="text" 
-                    placeholder="جستجو در دروس..." 
-                    value={searchTerm} 
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="flex-grow p-2 border rounded-lg"
-                />
-                <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} className="p-2 border rounded-lg">
-                    <option value="newest">جدیدترین</option>
-                    <option value="oldest">قدیمی‌ترین</option>
-                    <option value="title">عنوان</option>
-                </select>
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+            {/* Fixed Header */}
+            <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-6">
+                <h2 className="text-2xl font-bold mb-4">📚 لیست دروس ({lessons.length} درس)</h2>
+
+                {/* Search and Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="relative">
+                        <Search size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-200"/>
+                        <input
+                            type="text"
+                            placeholder="جستجو در دروس..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full pl-3 pr-10 py-2 rounded-lg bg-white/20 text-white placeholder-teal-200 border border-teal-400 focus:bg-white/30 focus:outline-none"
+                        />
+                    </div>
+                    <select
+                        value={sortOrder}
+                        onChange={e => setSortOrder(e.target.value)}
+                        className="p-2 rounded-lg bg-white/20 text-white border border-teal-400 focus:outline-none"
+                    >
+                        <option value="newest" className="text-slate-800">جدیدترین</option>
+                        <option value="oldest" className="text-slate-800">قدیمی‌ترین</option>
+                        <option value="title" className="text-slate-800">بر اساس عنوان</option>
+                        <option value="progress" className="text-slate-800">بیشترین پیشرفت</option>
+                    </select>
+                    <select
+                        value={filterBy}
+                        onChange={e => setFilterBy(e.target.value)}
+                        className="p-2 rounded-lg bg-white/20 text-white border border-teal-400 focus:outline-none"
+                    >
+                        <option value="all" className="text-slate-800">همه دروس</option>
+                        <option value="withContent" className="text-slate-800">دارای محتوا</option>
+                        <option value="empty" className="text-slate-800">بدون محتوا</option>
+                    </select>
+                </div>
             </div>
-            <div className="space-y-4">
-                {filteredAndSortedLessons.length > 0 ? filteredAndSortedLessons.map(lesson => (
-                    <LessonListItem key={lesson.id} lesson={lesson} navigateTo={navigateTo} deleteLesson={deleteLesson} editLesson={editLesson} />
-                )) : <p className="text-center text-slate-500 py-4">درسی یافت نشد.</p>}
+
+            {/* Scrollable Lessons List */}
+            <div className="max-h-[calc(100vh-300px)] overflow-y-auto p-4">
+                <div className="space-y-4">
+                    {filteredAndSortedLessons.length > 0 ? (
+                        filteredAndSortedLessons.map(lesson => (
+                            <LessonListItem
+                                key={lesson.id}
+                                lesson={lesson}
+                                navigateTo={navigateTo}
+                                deleteLesson={deleteLesson}
+                                editLesson={editLesson}
+                            />
+                        ))
+                    ) : (
+                        <div className="text-center py-12">
+                            <p className="text-slate-400 text-lg">درسی یافت نشد</p>
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="mt-2 text-teal-500 hover:underline"
+                                >
+                                    پاک کردن جستجو
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
-        </Card>
+
+            {/* Fixed Footer with count */}
+            <div className="bg-slate-50 px-4 py-2 border-t text-sm text-slate-500 text-center">
+                نمایش {filteredAndSortedLessons.length} از {lessons.length} درس
+            </div>
+        </div>
     );
 }
 
@@ -821,19 +890,33 @@ function LessonListItem({ lesson, navigateTo, deleteLesson, editLesson }) {
     const progress = lesson.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
     const hasContent = lesson.archivedNotes && lesson.archivedNotes.trim().length > 0;
 
-    // Progress calculation: weighted average of different metrics
-    // - Content added: 20%
-    // - Items learned: 40%
-    // - Quizzes taken: 20%
-    // - Chat practice: 20%
+    // Progress calculation based on ACTUAL learning, not just content
+    // Content alone = 0%, progress comes from real learning activity
     let progressPercent = 0;
-    if (hasContent) {
-        progressPercent += 20; // Content added
-        const itemProgress = progress.totalItems > 0 ? (progress.learnedItems / progress.totalItems) * 40 : 0;
-        const quizProgress = Math.min(progress.quizzesTaken * 10, 20); // Max 20% from quizzes
-        const chatProgress = Math.min(progress.chatPracticeCount * 5, 20); // Max 20% from chat
-        progressPercent += itemProgress + quizProgress + chatProgress;
+
+    // Only show progress if there's actual learning activity
+    const hasLearningActivity = progress.learnedItems > 0 || progress.quizzesTaken > 0 ||
+        progress.chatPracticeCount > 0 || (progress.correctResponses || 0) > 0;
+
+    if (hasLearningActivity) {
+        // Items learned from quizzes (40% max)
+        const itemProgress = progress.totalItems > 0
+            ? Math.min((progress.learnedItems / progress.totalItems) * 40, 40)
+            : 0;
+
+        // Quiz performance (30% max)
+        const quizProgress = progress.quizzesTaken > 0
+            ? Math.min(((progress.correctAnswers || 0) / Math.max(progress.quizzesTaken * 5, 1)) * 30, 30)
+            : 0;
+
+        // Chat practice (30% max) - based on practice + correct responses in chat
+        const chatBaseProgress = Math.min(progress.chatPracticeCount * 5, 15);
+        const correctResponseBonus = Math.min((progress.correctResponses || 0) * 3, 15);
+        const chatProgress = chatBaseProgress + correctResponseBonus;
+
+        progressPercent = itemProgress + quizProgress + chatProgress;
     }
+
     progressPercent = Math.min(Math.round(progressPercent), 100);
 
     // Progress bar color based on percentage
@@ -2626,7 +2709,38 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const silenceCheckIntervalRef = useRef(null);
   const streamRef = useRef(null);
   const hasSpokenRef = useRef(false); // Track if user has spoken at all
-  
+  const wakeLockRef = useRef(null);
+
+  // Wake Lock to prevent screen sleep during voice conversation
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if (voiceConversationMode && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+          console.log('Wake Lock activated');
+        } catch (err) {
+          console.log('Wake Lock failed:', err);
+        }
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('Wake Lock released');
+      }
+    };
+
+    if (voiceConversationMode) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    return () => releaseWakeLock();
+  }, [voiceConversationMode]);
+
   const [selectedTopics, setSelectedTopics] = useState(['general']);
   const [writingStyle, setWritingStyle] = useState(defaultChatSettings.writingStyle);
   const [translationLanguage, setTranslationLanguage] = useState(defaultChatSettings.translationLanguage);
@@ -2925,7 +3039,22 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Enhanced audio settings for better voice recognition
+      const audioConstraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 16000,
+          // Increase sensitivity
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googEchoCancellation: true
+        }
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
       streamRef.current = stream;
 
       // Check supported mimeTypes
@@ -3619,6 +3748,39 @@ function LiveVoiceChat({
     'Puck': 'صدای ۵ - مرد'
   };
 
+  // Wake Lock ref for preventing screen sleep
+  const wakeLockRef = useRef(null);
+
+  // Wake Lock to prevent screen sleep during live voice chat
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if (isOpen && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+          console.log('LiveChat Wake Lock activated');
+        } catch (err) {
+          console.log('Wake Lock failed:', err);
+        }
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('LiveChat Wake Lock released');
+      }
+    };
+
+    if (isOpen) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    return () => releaseWakeLock();
+  }, [isOpen]);
+
   useEffect(() => {
     if (aiVoice && availableVoices[aiVoice]) setSelectedVoice(aiVoice);
   }, [aiVoice]);
@@ -4151,8 +4313,20 @@ ${conversationSummary}
   const startListening = async () => {
     if (connectionStatus !== 'connected') return;
     try {
+      // Enhanced audio settings for better voice recognition
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          // Additional settings for better sensitivity
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googEchoCancellation: true
+        }
       });
       streamRef.current = stream;
 
