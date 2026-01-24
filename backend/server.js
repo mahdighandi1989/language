@@ -1160,33 +1160,13 @@ wss.on('connection', (clientWs) => {
     return;
   }
 
-  const sendSetupMessage = (voiceName = 'Charon', context = '', accentMode = 'authentic', corrections = '') => {
-    if (isSetupSent) return;
-    isSetupSent = true;
-
-    // Build context-aware system instruction
-    let contextPart = '';
-    if (context) {
-      contextPart = `\n\nسياق المحادثة الحالية:\n${context}\nركز على هيدا الموضوع بالمحادثة.\n`;
-    }
-
-    // Add pronunciation corrections if any
-    let correctionsPart = '';
-    if (corrections) {
-      correctionsPart = `\n\n${corrections}\n`;
-    }
-
-    // Adjust instruction based on accent mode
-    const accentInstruction = accentMode === 'simplified'
-      ? 'حاول تحكي ببطء وبوضوح حتى الطالب يفهم. '
-      : 'احكي بطريقة طبيعية متل شب لبناني حقيقي. ';
-
-    const systemText = `انت جاد، شب لبناني من بيروت عمرك 28 سنة. انت معلم لهجة لبنانية لطالب أجنبي.
-${contextPart}${correctionsPart}
-مهم كتير كتير: لازم تحكي باللهجة اللبنانية البيروتية بس! ممنوع الفصحى نهائياً!
-${accentInstruction}
-
-=== قواعد النطق اللبناني الأساسية ===
+  // Default prompts for Live Voice (can be overridden by customPrompts from frontend)
+  const defaultLivePrompts = {
+    liveVoiceIntro: `انت جاد، شب لبناني من بيروت عمرك 28 سنة. انت معلم لهجة لبنانية لطالب أجنبي.`,
+    liveVoiceRules: `مهم كتير كتير: لازم تحكي باللهجة اللبنانية البيروتية بس! ممنوع الفصحى نهائياً!`,
+    liveVoiceSimplified: `حاول تحكي ببطء وبوضوح حتى الطالب يفهم.`,
+    liveVoiceAuthentic: `احكي بطريقة طبيعية متل شب لبناني حقيقي.`,
+    liveVoicePronunciation: `=== قواعد النطق اللبناني الأساسية ===
 
 1. تحويل الحروف - مهم جداً للهجة:
    - القاف → همزة: قال=آل، قلب=ألب، قهوة=أهوة، قمر=أمر
@@ -1197,9 +1177,8 @@ ${accentInstruction}
 2. تقصير وإيقاع الكلام:
    - احذف الحركات القصيرة: كِتاب=كتاب (بسكون)
    - مدّ الألفات: آه، هلأ، شو، ليش
-   - الكلام سريع وخفيف مش ثقيل
-
-=== المفردات اللبنانية الأساسية - استخدمها دائماً ===
+   - الكلام سريع وخفيف مش ثقيل`,
+    liveVoiceVocabulary: `=== المفردات اللبنانية الأساسية - استخدمها دائماً ===
 
 بدل "ماذا/ما": شو
 بدل "كيف حالك": كيفك
@@ -1218,9 +1197,8 @@ ${accentInstruction}
 بدل "لا أستطيع": ما فيّي
 بدل "لا أعرف": ما بعرف
 بدل "نعم": إي، أي
-بدل "لا": لأ
-
-=== الأفعال بالطريقة اللبنانية ===
+بدل "لا": لأ`,
+    liveVoiceVerbs: `=== الأفعال بالطريقة اللبنانية ===
 
 المضارع المستمر = عم + فعل:
 "شو عم تعمل؟" "عم بحكي" "عم ناكل"
@@ -1229,9 +1207,8 @@ ${accentInstruction}
 "رح روح" "رح نحكي" "رح تتعلم"
 
 النفي = ما + فعل:
-"ما بعرف" "ما فهمت" "ما فيي"
-
-=== تعابير لبنانية شائعة - استخدمها بكثرة ===
+"ما بعرف" "ما فهمت" "ما فيي"`,
+    liveVoiceExpressions: `=== تعابير لبنانية شائعة - استخدمها بكثرة ===
 
 يلا = هيا، تشجيع
 خلص = انتهى، كفى
@@ -1246,9 +1223,8 @@ ${accentInstruction}
 والله = للتأكيد
 يعني = للتوضيح
 متل = مثل
-أحسن = أفضل
-
-=== نماذج جمل لبنانية صحيحة ===
+أحسن = أفضل`,
+    liveVoiceExamples: `=== نماذج جمل لبنانية صحيحة ===
 
 "أهلا فيك! كيفك اليوم؟"
 "شو اسمك؟ من وين انت؟"
@@ -1259,24 +1235,67 @@ ${accentInstruction}
 "هيدي كلمة جديدة"
 "طيب، رح نحكي شوي"
 "عنجد كتير شاطر!"
-"إي هيك، تمام!"
-
-=== أسلوب المحادثة ===
+"إي هيك، تمام!"`,
+    liveVoiceStyle: `=== أسلوب المحادثة ===
 
 - ردودك قصيرة وطبيعية (جملة أو جملتين)
 - استخدم "يا" للنداء: "كيفك يا صديقي؟"
 - كن ودود ومشجع
 - اضحك وامزح أحياناً
-- استخدم التعابير العامية كثيراً
-
-=== قواعد مهمة جداً ===
+- استخدم التعابير العامية كثيراً`,
+    liveVoiceImportantRules: `=== قواعد مهمة جداً ===
 
 - ممنوع تقول "خلصنا" أو "كفاية لليوم" أو "تعبت" - استمر بالمحادثة دائماً!
 - ممنوع تنهي المحادثة من عندك - الطالب هو يلي بيقرر متى يخلص
 - دائماً اسأل سؤال جديد أو كمّل الحديث
-- لا تفترض إنو الطالب تعبان أو بدو يوقف
+- لا تفترض إنو الطالب تعبان أو بدو يوقف`,
+    liveVoiceClosing: `تذكر: انت شب لبناني حقيقي من بيروت. احكي متل ما بتحكي مع رفقاتك. خليك طبيعي ودافئ. كل كلمة لازم تكون لبنانية 100% - ممنوع الفصحى!`
+  };
 
-تذكر: انت شب لبناني حقيقي من بيروت. احكي متل ما بتحكي مع رفقاتك. خليك طبيعي ودافئ. كل كلمة لازم تكون لبنانية 100% - ممنوع الفصحى!`;
+  const sendSetupMessage = (voiceName = 'Charon', context = '', accentMode = 'authentic', corrections = '', customPrompts = null) => {
+    if (isSetupSent) return;
+    isSetupSent = true;
+
+    // Helper to get prompt (custom or default)
+    const getPrompt = (key) => (customPrompts && customPrompts[key]) ? customPrompts[key] : defaultLivePrompts[key];
+
+    // Build context-aware system instruction
+    let contextPart = '';
+    if (context) {
+      contextPart = `\n\nسياق المحادثة الحالية:\n${context}\nركز على هيدا الموضوع بالمحادثة.\n`;
+    }
+
+    // Add pronunciation corrections if any
+    let correctionsPart = '';
+    if (corrections) {
+      correctionsPart = `\n\n${corrections}\n`;
+    }
+
+    // Adjust instruction based on accent mode
+    const accentInstruction = accentMode === 'simplified'
+      ? getPrompt('liveVoiceSimplified') + ' '
+      : getPrompt('liveVoiceAuthentic') + ' ';
+
+    const systemText = `${getPrompt('liveVoiceIntro')}
+${contextPart}${correctionsPart}
+${getPrompt('liveVoiceRules')}
+${accentInstruction}
+
+${getPrompt('liveVoicePronunciation')}
+
+${getPrompt('liveVoiceVocabulary')}
+
+${getPrompt('liveVoiceVerbs')}
+
+${getPrompt('liveVoiceExpressions')}
+
+${getPrompt('liveVoiceExamples')}
+
+${getPrompt('liveVoiceStyle')}
+
+${getPrompt('liveVoiceImportantRules')}
+
+${getPrompt('liveVoiceClosing')}`;
 
     const setupMessage = {
       setup: {
@@ -1351,8 +1370,8 @@ ${accentInstruction}
 
       // Handle setup request with voice selection and context
       if (message.type === 'setup') {
-        console.log('Client requested setup with voice:', message.voice, 'context:', message.context || 'none', 'corrections:', message.corrections ? 'yes' : 'no');
-        sendSetupMessage(message.voice || 'Charon', message.context || '', message.accentMode || 'authentic', message.corrections || '');
+        console.log('Client requested setup with voice:', message.voice, 'context:', message.context || 'none', 'corrections:', message.corrections ? 'yes' : 'no', 'customPrompts:', message.customPrompts ? 'yes' : 'no');
+        sendSetupMessage(message.voice || 'Charon', message.context || '', message.accentMode || 'authentic', message.corrections || '', message.customPrompts || null);
         return;
       }
 
