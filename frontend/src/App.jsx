@@ -4632,8 +4632,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Using empty deps to only run on actual unmount
   useEffect(() => {
     return () => {
-      // Generate new session ID so any in-flight responses will be ignored
-      sessionIdRef.current = Date.now();
+      // DON'T change session ID here - let responses complete naturally
+      // The voiceConversationModeRef = false will prevent new recordings
 
       // DON'T pause audio here - let it finish playing
       // Just clear the onended handler to prevent triggering new recordings
@@ -4662,7 +4662,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         audioContextRef.current.close().catch(() => {});
       }
 
-      // Reset voice conversation mode
+      // Mark that this component's voice conversation mode is inactive
+      // This prevents old callbacks from triggering new recordings
       voiceConversationModeRef.current = false;
       isRecordingRef.current = false;
       recordingStartPendingRef.current = false;
