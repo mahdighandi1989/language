@@ -158,7 +158,7 @@ function ExecutionFlowProvider({ children }) {
 
 
 // ============================================
-// LIVE CHAT CONTEXT - For floating voice chat
+// LIVE CHAT CONTEXT - For floating voice chat (both Live and Voice Conversation modes)
 // ============================================
 
 const LiveChatContext = createContext(null);
@@ -168,6 +168,7 @@ function useLiveChat() {
   if (!context) {
     console.warn('⚠️ useLiveChat: No context available');
     return {
+      // Live chat (Gemini Live)
       isLiveChatActive: false,
       isMinimized: false,
       liveChatConfig: null,
@@ -175,17 +176,39 @@ function useLiveChat() {
       closeLiveChat: () => {},
       minimizeLiveChat: () => {},
       maximizeLiveChat: () => {},
+      // Voice conversation mode
+      isVoiceConvActive: false,
+      isVoiceConvMinimized: false,
+      voiceConvConfig: null,
+      openVoiceConv: () => {},
+      closeVoiceConv: () => {},
+      minimizeVoiceConv: () => {},
+      maximizeVoiceConv: () => {},
+      updateVoiceConvStatus: () => {},
+      voiceConvStatus: {},
     };
   }
   return context;
 }
 
-function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory }) {
+function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory, navigateTo }) {
+  // ===== Live Chat (Gemini Live) State =====
   const [isLiveChatActive, setIsLiveChatActive] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [liveChatConfig, setLiveChatConfig] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
 
+  // ===== Voice Conversation Mode State =====
+  const [isVoiceConvActive, setIsVoiceConvActive] = useState(false);
+  const [isVoiceConvMinimized, setIsVoiceConvMinimized] = useState(false);
+  const [voiceConvConfig, setVoiceConvConfig] = useState(null);
+  const [voiceConvStatus, setVoiceConvStatus] = useState({
+    isRecording: false,
+    isPlaying: false,
+    isLoading: false,
+  });
+
+  // ===== Live Chat Functions =====
   const openLiveChat = useCallback((config) => {
     setLiveChatConfig(config);
     setIsLiveChatActive(true);
@@ -207,7 +230,34 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     setIsMinimized(false);
   }, []);
 
+  // ===== Voice Conversation Functions =====
+  const openVoiceConv = useCallback((config) => {
+    setVoiceConvConfig(config);
+    setIsVoiceConvActive(true);
+    setIsVoiceConvMinimized(false);
+  }, []);
+
+  const closeVoiceConv = useCallback(() => {
+    setIsVoiceConvActive(false);
+    setIsVoiceConvMinimized(false);
+    setVoiceConvConfig(null);
+    setVoiceConvStatus({ isRecording: false, isPlaying: false, isLoading: false });
+  }, []);
+
+  const minimizeVoiceConv = useCallback(() => {
+    setIsVoiceConvMinimized(true);
+  }, []);
+
+  const maximizeVoiceConv = useCallback(() => {
+    setIsVoiceConvMinimized(false);
+  }, []);
+
+  const updateVoiceConvStatus = useCallback((status) => {
+    setVoiceConvStatus(prev => ({ ...prev, ...status }));
+  }, []);
+
   const value = useMemo(() => ({
+    // Live chat
     isLiveChatActive,
     isMinimized,
     liveChatConfig,
@@ -217,12 +267,28 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     closeLiveChat,
     minimizeLiveChat,
     maximizeLiveChat,
+    // Voice conversation
+    isVoiceConvActive,
+    isVoiceConvMinimized,
+    voiceConvConfig,
+    voiceConvStatus,
+    openVoiceConv,
+    closeVoiceConv,
+    minimizeVoiceConv,
+    maximizeVoiceConv,
+    updateVoiceConvStatus,
+    // Shared
     data,
     setData,
     addJournalEntry,
     addPronunciationCorrection,
-    saveChatHistory
-  }), [isLiveChatActive, isMinimized, liveChatConfig, chatHistory, openLiveChat, closeLiveChat, minimizeLiveChat, maximizeLiveChat, data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory]);
+    saveChatHistory,
+    navigateTo
+  }), [
+    isLiveChatActive, isMinimized, liveChatConfig, chatHistory, openLiveChat, closeLiveChat, minimizeLiveChat, maximizeLiveChat,
+    isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, voiceConvStatus, openVoiceConv, closeVoiceConv, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
+    data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory, navigateTo
+  ]);
 
   return (
     <LiveChatContext.Provider value={value}>
@@ -983,6 +1049,7 @@ export default function App() {
         addJournalEntry={addJournalEntry}
         addPronunciationCorrection={addPronunciationCorrection}
         saveChatHistory={saveChatHistory}
+        navigateTo={navigateTo}
       >
         <Fonts />
         <div className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
@@ -1017,9 +1084,10 @@ export default function App() {
             />
           </div>
         </div>
-        {/* Global floating live voice chat - persists across page navigation */}
+        {/* Global floating voice chats - persist across page navigation */}
         <GlobalLiveVoiceChat />
         <FloatingLiveChatWidget />
+        <FloatingVoiceConvWidget />
       </LiveChatProvider>
     </ExecutionFlowProvider>
   );
@@ -4040,18 +4108,25 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Execution flow tracking
   const { setCurrentNode } = useExecutionFlow();
 
-  // Live chat context - for floating voice chat
-  const { openLiveChat, isLiveChatActive, minimizeLiveChat } = useLiveChat();
+  // Live chat context - for floating voice chat (both Live and Voice Conversation)
+  const {
+    openLiveChat, isLiveChatActive, minimizeLiveChat,
+    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus
+  } = useLiveChat();
 
-  // Auto-minimize live chat when leaving this page (unmounting)
+  // Auto-minimize chats when leaving this page (unmounting)
   useEffect(() => {
     return () => {
       // When ChatInterface unmounts and live chat is active, minimize it
       if (isLiveChatActive) {
         minimizeLiveChat();
       }
+      // When ChatInterface unmounts and voice conversation is active, minimize it
+      if (isVoiceConvActive) {
+        minimizeVoiceConv();
+      }
     };
-  }, [isLiveChatActive, minimizeLiveChat]);
+  }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv]);
 
   const chatWindowRef = useRef(null);
   const [customScenarioName, setCustomScenarioName] = useState('');
@@ -4108,6 +4183,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
     return () => releaseWakeLock();
   }, [voiceConversationMode]);
+
+  // Sync voice conversation status to context for floating widget
+  useEffect(() => {
+    if (voiceConversationMode) {
+      updateVoiceConvStatus({
+        isRecording,
+        isLoading,
+        isPlaying: currentAudioRef.current && !currentAudioRef.current.paused
+      });
+    }
+  }, [voiceConversationMode, isRecording, isLoading, updateVoiceConvStatus]);
 
   const [selectedTopics, setSelectedTopics] = useState(['general']);
   const [writingStyle, setWritingStyle] = useState(defaultChatSettings.writingStyle);
@@ -4615,12 +4701,24 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       }
       stopVoiceRecording();
       setVoiceConversationMode(false);
+      // Close voice conv in context
+      closeVoiceConv();
     } else {
       // Turning on - start voice conversation mode and begin recording
       voiceConversationModeRef.current = true;
       setVoiceConversationMode(true);
       // Pass true to indicate voice conversation mode since state hasn't updated yet
       startVoiceRecording(true);
+      // Open voice conv in context
+      openVoiceConv({
+        context,
+        lessonTitle,
+        selectedTopics,
+        customScenarioName,
+        customScenarioDetails,
+        aiVoice,
+        accentMode
+      });
     }
   };
 
@@ -5086,6 +5184,125 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
             {isLoading ? <Loader size={18} className="animate-spin" /> : <Volume2 size={18} className={isPlaying ? 'animate-pulse' : ''} />}
         </button>
     );
+}
+
+// --- Floating Voice Conversation Widget (minimized view for voice conv mode) ---
+function FloatingVoiceConvWidget() {
+  const {
+    isVoiceConvActive,
+    isVoiceConvMinimized,
+    voiceConvConfig,
+    voiceConvStatus,
+    maximizeVoiceConv,
+    closeVoiceConv,
+    navigateTo
+  } = useLiveChat();
+
+  if (!isVoiceConvActive || !isVoiceConvMinimized) return null;
+
+  const { isRecording, isPlaying, isLoading } = voiceConvStatus;
+
+  const getStatusColor = () => {
+    if (isLoading) return 'bg-yellow-500 animate-pulse';
+    if (isRecording) return 'bg-red-500 animate-pulse';
+    if (isPlaying) return 'bg-purple-500 animate-pulse';
+    return 'bg-slate-500';
+  };
+
+  const getStatusText = () => {
+    if (isLoading) return 'در حال پردازش...';
+    if (isRecording) return 'در حال ضبط...';
+    if (isPlaying) return 'در حال پخش...';
+    return 'متوقف شده';
+  };
+
+  // Navigate back to the chat page
+  const handleMaximize = () => {
+    if (voiceConvConfig?.context && navigateTo) {
+      if (voiceConvConfig.context === 'global') {
+        navigateTo('dashboard');
+      } else if (voiceConvConfig.context.startsWith('lesson-')) {
+        const lessonId = parseInt(voiceConvConfig.context.replace('lesson-', ''));
+        navigateTo('lesson', { id: lessonId });
+      }
+    }
+    maximizeVoiceConv();
+  };
+
+  return (
+    <div
+      className="fixed bottom-24 right-6 z-50"
+      style={{ animation: 'slideIn 0.3s ease-out' }}
+    >
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+      <div className="bg-gradient-to-br from-purple-700 via-purple-600 to-indigo-700 rounded-2xl shadow-2xl border border-purple-400/30 overflow-hidden w-72">
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 bg-black/20">
+          <div className="flex items-center gap-2">
+            <MessageCircle size={18} className="text-white" />
+            <span className="text-white font-medium text-sm">گفتگو با جاد</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleMaximize}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              title="بازگشت به صفحه چت"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </button>
+            <button
+              onClick={closeVoiceConv}
+              className="p-1.5 rounded-lg bg-red-500/50 hover:bg-red-500 text-white transition-colors"
+              title="پایان گفتگو"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Status */}
+        <div className="p-4 flex items-center justify-center gap-3">
+          <div className={`w-16 h-16 rounded-full ${getStatusColor()} flex items-center justify-center shadow-lg`}>
+            {isLoading ? (
+              <Loader size={28} className="text-white animate-spin" />
+            ) : isRecording ? (
+              <Mic size={28} className="text-white" />
+            ) : isPlaying ? (
+              <Volume2 size={28} className="text-white animate-pulse" />
+            ) : (
+              <MicOff size={28} className="text-white" />
+            )}
+          </div>
+          <div className="text-white">
+            <div className="font-medium">{getStatusText()}</div>
+            {voiceConvConfig?.lessonTitle ? (
+              <div className="text-white/60 text-sm truncate max-w-[120px]">
+                {voiceConvConfig.lessonTitle}
+              </div>
+            ) : (
+              <div className="text-white/60 text-sm">داشبورد</div>
+            )}
+          </div>
+        </div>
+
+        {/* Expand button */}
+        <button
+          onClick={handleMaximize}
+          className="w-full py-2 bg-white/10 hover:bg-white/20 text-white text-sm transition-colors flex items-center justify-center gap-2"
+        >
+          <span>بازگشت به چت</span>
+          <ChevronUp size={16} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // --- Floating Live Chat Widget (minimized view) ---
