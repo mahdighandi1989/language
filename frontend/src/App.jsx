@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, createContext, useContext, useCallback } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -751,6 +751,8 @@ export default function App() {
 
   // localStorage helper functions
   const STORAGE_KEY = 'lebanese_dialect_app_data';
+  const BACKUP_KEY = 'lebanese_dialect_app_backup';
+  const BACKUP_TIMESTAMP_KEY = 'lebanese_dialect_app_backup_timestamp';
 
   const saveToLocalStorage = (newData) => {
     try {
@@ -770,6 +772,48 @@ export default function App() {
       console.error("Error loading from localStorage:", error);
     }
     return initialData;
+  };
+
+  // Backup system - saves a copy of data to localStorage even when using Firebase
+  const saveBackup = (dataToBackup) => {
+    try {
+      // Only backup if there's meaningful data (at least one lesson or knowledge item)
+      const hasContent = dataToBackup.lessons?.length > 0 ||
+        Object.values(dataToBackup.knowledgeBase || {}).some(arr => arr?.length > 0);
+
+      if (hasContent) {
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(dataToBackup));
+        localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
+        console.log("Backup saved to localStorage");
+      }
+    } catch (error) {
+      console.error("Error saving backup:", error);
+    }
+  };
+
+  const loadBackup = () => {
+    try {
+      const backup = localStorage.getItem(BACKUP_KEY);
+      const timestamp = localStorage.getItem(BACKUP_TIMESTAMP_KEY);
+      if (backup) {
+        return {
+          data: { ...initialData, ...JSON.parse(backup) },
+          timestamp: timestamp ? new Date(timestamp).toLocaleString('fa-IR') : 'نامشخص'
+        };
+      }
+    } catch (error) {
+      console.error("Error loading backup:", error);
+    }
+    return null;
+  };
+
+  const clearBackup = () => {
+    try {
+      localStorage.removeItem(BACKUP_KEY);
+      localStorage.removeItem(BACKUP_TIMESTAMP_KEY);
+    } catch (error) {
+      console.error("Error clearing backup:", error);
+    }
   };
 
   useEffect(() => {
@@ -811,12 +855,84 @@ export default function App() {
 
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
+            const firestoreData = docSnap.data();
             console.log("Data loaded from Firestore (shared)");
-            setData(prevData => ({...initialData, ...docSnap.data()}));
+
+            // Check if Firestore data is empty but we have a backup
+            const firestoreHasContent = firestoreData.lessons?.length > 0 ||
+              Object.values(firestoreData.knowledgeBase || {}).some(arr => arr?.length > 0);
+
+            if (!firestoreHasContent) {
+              const backup = loadBackup();
+              if (backup) {
+                console.log("Firestore is empty but backup found! Showing recovery option.");
+                setModalConfig({
+                  title: "🔄 بازیابی داده‌ها",
+                  message: `داده‌های شما در سرور خالی است، اما یک نسخه پشتیبان از تاریخ ${backup.timestamp} یافت شد. آیا می‌خواهید داده‌ها را بازیابی کنید؟`,
+                  buttons: [
+                    {
+                      label: "بازیابی کن",
+                      onClick: () => {
+                        setData(backup.data);
+                        setDoc(userDocRef, backup.data).catch(err => console.error("Error restoring backup to Firestore:", err));
+                        setModalConfig(null);
+                      },
+                      className: "bg-teal-600 text-white hover:bg-teal-700"
+                    },
+                    {
+                      label: "شروع از اول",
+                      onClick: () => {
+                        setData({...initialData, ...firestoreData});
+                        setModalConfig(null);
+                      },
+                      className: "bg-slate-200 hover:bg-slate-300"
+                    }
+                  ]
+                });
+                setData({...initialData, ...firestoreData});
+              } else {
+                setData(prevData => ({...initialData, ...firestoreData}));
+              }
+            } else {
+              setData(prevData => ({...initialData, ...firestoreData}));
+              // Save backup when we have valid data
+              saveBackup({...initialData, ...firestoreData});
+            }
           } else {
-            console.log("Creating initial document in Firestore");
-            setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
-            setData(initialData);
+            console.log("Firestore document doesn't exist - checking for backup");
+            const backup = loadBackup();
+            if (backup) {
+              console.log("Found backup! Restoring to Firestore.");
+              setModalConfig({
+                title: "🔄 بازیابی داده‌ها",
+                message: `سند در سرور یافت نشد، اما یک نسخه پشتیبان از تاریخ ${backup.timestamp} یافت شد. آیا می‌خواهید داده‌ها را بازیابی کنید؟`,
+                buttons: [
+                  {
+                    label: "بازیابی کن",
+                    onClick: () => {
+                      setData(backup.data);
+                      setDoc(userDocRef, backup.data).catch(err => console.error("Error restoring backup to Firestore:", err));
+                      setModalConfig(null);
+                    },
+                    className: "bg-teal-600 text-white hover:bg-teal-700"
+                  },
+                  {
+                    label: "شروع از اول",
+                    onClick: () => {
+                      setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
+                      setData(initialData);
+                      setModalConfig(null);
+                    },
+                    className: "bg-slate-200 hover:bg-slate-300"
+                  }
+                ]
+              });
+              setData(initialData); // Set initial while waiting for user choice
+            } else {
+              console.log("No backup found - creating initial document");
+              setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
+              setData(initialData);
+            }
           }
           setIsAuthReady(true);
         }, (error) => {
@@ -854,6 +970,7 @@ export default function App() {
     if (userId === 'local-user') {
       const handler = setTimeout(() => {
         saveToLocalStorage(dataRef.current);
+        saveBackup(dataRef.current); // Also save backup
         console.log("Data saved to localStorage");
       }, 1000);
       return () => clearTimeout(handler);
@@ -868,6 +985,10 @@ export default function App() {
 
     const handler = setTimeout(() => {
         setDoc(userDocRef, dataRef.current, { merge: true })
+            .then(() => {
+              // Save backup to localStorage after successful Firestore save
+              saveBackup(dataRef.current);
+            })
             .catch(err => console.error("Error saving data to Firestore:", err));
     }, 1000);
 
@@ -1190,8 +1311,86 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
     const tabs = [
         { id: 'general', label: '⚙️ عمومی', icon: Settings },
         { id: 'prompts', label: '🧠 پرامپت‌ها', icon: MessageSquare },
-        { id: 'flow', label: '📊 جریان الگوریتم', icon: Activity }
+        { id: 'flow', label: '📊 جریان الگوریتم', icon: Activity },
+        { id: 'backup', label: '💾 پشتیبان‌گیری', icon: Database }
     ];
+
+    // Backup functions
+    const BACKUP_KEY = 'lebanese_dialect_app_backup';
+    const BACKUP_TIMESTAMP_KEY = 'lebanese_dialect_app_backup_timestamp';
+
+    const getBackupInfo = () => {
+        try {
+            const backup = localStorage.getItem(BACKUP_KEY);
+            const timestamp = localStorage.getItem(BACKUP_TIMESTAMP_KEY);
+            if (backup) {
+                const backupData = JSON.parse(backup);
+                return {
+                    exists: true,
+                    timestamp: timestamp ? new Date(timestamp).toLocaleString('fa-IR') : 'نامشخص',
+                    lessonsCount: backupData.lessons?.length || 0,
+                    knowledgeCount: Object.values(backupData.knowledgeBase || {}).flat().length
+                };
+            }
+        } catch (e) {
+            console.error("Error reading backup info:", e);
+        }
+        return { exists: false };
+    };
+
+    const manualBackup = () => {
+        try {
+            localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
+            localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
+            setModalConfig({
+                title: '✅ پشتیبان ذخیره شد',
+                message: `پشتیبان با ${data.lessons?.length || 0} درس و ${Object.values(data.knowledgeBase || {}).flat().length} آیتم دانش ذخیره شد.`,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-teal-500 text-white' }]
+            });
+        } catch (e) {
+            setModalConfig({
+                title: '❌ خطا',
+                message: 'خطا در ذخیره پشتیبان: ' + e.message,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-red-500 text-white' }]
+            });
+        }
+    };
+
+    const restoreFromBackup = () => {
+        try {
+            const backup = localStorage.getItem(BACKUP_KEY);
+            if (backup) {
+                const backupData = JSON.parse(backup);
+                setModalConfig({
+                    title: '⚠️ بازیابی از پشتیبان',
+                    message: 'آیا مطمئنید؟ داده‌های فعلی با پشتیبان جایگزین می‌شوند.',
+                    buttons: [
+                        { label: 'انصراف', onClick: () => setModalConfig(null), className: 'bg-slate-200' },
+                        {
+                            label: 'بازیابی کن',
+                            onClick: () => {
+                                setData(prev => ({ ...prev, ...backupData }));
+                                setModalConfig({
+                                    title: '✅ بازیابی شد',
+                                    message: 'داده‌ها با موفقیت بازیابی شدند.',
+                                    buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-teal-500 text-white' }]
+                                });
+                            },
+                            className: 'bg-teal-500 text-white'
+                        }
+                    ]
+                });
+            }
+        } catch (e) {
+            setModalConfig({
+                title: '❌ خطا',
+                message: 'خطا در بازیابی: ' + e.message,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-red-500 text-white' }]
+            });
+        }
+    };
+
+    const [backupInfo, setBackupInfo] = useState(() => getBackupInfo());
 
     return (
         <div className="space-y-6">
@@ -1296,6 +1495,113 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
             {/* Flow Visualization Tab */}
             {activeTab === 'flow' && (
                 <FlowVisualization />
+            )}
+
+            {/* Backup Tab */}
+            {activeTab === 'backup' && (
+                <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-blue-500 to-teal-600 text-white p-4 rounded-xl">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <Database size={24} /> سیستم پشتیبان‌گیری
+                        </h3>
+                        <p className="text-blue-100 text-sm mt-1">
+                            از داده‌های خود نسخه پشتیبان بگیرید تا در صورت از دست رفتن داده‌ها بتوانید آنها را بازیابی کنید.
+                        </p>
+                    </div>
+
+                    {/* Current Data Info */}
+                    <Card title="📊 وضعیت فعلی داده‌ها">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="bg-teal-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-teal-600">{data.lessons?.length || 0}</div>
+                                <div className="text-sm text-slate-600">درس</div>
+                            </div>
+                            <div className="bg-blue-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-blue-600">{data.knowledgeBase?.vocabulary?.length || 0}</div>
+                                <div className="text-sm text-slate-600">لغت</div>
+                            </div>
+                            <div className="bg-purple-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-purple-600">{data.knowledgeBase?.grammar?.length || 0}</div>
+                                <div className="text-sm text-slate-600">گرامر</div>
+                            </div>
+                            <div className="bg-orange-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-orange-600">{data.journal?.length || 0}</div>
+                                <div className="text-sm text-slate-600">فعالیت</div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Backup Status */}
+                    <Card title="💾 وضعیت پشتیبان">
+                        {backupInfo.exists ? (
+                            <div className="space-y-4">
+                                <div className="bg-green-50 border border-green-200 p-4 rounded-xl">
+                                    <div className="flex items-center gap-2 text-green-700 font-bold mb-2">
+                                        <CheckCircle size={20} /> پشتیبان موجود است
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-slate-500">تاریخ:</span>
+                                            <span className="mr-2 font-bold">{backupInfo.timestamp}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">تعداد دروس:</span>
+                                            <span className="mr-2 font-bold">{backupInfo.lessonsCount}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">آیتم‌های دانش:</span>
+                                            <span className="mr-2 font-bold">{backupInfo.knowledgeCount}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { manualBackup(); setBackupInfo(getBackupInfo()); }}
+                                        className="flex-1 bg-blue-500 text-white py-3 rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2"
+                                    >
+                                        <Save size={20} /> ذخیره پشتیبان جدید
+                                    </button>
+                                    <button
+                                        onClick={restoreFromBackup}
+                                        className="flex-1 bg-teal-500 text-white py-3 rounded-xl font-bold hover:bg-teal-600 flex items-center justify-center gap-2"
+                                    >
+                                        <RefreshCw size={20} /> بازیابی از پشتیبان
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
+                                    <div className="flex items-center gap-2 text-yellow-700 font-bold">
+                                        <AlertCircle size={20} /> هیچ پشتیبانی یافت نشد
+                                    </div>
+                                    <p className="text-sm text-yellow-600 mt-1">
+                                        هنوز نسخه پشتیبانی ذخیره نشده. توصیه می‌شود همین الان یک پشتیبان بگیرید.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { manualBackup(); setBackupInfo(getBackupInfo()); }}
+                                    className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2"
+                                >
+                                    <Save size={20} /> ذخیره پشتیبان
+                                </button>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Auto Backup Info */}
+                    <Card title="ℹ️ پشتیبان‌گیری خودکار">
+                        <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-800">
+                            <p className="font-bold mb-2">سیستم پشتیبان‌گیری خودکار فعال است:</p>
+                            <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                <li>هر بار که داده‌ها تغییر کنند، به صورت خودکار پشتیبان گرفته می‌شود</li>
+                                <li>اگر داده‌های سرور خالی باشد، امکان بازیابی از پشتیبان داده می‌شود</li>
+                                <li>پشتیبان در حافظه مرورگر (localStorage) ذخیره می‌شود</li>
+                                <li>اگر مرورگر یا دستگاه تغییر کنید، پشتیبان در دسترس نخواهد بود</li>
+                            </ul>
+                        </div>
+                    </Card>
+                </div>
             )}
         </div>
     );
