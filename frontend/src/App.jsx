@@ -1161,7 +1161,7 @@ export default function App() {
       case 'cultural': return <CulturalInsights {...commonProps} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} />;
       case 'stats': return <ProgressCenter {...commonProps} lessons={data.lessons} journal={data.journal} knowledgeBase={data.knowledgeBase} />;
       case 'journal': return <Journal {...commonProps} entries={data.journal} />;
-      case 'settings': return <SettingsPage {...commonProps} />;
+      case 'settings': return <SettingsPage {...commonProps} firebaseServices={firebaseServices} userId={userId} />;
       case 'archivedConversations': return <ArchivedConversations {...commonProps} conversations={data.archivedConversations || []} />;
       default: return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
     }
@@ -1261,7 +1261,7 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
     );
 }
 
-function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection }) {
+function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection, firebaseServices, userId }) {
     const [activeTab, setActiveTab] = useState('general');
     const pronunciationCorrections = data.pronunciationCorrections || [];
     const customPrompts = data.customPrompts || {};
@@ -1391,6 +1391,127 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
     };
 
     const [backupInfo, setBackupInfo] = useState(() => getBackupInfo());
+
+    // Firebase Recovery State
+    const [alternateAppId, setAlternateAppId] = useState('');
+    const [searchingFirebase, setSearchingFirebase] = useState(false);
+    const [firebaseSearchResult, setFirebaseSearchResult] = useState(null);
+    const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const SHARED_USER_ID = 'shared-user-mahdi';
+
+    const searchFirebasePath = async (appIdToSearch) => {
+        if (!firebaseServices?.db || !appIdToSearch.trim()) {
+            setModalConfig({
+                title: '❌ خطا',
+                message: 'لطفاً یک App ID وارد کنید',
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-slate-200' }]
+            });
+            return;
+        }
+
+        setSearchingFirebase(true);
+        setFirebaseSearchResult(null);
+
+        try {
+            const { doc, getDoc } = await import('firebase/firestore');
+            const searchPath = `/artifacts/${appIdToSearch.trim()}/users/${SHARED_USER_ID}/data/main`;
+            const docRef = doc(firebaseServices.db, searchPath);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const foundData = docSnap.data();
+                const hasContent = foundData.lessons?.length > 0 ||
+                    Object.values(foundData.knowledgeBase || {}).some(arr => arr?.length > 0);
+
+                setFirebaseSearchResult({
+                    found: true,
+                    hasContent,
+                    path: searchPath,
+                    appId: appIdToSearch.trim(),
+                    data: foundData,
+                    lessonsCount: foundData.lessons?.length || 0,
+                    knowledgeCount: Object.values(foundData.knowledgeBase || {}).flat().length
+                });
+            } else {
+                setFirebaseSearchResult({
+                    found: false,
+                    path: searchPath,
+                    appId: appIdToSearch.trim()
+                });
+            }
+        } catch (error) {
+            console.error("Error searching Firebase:", error);
+            setModalConfig({
+                title: '❌ خطا در جستجو',
+                message: `خطا: ${error.message}`,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-slate-200' }]
+            });
+        } finally {
+            setSearchingFirebase(false);
+        }
+    };
+
+    const migrateFromOldPath = async () => {
+        if (!firebaseSearchResult?.data || !firebaseServices?.db) return;
+
+        try {
+            const { doc, setDoc } = await import('firebase/firestore');
+            const currentPath = `/artifacts/${currentAppId}/users/${SHARED_USER_ID}/data/main`;
+            const currentDocRef = doc(firebaseServices.db, currentPath);
+
+            // Merge old data with current data (old data takes priority for non-empty arrays)
+            const mergedData = { ...data };
+            const oldData = firebaseSearchResult.data;
+
+            // Merge lessons
+            if (oldData.lessons?.length > 0) {
+                const existingIds = new Set(mergedData.lessons?.map(l => l.id) || []);
+                const newLessons = oldData.lessons.filter(l => !existingIds.has(l.id));
+                mergedData.lessons = [...(mergedData.lessons || []), ...newLessons];
+            }
+
+            // Merge knowledge base
+            if (oldData.knowledgeBase) {
+                Object.keys(oldData.knowledgeBase).forEach(key => {
+                    if (oldData.knowledgeBase[key]?.length > 0) {
+                        const existingTerms = new Set((mergedData.knowledgeBase?.[key] || []).map(i => i.term));
+                        const newItems = oldData.knowledgeBase[key].filter(i => !existingTerms.has(i.term));
+                        mergedData.knowledgeBase = mergedData.knowledgeBase || {};
+                        mergedData.knowledgeBase[key] = [...(mergedData.knowledgeBase[key] || []), ...newItems];
+                    }
+                });
+            }
+
+            // Merge journal
+            if (oldData.journal?.length > 0) {
+                const existingIds = new Set(mergedData.journal?.map(j => j.id) || []);
+                const newEntries = oldData.journal.filter(j => !existingIds.has(j.id));
+                mergedData.journal = [...(mergedData.journal || []), ...newEntries];
+            }
+
+            // Merge chat histories
+            if (oldData.chatHistories) {
+                mergedData.chatHistories = { ...mergedData.chatHistories, ...oldData.chatHistories };
+            }
+
+            // Save to Firebase and local state
+            await setDoc(currentDocRef, mergedData, { merge: true });
+            setData(mergedData);
+
+            setModalConfig({
+                title: '✅ انتقال موفق',
+                message: `داده‌ها با موفقیت منتقل شدند!\n- ${firebaseSearchResult.lessonsCount} درس\n- ${firebaseSearchResult.knowledgeCount} آیتم دانش`,
+                buttons: [{ label: 'عالی!', onClick: () => { setModalConfig(null); setFirebaseSearchResult(null); }, className: 'bg-teal-500 text-white' }]
+            });
+        } catch (error) {
+            console.error("Error migrating data:", error);
+            setModalConfig({
+                title: '❌ خطا در انتقال',
+                message: `خطا: ${error.message}`,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-slate-200' }]
+            });
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -1601,6 +1722,83 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
                             </ul>
                         </div>
                     </Card>
+
+                    {/* Firebase Recovery Tool */}
+                    {firebaseServices?.db && (
+                        <Card title="🔥 بازیابی از Firebase">
+                            <div className="space-y-4">
+                                <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl">
+                                    <p className="text-sm text-orange-800 mb-2">
+                                        اگر داده‌های شما در مسیر دیگری در Firebase ذخیره شده، می‌توانید آنها را جستجو و منتقل کنید.
+                                    </p>
+                                    <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded font-mono">
+                                        مسیر فعلی: /artifacts/<strong>{currentAppId}</strong>/users/{SHARED_USER_ID}/data/main
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="App ID قدیمی را وارد کنید..."
+                                        value={alternateAppId}
+                                        onChange={e => setAlternateAppId(e.target.value)}
+                                        className="flex-1 p-3 border rounded-xl text-sm"
+                                        dir="ltr"
+                                    />
+                                    <button
+                                        onClick={() => searchFirebasePath(alternateAppId)}
+                                        disabled={searchingFirebase || !alternateAppId.trim()}
+                                        className="px-4 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {searchingFirebase ? <Loader className="animate-spin" size={18} /> : <Search size={18} />}
+                                        جستجو
+                                    </button>
+                                </div>
+
+                                {/* Search Result */}
+                                {firebaseSearchResult && (
+                                    <div className={`p-4 rounded-xl border ${firebaseSearchResult.found && firebaseSearchResult.hasContent ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                        {firebaseSearchResult.found && firebaseSearchResult.hasContent ? (
+                                            <div className="space-y-3">
+                                                <div className="flex items-center gap-2 text-green-700 font-bold">
+                                                    <CheckCircle size={20} /> داده پیدا شد!
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    <div className="bg-white p-2 rounded">
+                                                        <span className="text-slate-500">دروس:</span>
+                                                        <span className="mr-2 font-bold text-green-600">{firebaseSearchResult.lessonsCount}</span>
+                                                    </div>
+                                                    <div className="bg-white p-2 rounded">
+                                                        <span className="text-slate-500">دانش:</span>
+                                                        <span className="mr-2 font-bold text-green-600">{firebaseSearchResult.knowledgeCount}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={migrateFromOldPath}
+                                                    className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 flex items-center justify-center gap-2"
+                                                >
+                                                    <Download size={20} /> انتقال به مسیر فعلی
+                                                </button>
+                                            </div>
+                                        ) : firebaseSearchResult.found ? (
+                                            <div className="flex items-center gap-2 text-yellow-700">
+                                                <AlertCircle size={20} /> سند پیدا شد اما خالی است
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-red-700">
+                                                <X size={20} /> داده‌ای در این مسیر یافت نشد
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                                    <strong>راهنما:</strong> App ID معمولاً یک رشته طولانی مثل <code className="bg-slate-200 px-1 rounded">abc123xyz-...</code> است.
+                                    می‌توانید از کنسول Firebase در بخش Firestore لیست artifacts را ببینید.
+                                </div>
+                            </div>
+                        </Card>
+                    )}
                 </div>
             )}
         </div>
