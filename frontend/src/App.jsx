@@ -320,6 +320,11 @@ const defaultPrompts = {
   chatFinglish: `Write your responses using Arabizi (Lebanese chat alphabet). For example: 'Mni7 ktir! Shu 3melt lyoum?'. Use numbers for specific letters: 7 for ح, 3 for ع, 2 for ء, 6 for ط, 9 for ص.`,
   chatTashkeel: `Write your responses in Arabic script with full Lebanese dialect vowel markings (Tashkeel) to aid pronunciation.`,
   chatLessonContext: `Your conversation MUST be based on the provided lesson notes (ONLY the correct content):`,
+  chatFeedbackInstruction: `IMPORTANT: When the student responds in Arabic (not asking questions in Persian), evaluate their response and add ONE of these hidden markers at the VERY END of your message:
+[FEEDBACK:correct] - if the student's Arabic usage was correct (grammar, vocabulary, meaning)
+[FEEDBACK:incorrect] - if the student made significant errors
+[FEEDBACK:partial] - if the student was partially correct with minor errors
+Only add feedback for actual Arabic practice attempts, not for questions or Persian messages.`,
   chatScenario: `You are role-playing.`,
   chatTopicFocus: `Focus the conversation on these items:`,
 
@@ -4111,7 +4116,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Live chat context - for floating voice chat (both Live and Voice Conversation)
   const {
     openLiveChat, isLiveChatActive, minimizeLiveChat,
-    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus
+    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus
   } = useLiveChat();
 
   // Auto-minimize chats when leaving this page (unmounting)
@@ -4123,10 +4128,24 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       }
       // When ChatInterface unmounts and voice conversation is active, minimize it
       if (isVoiceConvActive) {
+        // Save current chat history before minimizing so it persists
+        saveChatHistory(context, chatHistoryRef.current);
         minimizeVoiceConv();
       }
     };
-  }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv]);
+  }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv, context, saveChatHistory]);
+
+  // Restore voice conversation mode when returning to page with active voice conv
+  useEffect(() => {
+    if (isVoiceConvActive && !isVoiceConvMinimized && voiceConvConfig?.context === context) {
+      // Returning to the page where voice conversation was active
+      if (!voiceConversationModeRef.current) {
+        voiceConversationModeRef.current = true;
+        setVoiceConversationMode(true);
+        // Don't auto-start recording, let user continue naturally
+      }
+    }
+  }, [isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, context]);
 
   const chatWindowRef = useRef(null);
   const [customScenarioName, setCustomScenarioName] = useState('');
@@ -4219,12 +4238,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   }, []);
 
   useEffect(() => {
-    // Don't reset conversation during voice conversation mode
+    // Don't reset conversation during voice conversation mode (local or from context)
     if (voiceConversationModeRef.current) return;
+    // Also don't reset if voice conv is active from context and we're the target page
+    if (isVoiceConvActive && voiceConvConfig?.context === context) return;
     if (!initialHistory || initialHistory.length === 0) {
         startNewConversation();
     }
-  }, [context, lessonTitle, initialHistory]);
+  }, [context, lessonTitle, initialHistory, isVoiceConvActive, voiceConvConfig]);
 
   const startNewConversation = (archiveCurrent = false) => {
     // Don't start new conversation during voice conversation mode
@@ -4347,6 +4368,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             cleanedNotes = cleanedNotes.replace(/\n{3,}/g, '\n\n').trim();
         }
         systemPrompt += `\n${getPrompt(customPrompts, 'chatLessonContext')} \n---\n${cleanedNotes}\n---`;
+        // Add feedback instruction for lesson contexts to track correct/incorrect responses
+        systemPrompt += `\n${getPrompt(customPrompts, 'chatFeedbackInstruction')}`;
     } else {
         const currentTopic = selectedTopics[0];
         if (currentTopic === 'custom_scenario') {
@@ -4415,10 +4438,47 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     try {
         // Track flow: Calling Gemini API
         setCurrentNode('callingGemini');
-        const aiResponseText = await callGeminiAPI(payload);
+        let aiResponseText = await callGeminiAPI(payload);
 
         // Track flow: Received response
         setCurrentNode('receivingResponse');
+
+        // Parse feedback marker for lesson contexts and update progress
+        if (context.startsWith('lesson-')) {
+            const feedbackMatch = aiResponseText.match(/\[FEEDBACK:(correct|incorrect|partial)\]/i);
+            if (feedbackMatch) {
+                const feedbackType = feedbackMatch[1].toLowerCase();
+                const lessonId = parseInt(context.replace('lesson-', ''));
+
+                // Update lesson progress based on feedback
+                setData(prev => ({
+                    ...prev,
+                    lessons: prev.lessons.map(l => {
+                        if (l.id === lessonId) {
+                            const currentProgress = l.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0, correctResponses: 0, incorrectResponses: 0 };
+                            const updates = { ...currentProgress };
+
+                            if (feedbackType === 'correct') {
+                                updates.correctResponses = (currentProgress.correctResponses || 0) + 1;
+                            } else if (feedbackType === 'incorrect') {
+                                updates.incorrectResponses = (currentProgress.incorrectResponses || 0) + 1;
+                                // Decrease correctResponses if positive (but not below 0)
+                                updates.correctResponses = Math.max((currentProgress.correctResponses || 0) - 1, 0);
+                            } else if (feedbackType === 'partial') {
+                                // Partial correct - add half credit
+                                updates.correctResponses = (currentProgress.correctResponses || 0) + 0.5;
+                            }
+
+                            return { ...l, progress: updates };
+                        }
+                        return l;
+                    })
+                }));
+
+                // Strip feedback marker from displayed text
+                aiResponseText = aiResponseText.replace(/\[FEEDBACK:(correct|incorrect|partial)\]/gi, '').trim();
+            }
+        }
 
         let ttsPrompt = `Say in a clear, ${accentMode === 'standard' ? 'standard' : 'authentic, colloquial Beirut'} Lebanese accent: ${aiResponseText.split('TRANSLATION:')[0]}`;
 
