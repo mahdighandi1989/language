@@ -656,17 +656,18 @@ const initialData = {
 
 // --- Gemini API Helpers ---
 // Calls backend API for Gemini chat (API key is secure on server)
-async function callGeminiAPI(payload, retries = 3, delay = 1000) {
+async function callGeminiAPI(payload, retries = 3, delay = 1000, signal = null) {
   const response = await fetch('/api/gemini/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
 
   if (!response.ok) {
     if (response.status === 429 && retries > 0) {
       await new Promise(res => setTimeout(res, delay));
-      return callGeminiAPI(payload, retries - 1, delay * 2);
+      return callGeminiAPI(payload, retries - 1, delay * 2, signal);
     }
     const error = new Error(`HTTP error! status: ${response.status}`);
     error.status = response.status;
@@ -678,12 +679,13 @@ async function callGeminiAPI(payload, retries = 3, delay = 1000) {
 }
 
 // Calls backend API for Gemini TTS
-async function callGeminiTTS(fullPrompt, voiceName = "Kore") {
+async function callGeminiTTS(fullPrompt, voiceName = "Kore", signal = null) {
   try {
     const response = await fetch('/api/gemini/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: fullPrompt, voice: voiceName })
+      body: JSON.stringify({ prompt: fullPrompt, voice: voiceName }),
+      signal
     });
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const result = await response.json();
@@ -692,7 +694,10 @@ async function callGeminiTTS(fullPrompt, voiceName = "Kore") {
     }
     throw new Error("Invalid audio data received.");
   } catch (error) {
-    console.error("Error with TTS API:", error);
+    // Don't log abort errors as they are intentional
+    if (error.name !== 'AbortError') {
+      console.error("Error with TTS API:", error);
+    }
     return null;
   }
 }
@@ -4623,9 +4628,53 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus
   } = useLiveChat();
 
-  // Auto-minimize chats when leaving this page (unmounting)
+  // Auto-minimize chats when leaving this page (unmounting) and cleanup all resources
   useEffect(() => {
     return () => {
+      // CRITICAL: Cancel any pending API requests to prevent stale responses
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
+      // Stop any ongoing audio playback
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.onended = null;
+        currentAudioRef.current = null;
+      }
+
+      // Stop MediaRecorder if recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      mediaRecorderRef.current = null;
+
+      // Stop stream tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      // Cleanup silence detection
+      if (silenceCheckIntervalRef.current) {
+        clearInterval(silenceCheckIntervalRef.current);
+        silenceCheckIntervalRef.current = null;
+      }
+      if (silenceTimeoutRef.current) {
+        clearTimeout(silenceTimeoutRef.current);
+        silenceTimeoutRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+
+      // Reset voice conversation mode
+      voiceConversationModeRef.current = false;
+      isRecordingRef.current = false;
+      recordingStartPendingRef.current = false;
+
       // When ChatInterface unmounts and live chat is active, minimize it
       if (isLiveChatActive) {
         minimizeLiveChat();
@@ -4644,6 +4693,15 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (isVoiceConvActive && !isVoiceConvMinimized && voiceConvConfig?.context === context) {
       // Returning to the page where voice conversation was active
       if (!voiceConversationModeRef.current) {
+        // Generate new session ID to invalidate any stale responses from before navigation
+        sessionIdRef.current = Date.now();
+
+        // Cancel any pending requests that might be leftover
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          abortControllerRef.current = null;
+        }
+
         voiceConversationModeRef.current = true;
         setVoiceConversationMode(true);
         // Don't auto-start recording, let user continue naturally
@@ -4669,6 +4727,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
   const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
   const currentAudioRef = useRef(null);
+  const abortControllerRef = useRef(null); // AbortController for canceling pending API requests
+  const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses
 
   // Silence detection refs for voice conversation mode
   const audioContextRef = useRef(null);
@@ -4826,6 +4886,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     const messageText = textToSend || input;
     if ((!messageText.trim() && !attachedFile && !audioBlobUrl) || isLoading) return;
 
+    // Cancel any previous pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Track session ID to detect stale responses
+    const currentSessionId = sessionIdRef.current;
+
     // Track flow: User input received
     setCurrentNode(audioBlobUrl ? 'audioRecording' : 'userInput', audioBlobUrl ? 'chatVoice' : 'chat');
 
@@ -4959,7 +5030,13 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     try {
         // Track flow: Calling Gemini API
         setCurrentNode('callingGemini');
-        let aiResponseText = await callGeminiAPI(payload);
+        let aiResponseText = await callGeminiAPI(payload, 3, 1000, abortController.signal);
+
+        // Check if request was aborted or session changed (stale response)
+        if (abortController.signal.aborted || currentSessionId !== sessionIdRef.current) {
+          console.log('Request aborted or session changed, discarding response');
+          return;
+        }
 
         // Track flow: Received response
         setCurrentNode('receivingResponse');
@@ -5008,8 +5085,15 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             setCurrentNode('generatingTTS');
         }
 
-        const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
+        const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice, abortController.signal) : Promise.resolve(null);
         const audioResult = await audioPromise;
+
+        // Check again after TTS call if request was aborted or session changed
+        if (abortController.signal.aborted || currentSessionId !== sessionIdRef.current) {
+          console.log('Request aborted after TTS or session changed, discarding response');
+          return;
+        }
+
         const audioUrl = audioResult ? getWavUrl(audioResult.audioData, audioResult.mimeType) : null;
         const newAiMessage = { role: 'model', parts: [{ text: aiResponseText, type: 'text', audioUrl }] };
         newHistory = [...newHistory, newAiMessage];
@@ -5029,6 +5113,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             const triggerNextRecording = async () => {
                 // Prevent duplicate triggers from both onended and error handlers
                 if (recordingTriggered) return;
+                // CRITICAL: Check if this response is from a stale session
+                if (currentSessionId !== sessionIdRef.current) {
+                    console.log('Stale session detected, not triggering next recording');
+                    return;
+                }
                 if (!voiceConversationModeRef.current) return;
                 if (isRecordingRef.current || recordingStartPendingRef.current) return;
 
@@ -5036,8 +5125,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                 recordingStartPendingRef.current = true;
 
                 setTimeout(async () => {
-                    // Double-check all conditions before starting
-                    if (voiceConversationModeRef.current && !isRecordingRef.current) {
+                    // Double-check all conditions before starting (including session check)
+                    if (currentSessionId === sessionIdRef.current && voiceConversationModeRef.current && !isRecordingRef.current) {
                         await playBeepSound(800, 150);
                         startVoiceRecording(true);
                     }
@@ -5056,6 +5145,16 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             });
         }
     } catch(error) {
+        // Ignore AbortError - it's intentional when user navigates away or starts new request
+        if (error.name === 'AbortError') {
+          console.log('Request was intentionally aborted');
+          return;
+        }
+        // Also ignore if session changed (stale request)
+        if (currentSessionId !== sessionIdRef.current) {
+          console.log('Session changed, ignoring error from stale request');
+          return;
+        }
         // Track flow: Error occurred
         setCurrentNode('error');
         const errorAiMessage = { role: 'model', parts: [{ text: "متاسفانه مشکلی پیش آمد.", type: 'text', isError: true }] };
@@ -5066,9 +5165,12 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             setVoiceConversationMode(false);
         }
     } finally {
-        setIsLoading(false);
-        // Track flow: Back to idle (after a short delay to show complete)
-        setTimeout(() => setCurrentNode('idle'), 1500);
+        // Only update loading state if this is still the current session
+        if (currentSessionId === sessionIdRef.current) {
+          setIsLoading(false);
+          // Track flow: Back to idle (after a short delay to show complete)
+          setTimeout(() => setCurrentNode('idle'), 1500);
+        }
     }
   };
 
@@ -5280,11 +5382,19 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Toggle voice conversation mode
   const toggleVoiceConversationMode = () => {
     if (voiceConversationMode) {
-      // Turning off - stop any ongoing audio/recording
+      // Turning off - stop any ongoing audio/recording and cancel pending requests
       voiceConversationModeRef.current = false;
+
+      // Cancel any pending API requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
       cleanupSilenceDetection();
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
+        currentAudioRef.current.onended = null;
         currentAudioRef.current = null;
       }
       stopVoiceRecording();
@@ -5293,6 +5403,15 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       closeVoiceConv();
     } else {
       // Turning on - start voice conversation mode and begin recording
+
+      // Cancel any pending requests from previous session
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // Generate new session ID to invalidate any stale responses
+      sessionIdRef.current = Date.now();
+
       voiceConversationModeRef.current = true;
       setVoiceConversationMode(true);
       // Pass true to indicate voice conversation mode since state hasn't updated yet
