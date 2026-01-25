@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, createContext, useContext, useCallback } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -751,6 +751,8 @@ export default function App() {
 
   // localStorage helper functions
   const STORAGE_KEY = 'lebanese_dialect_app_data';
+  const BACKUP_KEY = 'lebanese_dialect_app_backup';
+  const BACKUP_TIMESTAMP_KEY = 'lebanese_dialect_app_backup_timestamp';
 
   const saveToLocalStorage = (newData) => {
     try {
@@ -770,6 +772,48 @@ export default function App() {
       console.error("Error loading from localStorage:", error);
     }
     return initialData;
+  };
+
+  // Backup system - saves a copy of data to localStorage even when using Firebase
+  const saveBackup = (dataToBackup) => {
+    try {
+      // Only backup if there's meaningful data (at least one lesson or knowledge item)
+      const hasContent = dataToBackup.lessons?.length > 0 ||
+        Object.values(dataToBackup.knowledgeBase || {}).some(arr => arr?.length > 0);
+
+      if (hasContent) {
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(dataToBackup));
+        localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
+        console.log("Backup saved to localStorage");
+      }
+    } catch (error) {
+      console.error("Error saving backup:", error);
+    }
+  };
+
+  const loadBackup = () => {
+    try {
+      const backup = localStorage.getItem(BACKUP_KEY);
+      const timestamp = localStorage.getItem(BACKUP_TIMESTAMP_KEY);
+      if (backup) {
+        return {
+          data: { ...initialData, ...JSON.parse(backup) },
+          timestamp: timestamp ? new Date(timestamp).toLocaleString('fa-IR') : 'نامشخص'
+        };
+      }
+    } catch (error) {
+      console.error("Error loading backup:", error);
+    }
+    return null;
+  };
+
+  const clearBackup = () => {
+    try {
+      localStorage.removeItem(BACKUP_KEY);
+      localStorage.removeItem(BACKUP_TIMESTAMP_KEY);
+    } catch (error) {
+      console.error("Error clearing backup:", error);
+    }
   };
 
   useEffect(() => {
@@ -811,12 +855,84 @@ export default function App() {
 
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
+            const firestoreData = docSnap.data();
             console.log("Data loaded from Firestore (shared)");
-            setData(prevData => ({...initialData, ...docSnap.data()}));
+
+            // Check if Firestore data is empty but we have a backup
+            const firestoreHasContent = firestoreData.lessons?.length > 0 ||
+              Object.values(firestoreData.knowledgeBase || {}).some(arr => arr?.length > 0);
+
+            if (!firestoreHasContent) {
+              const backup = loadBackup();
+              if (backup) {
+                console.log("Firestore is empty but backup found! Showing recovery option.");
+                setModalConfig({
+                  title: "🔄 بازیابی داده‌ها",
+                  message: `داده‌های شما در سرور خالی است، اما یک نسخه پشتیبان از تاریخ ${backup.timestamp} یافت شد. آیا می‌خواهید داده‌ها را بازیابی کنید؟`,
+                  buttons: [
+                    {
+                      label: "بازیابی کن",
+                      onClick: () => {
+                        setData(backup.data);
+                        setDoc(userDocRef, backup.data).catch(err => console.error("Error restoring backup to Firestore:", err));
+                        setModalConfig(null);
+                      },
+                      className: "bg-teal-600 text-white hover:bg-teal-700"
+                    },
+                    {
+                      label: "شروع از اول",
+                      onClick: () => {
+                        setData({...initialData, ...firestoreData});
+                        setModalConfig(null);
+                      },
+                      className: "bg-slate-200 hover:bg-slate-300"
+                    }
+                  ]
+                });
+                setData({...initialData, ...firestoreData});
+              } else {
+                setData(prevData => ({...initialData, ...firestoreData}));
+              }
+            } else {
+              setData(prevData => ({...initialData, ...firestoreData}));
+              // Save backup when we have valid data
+              saveBackup({...initialData, ...firestoreData});
+            }
           } else {
-            console.log("Creating initial document in Firestore");
-            setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
-            setData(initialData);
+            console.log("Firestore document doesn't exist - checking for backup");
+            const backup = loadBackup();
+            if (backup) {
+              console.log("Found backup! Restoring to Firestore.");
+              setModalConfig({
+                title: "🔄 بازیابی داده‌ها",
+                message: `سند در سرور یافت نشد، اما یک نسخه پشتیبان از تاریخ ${backup.timestamp} یافت شد. آیا می‌خواهید داده‌ها را بازیابی کنید؟`,
+                buttons: [
+                  {
+                    label: "بازیابی کن",
+                    onClick: () => {
+                      setData(backup.data);
+                      setDoc(userDocRef, backup.data).catch(err => console.error("Error restoring backup to Firestore:", err));
+                      setModalConfig(null);
+                    },
+                    className: "bg-teal-600 text-white hover:bg-teal-700"
+                  },
+                  {
+                    label: "شروع از اول",
+                    onClick: () => {
+                      setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
+                      setData(initialData);
+                      setModalConfig(null);
+                    },
+                    className: "bg-slate-200 hover:bg-slate-300"
+                  }
+                ]
+              });
+              setData(initialData); // Set initial while waiting for user choice
+            } else {
+              console.log("No backup found - creating initial document");
+              setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
+              setData(initialData);
+            }
           }
           setIsAuthReady(true);
         }, (error) => {
@@ -854,6 +970,7 @@ export default function App() {
     if (userId === 'local-user') {
       const handler = setTimeout(() => {
         saveToLocalStorage(dataRef.current);
+        saveBackup(dataRef.current); // Also save backup
         console.log("Data saved to localStorage");
       }, 1000);
       return () => clearTimeout(handler);
@@ -868,6 +985,10 @@ export default function App() {
 
     const handler = setTimeout(() => {
         setDoc(userDocRef, dataRef.current, { merge: true })
+            .then(() => {
+              // Save backup to localStorage after successful Firestore save
+              saveBackup(dataRef.current);
+            })
             .catch(err => console.error("Error saving data to Firestore:", err));
     }, 1000);
 
@@ -1040,7 +1161,7 @@ export default function App() {
       case 'cultural': return <CulturalInsights {...commonProps} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} />;
       case 'stats': return <ProgressCenter {...commonProps} lessons={data.lessons} journal={data.journal} knowledgeBase={data.knowledgeBase} />;
       case 'journal': return <Journal {...commonProps} entries={data.journal} />;
-      case 'settings': return <SettingsPage {...commonProps} />;
+      case 'settings': return <SettingsPage {...commonProps} firebaseServices={firebaseServices} userId={userId} />;
       case 'archivedConversations': return <ArchivedConversations {...commonProps} conversations={data.archivedConversations || []} />;
       default: return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
     }
@@ -1140,7 +1261,7 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
     );
 }
 
-function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection }) {
+function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrection, firebaseServices, userId }) {
     const [activeTab, setActiveTab] = useState('general');
     const pronunciationCorrections = data.pronunciationCorrections || [];
     const customPrompts = data.customPrompts || {};
@@ -1190,8 +1311,207 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
     const tabs = [
         { id: 'general', label: '⚙️ عمومی', icon: Settings },
         { id: 'prompts', label: '🧠 پرامپت‌ها', icon: MessageSquare },
-        { id: 'flow', label: '📊 جریان الگوریتم', icon: Activity }
+        { id: 'flow', label: '📊 جریان الگوریتم', icon: Activity },
+        { id: 'backup', label: '💾 پشتیبان‌گیری', icon: Database }
     ];
+
+    // Backup functions
+    const BACKUP_KEY = 'lebanese_dialect_app_backup';
+    const BACKUP_TIMESTAMP_KEY = 'lebanese_dialect_app_backup_timestamp';
+
+    const getBackupInfo = () => {
+        try {
+            const backup = localStorage.getItem(BACKUP_KEY);
+            const timestamp = localStorage.getItem(BACKUP_TIMESTAMP_KEY);
+            if (backup) {
+                const backupData = JSON.parse(backup);
+                return {
+                    exists: true,
+                    timestamp: timestamp ? new Date(timestamp).toLocaleString('fa-IR') : 'نامشخص',
+                    lessonsCount: backupData.lessons?.length || 0,
+                    knowledgeCount: Object.values(backupData.knowledgeBase || {}).flat().length
+                };
+            }
+        } catch (e) {
+            console.error("Error reading backup info:", e);
+        }
+        return { exists: false };
+    };
+
+    const manualBackup = () => {
+        try {
+            localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
+            localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
+            setModalConfig({
+                title: '✅ پشتیبان ذخیره شد',
+                message: `پشتیبان با ${data.lessons?.length || 0} درس و ${Object.values(data.knowledgeBase || {}).flat().length} آیتم دانش ذخیره شد.`,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-teal-500 text-white' }]
+            });
+        } catch (e) {
+            setModalConfig({
+                title: '❌ خطا',
+                message: 'خطا در ذخیره پشتیبان: ' + e.message,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-red-500 text-white' }]
+            });
+        }
+    };
+
+    const restoreFromBackup = () => {
+        try {
+            const backup = localStorage.getItem(BACKUP_KEY);
+            if (backup) {
+                const backupData = JSON.parse(backup);
+                setModalConfig({
+                    title: '⚠️ بازیابی از پشتیبان',
+                    message: 'آیا مطمئنید؟ داده‌های فعلی با پشتیبان جایگزین می‌شوند.',
+                    buttons: [
+                        { label: 'انصراف', onClick: () => setModalConfig(null), className: 'bg-slate-200' },
+                        {
+                            label: 'بازیابی کن',
+                            onClick: () => {
+                                setData(prev => ({ ...prev, ...backupData }));
+                                setModalConfig({
+                                    title: '✅ بازیابی شد',
+                                    message: 'داده‌ها با موفقیت بازیابی شدند.',
+                                    buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-teal-500 text-white' }]
+                                });
+                            },
+                            className: 'bg-teal-500 text-white'
+                        }
+                    ]
+                });
+            }
+        } catch (e) {
+            setModalConfig({
+                title: '❌ خطا',
+                message: 'خطا در بازیابی: ' + e.message,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-red-500 text-white' }]
+            });
+        }
+    };
+
+    const [backupInfo, setBackupInfo] = useState(() => getBackupInfo());
+
+    // Firebase Recovery State
+    const [alternateAppId, setAlternateAppId] = useState('');
+    const [searchingFirebase, setSearchingFirebase] = useState(false);
+    const [firebaseSearchResult, setFirebaseSearchResult] = useState(null);
+    const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const SHARED_USER_ID = 'shared-user-mahdi';
+
+    const searchFirebasePath = async (appIdToSearch) => {
+        if (!firebaseServices?.db || !appIdToSearch.trim()) {
+            setModalConfig({
+                title: '❌ خطا',
+                message: 'لطفاً یک App ID وارد کنید',
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-slate-200' }]
+            });
+            return;
+        }
+
+        setSearchingFirebase(true);
+        setFirebaseSearchResult(null);
+
+        try {
+            const { doc, getDoc } = await import('firebase/firestore');
+            const searchPath = `/artifacts/${appIdToSearch.trim()}/users/${SHARED_USER_ID}/data/main`;
+            const docRef = doc(firebaseServices.db, searchPath);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const foundData = docSnap.data();
+                const hasContent = foundData.lessons?.length > 0 ||
+                    Object.values(foundData.knowledgeBase || {}).some(arr => arr?.length > 0);
+
+                setFirebaseSearchResult({
+                    found: true,
+                    hasContent,
+                    path: searchPath,
+                    appId: appIdToSearch.trim(),
+                    data: foundData,
+                    lessonsCount: foundData.lessons?.length || 0,
+                    knowledgeCount: Object.values(foundData.knowledgeBase || {}).flat().length
+                });
+            } else {
+                setFirebaseSearchResult({
+                    found: false,
+                    path: searchPath,
+                    appId: appIdToSearch.trim()
+                });
+            }
+        } catch (error) {
+            console.error("Error searching Firebase:", error);
+            setModalConfig({
+                title: '❌ خطا در جستجو',
+                message: `خطا: ${error.message}`,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-slate-200' }]
+            });
+        } finally {
+            setSearchingFirebase(false);
+        }
+    };
+
+    const migrateFromOldPath = async () => {
+        if (!firebaseSearchResult?.data || !firebaseServices?.db) return;
+
+        try {
+            const { doc, setDoc } = await import('firebase/firestore');
+            const currentPath = `/artifacts/${currentAppId}/users/${SHARED_USER_ID}/data/main`;
+            const currentDocRef = doc(firebaseServices.db, currentPath);
+
+            // Merge old data with current data (old data takes priority for non-empty arrays)
+            const mergedData = { ...data };
+            const oldData = firebaseSearchResult.data;
+
+            // Merge lessons
+            if (oldData.lessons?.length > 0) {
+                const existingIds = new Set(mergedData.lessons?.map(l => l.id) || []);
+                const newLessons = oldData.lessons.filter(l => !existingIds.has(l.id));
+                mergedData.lessons = [...(mergedData.lessons || []), ...newLessons];
+            }
+
+            // Merge knowledge base
+            if (oldData.knowledgeBase) {
+                Object.keys(oldData.knowledgeBase).forEach(key => {
+                    if (oldData.knowledgeBase[key]?.length > 0) {
+                        const existingTerms = new Set((mergedData.knowledgeBase?.[key] || []).map(i => i.term));
+                        const newItems = oldData.knowledgeBase[key].filter(i => !existingTerms.has(i.term));
+                        mergedData.knowledgeBase = mergedData.knowledgeBase || {};
+                        mergedData.knowledgeBase[key] = [...(mergedData.knowledgeBase[key] || []), ...newItems];
+                    }
+                });
+            }
+
+            // Merge journal
+            if (oldData.journal?.length > 0) {
+                const existingIds = new Set(mergedData.journal?.map(j => j.id) || []);
+                const newEntries = oldData.journal.filter(j => !existingIds.has(j.id));
+                mergedData.journal = [...(mergedData.journal || []), ...newEntries];
+            }
+
+            // Merge chat histories
+            if (oldData.chatHistories) {
+                mergedData.chatHistories = { ...mergedData.chatHistories, ...oldData.chatHistories };
+            }
+
+            // Save to Firebase and local state
+            await setDoc(currentDocRef, mergedData, { merge: true });
+            setData(mergedData);
+
+            setModalConfig({
+                title: '✅ انتقال موفق',
+                message: `داده‌ها با موفقیت منتقل شدند!\n- ${firebaseSearchResult.lessonsCount} درس\n- ${firebaseSearchResult.knowledgeCount} آیتم دانش`,
+                buttons: [{ label: 'عالی!', onClick: () => { setModalConfig(null); setFirebaseSearchResult(null); }, className: 'bg-teal-500 text-white' }]
+            });
+        } catch (error) {
+            console.error("Error migrating data:", error);
+            setModalConfig({
+                title: '❌ خطا در انتقال',
+                message: `خطا: ${error.message}`,
+                buttons: [{ label: 'باشه', onClick: () => setModalConfig(null), className: 'bg-slate-200' }]
+            });
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -1296,6 +1616,190 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
             {/* Flow Visualization Tab */}
             {activeTab === 'flow' && (
                 <FlowVisualization />
+            )}
+
+            {/* Backup Tab */}
+            {activeTab === 'backup' && (
+                <div className="space-y-6">
+                    <div className="bg-gradient-to-r from-blue-500 to-teal-600 text-white p-4 rounded-xl">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <Database size={24} /> سیستم پشتیبان‌گیری
+                        </h3>
+                        <p className="text-blue-100 text-sm mt-1">
+                            از داده‌های خود نسخه پشتیبان بگیرید تا در صورت از دست رفتن داده‌ها بتوانید آنها را بازیابی کنید.
+                        </p>
+                    </div>
+
+                    {/* Current Data Info */}
+                    <Card title="📊 وضعیت فعلی داده‌ها">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="bg-teal-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-teal-600">{data.lessons?.length || 0}</div>
+                                <div className="text-sm text-slate-600">درس</div>
+                            </div>
+                            <div className="bg-blue-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-blue-600">{data.knowledgeBase?.vocabulary?.length || 0}</div>
+                                <div className="text-sm text-slate-600">لغت</div>
+                            </div>
+                            <div className="bg-purple-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-purple-600">{data.knowledgeBase?.grammar?.length || 0}</div>
+                                <div className="text-sm text-slate-600">گرامر</div>
+                            </div>
+                            <div className="bg-orange-50 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-orange-600">{data.journal?.length || 0}</div>
+                                <div className="text-sm text-slate-600">فعالیت</div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Backup Status */}
+                    <Card title="💾 وضعیت پشتیبان">
+                        {backupInfo.exists ? (
+                            <div className="space-y-4">
+                                <div className="bg-green-50 border border-green-200 p-4 rounded-xl">
+                                    <div className="flex items-center gap-2 text-green-700 font-bold mb-2">
+                                        <CheckCircle size={20} /> پشتیبان موجود است
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-slate-500">تاریخ:</span>
+                                            <span className="mr-2 font-bold">{backupInfo.timestamp}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">تعداد دروس:</span>
+                                            <span className="mr-2 font-bold">{backupInfo.lessonsCount}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-500">آیتم‌های دانش:</span>
+                                            <span className="mr-2 font-bold">{backupInfo.knowledgeCount}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { manualBackup(); setBackupInfo(getBackupInfo()); }}
+                                        className="flex-1 bg-blue-500 text-white py-3 rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2"
+                                    >
+                                        <Save size={20} /> ذخیره پشتیبان جدید
+                                    </button>
+                                    <button
+                                        onClick={restoreFromBackup}
+                                        className="flex-1 bg-teal-500 text-white py-3 rounded-xl font-bold hover:bg-teal-600 flex items-center justify-center gap-2"
+                                    >
+                                        <RefreshCw size={20} /> بازیابی از پشتیبان
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
+                                    <div className="flex items-center gap-2 text-yellow-700 font-bold">
+                                        <AlertCircle size={20} /> هیچ پشتیبانی یافت نشد
+                                    </div>
+                                    <p className="text-sm text-yellow-600 mt-1">
+                                        هنوز نسخه پشتیبانی ذخیره نشده. توصیه می‌شود همین الان یک پشتیبان بگیرید.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { manualBackup(); setBackupInfo(getBackupInfo()); }}
+                                    className="w-full bg-blue-500 text-white py-3 rounded-xl font-bold hover:bg-blue-600 flex items-center justify-center gap-2"
+                                >
+                                    <Save size={20} /> ذخیره پشتیبان
+                                </button>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Auto Backup Info */}
+                    <Card title="ℹ️ پشتیبان‌گیری خودکار">
+                        <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-800">
+                            <p className="font-bold mb-2">سیستم پشتیبان‌گیری خودکار فعال است:</p>
+                            <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                <li>هر بار که داده‌ها تغییر کنند، به صورت خودکار پشتیبان گرفته می‌شود</li>
+                                <li>اگر داده‌های سرور خالی باشد، امکان بازیابی از پشتیبان داده می‌شود</li>
+                                <li>پشتیبان در حافظه مرورگر (localStorage) ذخیره می‌شود</li>
+                                <li>اگر مرورگر یا دستگاه تغییر کنید، پشتیبان در دسترس نخواهد بود</li>
+                            </ul>
+                        </div>
+                    </Card>
+
+                    {/* Firebase Recovery Tool */}
+                    {firebaseServices?.db && (
+                        <Card title="🔥 بازیابی از Firebase">
+                            <div className="space-y-4">
+                                <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl">
+                                    <p className="text-sm text-orange-800 mb-2">
+                                        اگر داده‌های شما در مسیر دیگری در Firebase ذخیره شده، می‌توانید آنها را جستجو و منتقل کنید.
+                                    </p>
+                                    <div className="text-xs text-orange-600 bg-orange-100 p-2 rounded font-mono">
+                                        مسیر فعلی: /artifacts/<strong>{currentAppId}</strong>/users/{SHARED_USER_ID}/data/main
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="App ID قدیمی را وارد کنید..."
+                                        value={alternateAppId}
+                                        onChange={e => setAlternateAppId(e.target.value)}
+                                        className="flex-1 p-3 border rounded-xl text-sm"
+                                        dir="ltr"
+                                    />
+                                    <button
+                                        onClick={() => searchFirebasePath(alternateAppId)}
+                                        disabled={searchingFirebase || !alternateAppId.trim()}
+                                        className="px-4 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {searchingFirebase ? <Loader className="animate-spin" size={18} /> : <Search size={18} />}
+                                        جستجو
+                                    </button>
+                                </div>
+
+                                {/* Search Result */}
+                                {firebaseSearchResult && (
+                                    <div className={`p-4 rounded-xl border ${firebaseSearchResult.found && firebaseSearchResult.hasContent ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                        {firebaseSearchResult.found && firebaseSearchResult.hasContent ? (
+                                            <div className="space-y-3">
+                                                <div className="flex items-center gap-2 text-green-700 font-bold">
+                                                    <CheckCircle size={20} /> داده پیدا شد!
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    <div className="bg-white p-2 rounded">
+                                                        <span className="text-slate-500">دروس:</span>
+                                                        <span className="mr-2 font-bold text-green-600">{firebaseSearchResult.lessonsCount}</span>
+                                                    </div>
+                                                    <div className="bg-white p-2 rounded">
+                                                        <span className="text-slate-500">دانش:</span>
+                                                        <span className="mr-2 font-bold text-green-600">{firebaseSearchResult.knowledgeCount}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={migrateFromOldPath}
+                                                    className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 flex items-center justify-center gap-2"
+                                                >
+                                                    <Download size={20} /> انتقال به مسیر فعلی
+                                                </button>
+                                            </div>
+                                        ) : firebaseSearchResult.found ? (
+                                            <div className="flex items-center gap-2 text-yellow-700">
+                                                <AlertCircle size={20} /> سند پیدا شد اما خالی است
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-red-700">
+                                                <X size={20} /> داده‌ای در این مسیر یافت نشد
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                                    <strong>راهنما:</strong> App ID معمولاً یک رشته طولانی مثل <code className="bg-slate-200 px-1 rounded">abc123xyz-...</code> است.
+                                    می‌توانید از کنسول Firebase در بخش Firestore لیست artifacts را ببینید.
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+                </div>
             )}
         </div>
     );
@@ -4152,6 +4656,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const [customScenarioDetails, setCustomScenarioDetails] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false); // Ref to track recording state in async callbacks
+  const recordingStartPendingRef = useRef(false); // Prevent duplicate recording starts
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -4382,8 +4888,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
     // Build contents for API - transcribe audio first if needed
     let contentsForApi = [];
-    for (const m of newHistory) {
+    let historyNeedsUpdate = false;
+
+    for (let i = 0; i < newHistory.length; i++) {
+      const m = newHistory[i];
       if (m.parts[0].type === 'audio' && m.parts[0].audioUrl) {
+        // Skip if already transcribed
+        if (m.parts[0].transcribedText) {
+          contentsForApi.push({ role: m.role, parts: [{ text: `[پیام صوتی کاربر]: ${m.parts[0].transcribedText}` }] });
+          continue;
+        }
+
         // Transcribe audio to text first
         setCurrentNode('audioTranscription');
         try {
@@ -4414,10 +4929,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           if (transcribeResponse.ok) {
             const transcribeData = await transcribeResponse.json();
             const transcribedText = transcribeData.candidates?.[0]?.content?.parts?.[0]?.text || '[پیام صوتی]';
-            // Update the message in history with transcribed text
-            m.parts[0].transcribedText = transcribedText;
-            // Update chat history to show transcription
-            setChatHistory([...newHistory]);
+            // Update the message in history with transcribed text (immutable update)
+            newHistory = newHistory.map((msg, idx) =>
+              idx === i ? { ...msg, parts: [{ ...msg.parts[0], transcribedText }] } : msg
+            );
+            historyNeedsUpdate = true;
             contentsForApi.push({ role: m.role, parts: [{ text: `[پیام صوتی کاربر]: ${transcribedText}` }] });
           } else {
             contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی - خطا در تبدیل]' }] });
@@ -4431,6 +4947,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       } else if (m.parts[0].text?.trim()) {
         contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
       }
+    }
+
+    // Update chat history once after all transcriptions are done (not inside loop)
+    if (historyNeedsUpdate) {
+      setChatHistory([...newHistory]);
     }
 
     const payload = { contents: contentsForApi, systemInstruction: { parts: [{ text: systemPrompt }] } };
@@ -4503,33 +5024,35 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             currentAudioRef.current = audio;
 
             const beepDelay = defaultChatSettings.voiceConversationBeepDelay || 500;
+            let recordingTriggered = false; // Local flag to prevent duplicate recording starts
+
+            const triggerNextRecording = async () => {
+                // Prevent duplicate triggers from both onended and error handlers
+                if (recordingTriggered) return;
+                if (!voiceConversationModeRef.current) return;
+                if (isRecordingRef.current || recordingStartPendingRef.current) return;
+
+                recordingTriggered = true;
+                recordingStartPendingRef.current = true;
+
+                setTimeout(async () => {
+                    // Double-check all conditions before starting
+                    if (voiceConversationModeRef.current && !isRecordingRef.current) {
+                        await playBeepSound(800, 150);
+                        startVoiceRecording(true);
+                    }
+                    recordingStartPendingRef.current = false;
+                }, beepDelay);
+            };
 
             audio.onended = async () => {
                 currentAudioRef.current = null;
-                // Auto-start recording if voice conversation mode is still active (use ref to avoid stale closure)
-                if (voiceConversationModeRef.current) {
-                    // Wait for beep delay, then play beep, then start recording
-                    setTimeout(async () => {
-                        // Double-check ref before starting (user might have turned off mode during delay)
-                        if (voiceConversationModeRef.current) {
-                            await playBeepSound(800, 150); // Play beep sound
-                            startVoiceRecording(true); // Pass true for voice conversation mode
-                        }
-                    }, beepDelay);
-                }
+                await triggerNextRecording();
             };
 
             audio.play().catch(async err => {
                 console.error('Audio playback error:', err);
-                // Still try to start recording if in voice conversation mode (use ref)
-                if (voiceConversationModeRef.current) {
-                    setTimeout(async () => {
-                        if (voiceConversationModeRef.current) {
-                            await playBeepSound(800, 150);
-                            startVoiceRecording(true); // Pass true for voice conversation mode
-                        }
-                    }, beepDelay);
-                }
+                await triggerNextRecording();
             });
         }
     } catch(error) {
@@ -4571,7 +5094,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // useVoiceConversation parameter overrides the state check for immediate use when toggling
   const startVoiceRecording = async (useVoiceConversation = false) => {
     const isVoiceConvMode = useVoiceConversation || voiceConversationMode;
-    if (isRecording || isLoading) return;
+    // Use both state and ref to prevent race conditions
+    if (isRecording || isRecordingRef.current || isLoading) return;
 
     // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -4666,6 +5190,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
       mediaRecorderRef.current.onstop = () => {
         // Important: Reset recording state first so next recording can start
+        isRecordingRef.current = false;
         setIsRecording(false);
 
         // Cleanup silence detection
@@ -4704,6 +5229,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
+        isRecordingRef.current = false;
         setIsRecording(false);
         if (voiceConversationMode) {
           voiceConversationModeRef.current = false;
@@ -4713,6 +5239,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       };
 
       mediaRecorderRef.current.start();
+      isRecordingRef.current = true;
       setIsRecording(true);
     } catch (err) {
       console.error('Microphone error:', err);
@@ -4746,6 +5273,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
+    isRecordingRef.current = false;
     setIsRecording(false);
   };
 
