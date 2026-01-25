@@ -1064,9 +1064,9 @@ export default function App() {
     });
   };
 
-  const saveChatHistory = (context, history) => {
+  const saveChatHistory = useCallback((context, history) => {
     setData(prev => ({ ...prev, chatHistories: { ...prev.chatHistories, [context]: history } }));
-  };
+  }, []);
 
   const addJournalEntry = (entry) => {
     const newEntry = { id: Date.now(), date: new Date().toISOString(), entry };
