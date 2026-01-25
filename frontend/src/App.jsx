@@ -4628,57 +4628,55 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus
   } = useLiveChat();
 
-  // Auto-minimize chats when leaving this page (unmounting) and cleanup all resources
+  // Cleanup when component unmounts (NOT when dependencies change)
+  // Using empty deps to only run on actual unmount
   useEffect(() => {
     return () => {
       // Generate new session ID so any in-flight responses will be ignored
       sessionIdRef.current = Date.now();
 
-      // Stop any ongoing audio playback
+      // DON'T pause audio here - let it finish playing
+      // Just clear the onended handler to prevent triggering new recordings
       if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
         currentAudioRef.current.onended = null;
-        currentAudioRef.current = null;
       }
 
       // Stop MediaRecorder if recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
-      mediaRecorderRef.current = null;
 
       // Stop stream tracks
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
       }
 
       // Cleanup silence detection
       if (silenceCheckIntervalRef.current) {
         clearInterval(silenceCheckIntervalRef.current);
-        silenceCheckIntervalRef.current = null;
       }
       if (silenceTimeoutRef.current) {
         clearTimeout(silenceTimeoutRef.current);
-        silenceTimeoutRef.current = null;
       }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
       }
 
       // Reset voice conversation mode
       voiceConversationModeRef.current = false;
       isRecordingRef.current = false;
       recordingStartPendingRef.current = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      // When ChatInterface unmounts and live chat is active, minimize it
+  // Separate effect for minimizing chats when leaving the page
+  useEffect(() => {
+    return () => {
       if (isLiveChatActive) {
         minimizeLiveChat();
       }
-      // When ChatInterface unmounts and voice conversation is active, minimize it
       if (isVoiceConvActive) {
-        // Save current chat history before minimizing so it persists
         saveChatHistory(context, chatHistoryRef.current);
         minimizeVoiceConv();
       }
