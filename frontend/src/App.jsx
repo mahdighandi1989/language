@@ -4631,11 +4631,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Auto-minimize chats when leaving this page (unmounting) and cleanup all resources
   useEffect(() => {
     return () => {
-      // CRITICAL: Cancel any pending API requests to prevent stale responses
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      // Generate new session ID so any in-flight responses will be ignored
+      sessionIdRef.current = Date.now();
 
       // Stop any ongoing audio playback
       if (currentAudioRef.current) {
@@ -4696,12 +4693,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         // Generate new session ID to invalidate any stale responses from before navigation
         sessionIdRef.current = Date.now();
 
-        // Cancel any pending requests that might be leftover
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-          abortControllerRef.current = null;
-        }
-
         voiceConversationModeRef.current = true;
         setVoiceConversationMode(true);
         // Don't auto-start recording, let user continue naturally
@@ -4727,8 +4718,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
   const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
   const currentAudioRef = useRef(null);
-  const abortControllerRef = useRef(null); // AbortController for canceling pending API requests
-  const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses
+  const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses from triggering new recordings
 
   // Silence detection refs for voice conversation mode
   const audioContextRef = useRef(null);
@@ -4886,15 +4876,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     const messageText = textToSend || input;
     if ((!messageText.trim() && !attachedFile && !audioBlobUrl) || isLoading) return;
 
-    // Cancel any previous pending request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    // Create new AbortController for this request
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    // Track session ID to detect stale responses
+    // Track session ID to detect stale responses (for voice conversation loop prevention)
     const currentSessionId = sessionIdRef.current;
 
     // Track flow: User input received
@@ -4973,12 +4955,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         // Transcribe audio to text first
         setCurrentNode('audioTranscription');
         try {
-          // Check if abort was requested
-          if (abortController.signal.aborted) {
-            console.log('Transcription aborted');
-            return;
-          }
-
           const response = await fetch(m.parts[0].audioUrl);
           if (!response.ok) {
             throw new Error(`Blob fetch failed: ${response.status}`);
@@ -4989,12 +4965,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             reader.onloadend = () => resolve(reader.result.split(',')[1]);
             reader.readAsDataURL(blob);
           });
-
-          // Check again if abort was requested
-          if (abortController.signal.aborted) {
-            console.log('Transcription aborted after blob fetch');
-            return;
-          }
 
           // Call Gemini to transcribe the audio
           const transcribeResponse = await fetch('/api/gemini/chat', {
@@ -5009,8 +4979,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                 ]
               }],
               includeAudio: true
-            }),
-            signal: abortController.signal
+            })
           });
 
           if (transcribeResponse.ok) {
@@ -5026,23 +4995,13 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی - خطا در تبدیل]' }] });
           }
         } catch (e) {
-          // Handle AbortError silently
-          if (e.name === 'AbortError') {
-            console.log('Transcription request aborted');
-            return;
-          }
           console.error('Error transcribing audio:', e);
-          // For expired/invalid blob URLs, use text if available, otherwise skip with placeholder
-          if (m.parts[0].text?.trim() && m.parts[0].text !== '[پیام صوتی]') {
-            contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
-          } else {
-            // Mark as transcription failed so we don't keep retrying invalid blob URLs
-            newHistory = newHistory.map((msg, idx) =>
-              idx === i ? { ...msg, parts: [{ ...msg.parts[0], transcribedText: '[پیام صوتی قدیمی]' }] } : msg
-            );
-            historyNeedsUpdate = true;
-            contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی قدیمی]' }] });
-          }
+          // For expired/invalid blob URLs, mark as old audio so we don't retry
+          newHistory = newHistory.map((msg, idx) =>
+            idx === i ? { ...msg, parts: [{ ...msg.parts[0], transcribedText: '[پیام صوتی قدیمی]' }] } : msg
+          );
+          historyNeedsUpdate = true;
+          contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی قدیمی]' }] });
         }
       } else if (m.parts[0].text?.trim()) {
         contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
@@ -5059,11 +5018,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     try {
         // Track flow: Calling Gemini API
         setCurrentNode('callingGemini');
-        let aiResponseText = await callGeminiAPI(payload, 3, 1000, abortController.signal);
+        let aiResponseText = await callGeminiAPI(payload);
 
-        // Check if request was aborted or session changed (stale response)
-        if (abortController.signal.aborted || currentSessionId !== sessionIdRef.current) {
-          console.log('Request aborted or session changed, discarding response');
+        // Check if session changed (stale response - user navigated away and back)
+        if (currentSessionId !== sessionIdRef.current) {
+          console.log('Session changed, discarding stale response');
           return;
         }
 
@@ -5114,12 +5073,12 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             setCurrentNode('generatingTTS');
         }
 
-        const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice, abortController.signal) : Promise.resolve(null);
+        const audioPromise = (aiResponseType === 'audio' || voiceConversationMode) ? callGeminiTTS(ttsPrompt, aiVoice) : Promise.resolve(null);
         const audioResult = await audioPromise;
 
-        // Check again after TTS call if request was aborted or session changed
-        if (abortController.signal.aborted || currentSessionId !== sessionIdRef.current) {
-          console.log('Request aborted after TTS or session changed, discarding response');
+        // Check again after TTS if session changed
+        if (currentSessionId !== sessionIdRef.current) {
+          console.log('Session changed after TTS, discarding response');
           return;
         }
 
@@ -5411,14 +5370,10 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Toggle voice conversation mode
   const toggleVoiceConversationMode = () => {
     if (voiceConversationMode) {
-      // Turning off - stop any ongoing audio/recording and cancel pending requests
+      // Turning off - stop any ongoing audio/recording
       voiceConversationModeRef.current = false;
-
-      // Cancel any pending API requests
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      // Generate new session ID so any pending responses will be ignored
+      sessionIdRef.current = Date.now();
 
       cleanupSilenceDetection();
       if (currentAudioRef.current) {
@@ -5432,12 +5387,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       closeVoiceConv();
     } else {
       // Turning on - start voice conversation mode and begin recording
-
-      // Cancel any pending requests from previous session
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
       // Generate new session ID to invalidate any stale responses
       sessionIdRef.current = Date.now();
 
