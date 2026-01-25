@@ -4690,9 +4690,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (isVoiceConvActive && !isVoiceConvMinimized && voiceConvConfig?.context === context) {
       // Returning to the page where voice conversation was active
       if (!voiceConversationModeRef.current) {
-        // Generate new session ID to invalidate any stale responses from before navigation
-        sessionIdRef.current = Date.now();
-
         voiceConversationModeRef.current = true;
         setVoiceConversationMode(true);
         // Don't auto-start recording, let user continue naturally
@@ -5372,8 +5369,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (voiceConversationMode) {
       // Turning off - stop any ongoing audio/recording
       voiceConversationModeRef.current = false;
-      // Generate new session ID so any pending responses will be ignored
-      sessionIdRef.current = Date.now();
 
       cleanupSilenceDetection();
       if (currentAudioRef.current) {
@@ -5387,9 +5382,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       closeVoiceConv();
     } else {
       // Turning on - start voice conversation mode and begin recording
-      // Generate new session ID to invalidate any stale responses
-      sessionIdRef.current = Date.now();
-
       voiceConversationModeRef.current = true;
       setVoiceConversationMode(true);
       // Pass true to indicate voice conversation mode since state hasn't updated yet
