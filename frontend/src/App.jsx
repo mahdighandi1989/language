@@ -189,6 +189,11 @@ function useLiveChat() {
       shouldAutoStartRecording: false,
       markAudioFinishedWhileMinimized: () => {},
       clearAutoStartRecording: () => {},
+      voiceConvChatHistory: [],
+      voiceConvAudioRef: { current: null },
+      voiceConvActiveRef: { current: false },
+      saveVoiceConvState: () => {},
+      updateVoiceConvChatHistory: () => {},
     };
   }
   return context;
@@ -211,6 +216,9 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     isLoading: false,
   });
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false); // Track if audio finished while minimized
+  const [voiceConvChatHistory, setVoiceConvChatHistory] = useState([]); // Chat history for minimized voice conv
+  const voiceConvAudioRef = useRef(null); // Reference to current audio for minimized mode
+  const voiceConvActiveRef = useRef(false); // Track if voice conv is active for async callbacks
 
   // ===== Live Chat Functions =====
   const openLiveChat = useCallback((config) => {
@@ -242,11 +250,18 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
   }, []);
 
   const closeVoiceConv = useCallback(() => {
+    // Stop any playing audio
+    if (voiceConvAudioRef.current) {
+      voiceConvAudioRef.current.pause();
+      voiceConvAudioRef.current.onended = null;
+      voiceConvAudioRef.current = null;
+    }
     setIsVoiceConvActive(false);
     setIsVoiceConvMinimized(false);
     setVoiceConvConfig(null);
     setVoiceConvStatus({ isRecording: false, isPlaying: false, isLoading: false });
     setShouldAutoStartRecording(false); // Clear auto-start flag
+    setVoiceConvChatHistory([]); // Clear chat history
   }, []);
 
   const minimizeVoiceConv = useCallback(() => {
@@ -270,6 +285,22 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
   const clearAutoStartRecording = useCallback(() => {
     setShouldAutoStartRecording(false);
   }, []);
+
+  // Save voice conv state when minimizing (for continuation in floating widget)
+  const saveVoiceConvState = useCallback((chatHistory, audio) => {
+    setVoiceConvChatHistory(chatHistory);
+    voiceConvAudioRef.current = audio;
+  }, []);
+
+  // Update voice conv chat history (used by floating widget)
+  const updateVoiceConvChatHistory = useCallback((updater) => {
+    setVoiceConvChatHistory(prev => typeof updater === 'function' ? updater(prev) : updater);
+  }, []);
+
+  // Keep activeRef synced
+  useEffect(() => {
+    voiceConvActiveRef.current = isVoiceConvActive;
+  }, [isVoiceConvActive]);
 
   const value = useMemo(() => ({
     // Live chat
@@ -295,6 +326,11 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     shouldAutoStartRecording,
     markAudioFinishedWhileMinimized,
     clearAutoStartRecording,
+    voiceConvChatHistory,
+    voiceConvAudioRef,
+    voiceConvActiveRef,
+    saveVoiceConvState,
+    updateVoiceConvChatHistory,
     // Shared
     data,
     setData,
@@ -306,6 +342,7 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     isLiveChatActive, isMinimized, liveChatConfig, chatHistory, openLiveChat, closeLiveChat, minimizeLiveChat, maximizeLiveChat,
     isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, voiceConvStatus, openVoiceConv, closeVoiceConv, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
     shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording,
+    voiceConvChatHistory, saveVoiceConvState, updateVoiceConvChatHistory,
     data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory, navigateTo
   ]);
 
@@ -4645,7 +4682,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const {
     openLiveChat, isLiveChatActive, minimizeLiveChat,
     openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
-    shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording
+    shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording,
+    saveVoiceConvState, voiceConvAudioRef
   } = useLiveChat();
 
   // Cleanup when component unmounts (NOT when dependencies change)
@@ -4717,10 +4755,12 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       }
       if (isVoiceConvActive) {
         saveChatHistory(context, chatHistoryRef.current);
+        // Save state to provider so FloatingVoiceConvWidget can continue
+        saveVoiceConvState(chatHistoryRef.current, currentAudioRef.current);
         minimizeVoiceConv();
       }
     };
-  }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv, context, saveChatHistory]);
+  }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv, context, saveChatHistory, saveVoiceConvState]);
 
   // Keep refs synced with global voice conv state (for cleanup and onended handler decisions)
   const markAudioFinishedWhileMinimizedRef = useRef(markAudioFinishedWhileMinimized);
@@ -5950,7 +5990,7 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
     );
 }
 
-// --- Floating Voice Conversation Widget (minimized view for voice conv mode) ---
+// --- Floating Voice Conversation Widget (minimized view with conversation continuation) ---
 function FloatingVoiceConvWidget() {
   const {
     isVoiceConvActive,
@@ -5959,8 +5999,312 @@ function FloatingVoiceConvWidget() {
     voiceConvStatus,
     maximizeVoiceConv,
     closeVoiceConv,
-    navigateTo
+    navigateTo,
+    updateVoiceConvStatus,
+    voiceConvChatHistory,
+    voiceConvAudioRef,
+    voiceConvActiveRef,
+    updateVoiceConvChatHistory,
+    data
   } = useLiveChat();
+
+  // Refs for voice conversation continuation
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const currentAudioRef = useRef(null);
+  const isRecordingRef = useRef(false);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const silenceCheckIntervalRef = useRef(null);
+  const hasSpokenRef = useRef(false);
+  const isProcessingRef = useRef(false);
+  const startRecordingRef = useRef(null); // Ref to avoid circular dependency
+  const processRecordingRef = useRef(null); // Ref to get latest processRecording
+
+  const { defaultChatSettings = {} } = data || {};
+
+  // Cleanup function
+  const cleanupRecording = useCallback(() => {
+    if (silenceCheckIntervalRef.current) {
+      clearInterval(silenceCheckIntervalRef.current);
+      silenceCheckIntervalRef.current = null;
+    }
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    isRecordingRef.current = false;
+  }, []);
+
+  // Start recording in minimized mode
+  const startMinimizedRecording = useCallback(async () => {
+    if (isRecordingRef.current || isProcessingRef.current || !voiceConvActiveRef.current) {
+      console.log('FloatingWidget: Cannot start recording - already recording or processing');
+      return;
+    }
+
+    console.log('FloatingWidget: Starting recording');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        console.log('FloatingWidget: Recording stopped, processing...');
+        if (audioChunksRef.current.length === 0 || !voiceConvActiveRef.current) {
+          cleanupRecording();
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (processRecordingRef.current) {
+          await processRecordingRef.current(audioBlob);
+        }
+      };
+
+      // Setup silence detection
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      source.connect(analyserRef.current);
+
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      hasSpokenRef.current = false;
+
+      const silenceThreshold = defaultChatSettings.silenceThreshold || 10;
+      const silenceDuration = defaultChatSettings.silenceDuration || 1500;
+
+      silenceCheckIntervalRef.current = setInterval(() => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const average = dataArray.reduce((a, b) => a + b, 0) / bufferLength;
+
+        if (average > silenceThreshold) {
+          hasSpokenRef.current = true;
+          if (silenceTimeoutRef.current) {
+            clearTimeout(silenceTimeoutRef.current);
+            silenceTimeoutRef.current = null;
+          }
+        } else if (hasSpokenRef.current && !silenceTimeoutRef.current) {
+          silenceTimeoutRef.current = setTimeout(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+              console.log('FloatingWidget: Silence detected, stopping recording');
+              mediaRecorderRef.current.stop();
+            }
+          }, silenceDuration);
+        }
+      }, 100);
+
+      mediaRecorder.start();
+      isRecordingRef.current = true;
+      updateVoiceConvStatus({ isRecording: true, isPlaying: false, isLoading: false });
+      await playBeepSound(800, 150);
+
+    } catch (err) {
+      console.error('FloatingWidget: Microphone error:', err);
+      cleanupRecording();
+      updateVoiceConvStatus({ isRecording: false });
+    }
+  }, [cleanupRecording, defaultChatSettings, updateVoiceConvStatus]);
+
+  // Keep ref updated to avoid circular dependency
+  useEffect(() => {
+    startRecordingRef.current = startMinimizedRecording;
+  }, [startMinimizedRecording]);
+
+  // Process recording and get AI response (defined first, then ref is set)
+  // Note: processRecordingRef is set after processRecording is defined below
+
+  // Process recording and get AI response
+  const processRecording = useCallback(async (audioBlob) => {
+    if (!voiceConvActiveRef.current) {
+      cleanupRecording();
+      return;
+    }
+
+    isProcessingRef.current = true;
+    isRecordingRef.current = false;
+    updateVoiceConvStatus({ isRecording: false, isLoading: true });
+    cleanupRecording();
+
+    try {
+      // Convert audio to base64
+      const reader = new FileReader();
+      const audioBase64 = await new Promise((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
+
+      // Build chat history for API
+      const currentHistory = voiceConvChatHistory || [];
+      const userMessage = {
+        role: 'user',
+        parts: [{ inlineData: { mimeType: 'audio/webm', data: audioBase64 } }]
+      };
+
+      // Build system prompt
+      const customPrompts = data?.customPrompts || {};
+      const systemPrompt = `${customPrompts.chatBase || "You are Jad, a friendly Lebanese Arabic tutor."}\n${customPrompts.liveVoiceRules || ""}\n${customPrompts.chatTashkeel || ""}`;
+
+      // Call API
+      const payload = {
+        history: [...currentHistory, userMessage],
+        systemPrompt,
+        userMessage: '[Voice input from user]',
+        writingStyle: defaultChatSettings.writingStyle || 'tashkeel'
+      };
+
+      const textResponse = await callGeminiAPI(payload);
+
+      if (!voiceConvActiveRef.current) {
+        isProcessingRef.current = false;
+        return;
+      }
+
+      // Update chat history
+      const aiMessage = { role: 'model', parts: [{ text: textResponse, type: 'text' }] };
+      const newHistory = [...currentHistory, userMessage, aiMessage];
+      updateVoiceConvChatHistory(newHistory);
+
+      // Get TTS
+      const voiceName = defaultChatSettings.aiVoice || 'Charon';
+      const ttsResult = await callGeminiTTS(textResponse, voiceName);
+
+      if (!voiceConvActiveRef.current || !ttsResult) {
+        isProcessingRef.current = false;
+        updateVoiceConvStatus({ isLoading: false });
+        return;
+      }
+
+      // Play audio response
+      const audioUrl = getWavUrl(ttsResult.audioData, ttsResult.mimeType);
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      voiceConvAudioRef.current = audio;
+
+      audio.onended = () => {
+        currentAudioRef.current = null;
+        voiceConvAudioRef.current = null;
+        URL.revokeObjectURL(audioUrl);
+        updateVoiceConvStatus({ isPlaying: false });
+        isProcessingRef.current = false;
+
+        // Continue conversation if still active and minimized
+        if (voiceConvActiveRef.current && isVoiceConvMinimized) {
+          setTimeout(() => {
+            if (voiceConvActiveRef.current && isVoiceConvMinimized && startRecordingRef.current) {
+              startRecordingRef.current();
+            }
+          }, defaultChatSettings.voiceConversationBeepDelay || 500);
+        }
+      };
+
+      audio.onerror = () => {
+        currentAudioRef.current = null;
+        voiceConvAudioRef.current = null;
+        updateVoiceConvStatus({ isPlaying: false, isLoading: false });
+        isProcessingRef.current = false;
+      };
+
+      updateVoiceConvStatus({ isLoading: false, isPlaying: true });
+      audio.play().catch(err => {
+        console.error('FloatingWidget: Audio play error:', err);
+        isProcessingRef.current = false;
+      });
+
+    } catch (err) {
+      console.error('FloatingWidget: Error processing recording:', err);
+      updateVoiceConvStatus({ isLoading: false });
+      isProcessingRef.current = false;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleanupRecording, voiceConvChatHistory, data, defaultChatSettings, updateVoiceConvStatus, updateVoiceConvChatHistory, isVoiceConvMinimized]);
+
+  // Keep processRecording ref updated
+  useEffect(() => {
+    processRecordingRef.current = processRecording;
+  }, [processRecording]);
+
+  // Watch for audio ending when minimized
+  useEffect(() => {
+    if (!isVoiceConvActive || !isVoiceConvMinimized) return;
+
+    const audio = voiceConvAudioRef.current;
+    if (!audio) {
+      // No audio playing, start recording if not already
+      if (!isRecordingRef.current && !isProcessingRef.current) {
+        console.log('FloatingWidget: No audio, starting recording');
+        const timer = setTimeout(() => {
+          if (voiceConvActiveRef.current && isVoiceConvMinimized && !isRecordingRef.current && !isProcessingRef.current && startRecordingRef.current) {
+            startRecordingRef.current();
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+
+    // Audio is playing, set up onended handler
+    const originalOnended = audio.onended;
+    audio.onended = () => {
+      console.log('FloatingWidget: Audio ended');
+      if (originalOnended) originalOnended();
+      voiceConvAudioRef.current = null;
+      currentAudioRef.current = null;
+      updateVoiceConvStatus({ isPlaying: false });
+
+      // Start recording after delay
+      setTimeout(() => {
+        if (voiceConvActiveRef.current && isVoiceConvMinimized && !isRecordingRef.current && !isProcessingRef.current && startRecordingRef.current) {
+          startRecordingRef.current();
+        }
+      }, defaultChatSettings.voiceConversationBeepDelay || 500);
+    };
+
+    return () => {
+      // Restore original handler if component unmounts while audio is still playing
+      if (audio && originalOnended) {
+        audio.onended = originalOnended;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVoiceConvActive, isVoiceConvMinimized, defaultChatSettings, updateVoiceConvStatus]);
+
+  // Cleanup on close
+  useEffect(() => {
+    return () => {
+      cleanupRecording();
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+    };
+  }, [cleanupRecording]);
 
   if (!isVoiceConvActive || !isVoiceConvMinimized) return null;
 
@@ -5982,6 +6326,8 @@ function FloatingVoiceConvWidget() {
 
   // Navigate back to the chat page
   const handleMaximize = () => {
+    // Stop recording before maximizing
+    cleanupRecording();
     if (voiceConvConfig?.context && navigateTo) {
       if (voiceConvConfig.context === 'global') {
         navigateTo('dashboard');
@@ -5991,6 +6337,15 @@ function FloatingVoiceConvWidget() {
       }
     }
     maximizeVoiceConv();
+  };
+
+  const handleClose = () => {
+    cleanupRecording();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    closeVoiceConv();
   };
 
   return (
@@ -6022,7 +6377,7 @@ function FloatingVoiceConvWidget() {
               </svg>
             </button>
             <button
-              onClick={closeVoiceConv}
+              onClick={handleClose}
               className="p-1.5 rounded-lg bg-red-500/50 hover:bg-red-500 text-white transition-colors"
               title="پایان گفتگو"
             >
