@@ -4152,6 +4152,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const [customScenarioDetails, setCustomScenarioDetails] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false); // Ref to track recording state in async callbacks
+  const recordingStartPendingRef = useRef(false); // Prevent duplicate recording starts
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -4382,8 +4384,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
     // Build contents for API - transcribe audio first if needed
     let contentsForApi = [];
-    for (const m of newHistory) {
+    let historyNeedsUpdate = false;
+
+    for (let i = 0; i < newHistory.length; i++) {
+      const m = newHistory[i];
       if (m.parts[0].type === 'audio' && m.parts[0].audioUrl) {
+        // Skip if already transcribed
+        if (m.parts[0].transcribedText) {
+          contentsForApi.push({ role: m.role, parts: [{ text: `[پیام صوتی کاربر]: ${m.parts[0].transcribedText}` }] });
+          continue;
+        }
+
         // Transcribe audio to text first
         setCurrentNode('audioTranscription');
         try {
@@ -4414,10 +4425,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           if (transcribeResponse.ok) {
             const transcribeData = await transcribeResponse.json();
             const transcribedText = transcribeData.candidates?.[0]?.content?.parts?.[0]?.text || '[پیام صوتی]';
-            // Update the message in history with transcribed text
-            m.parts[0].transcribedText = transcribedText;
-            // Update chat history to show transcription
-            setChatHistory([...newHistory]);
+            // Update the message in history with transcribed text (immutable update)
+            newHistory = newHistory.map((msg, idx) =>
+              idx === i ? { ...msg, parts: [{ ...msg.parts[0], transcribedText }] } : msg
+            );
+            historyNeedsUpdate = true;
             contentsForApi.push({ role: m.role, parts: [{ text: `[پیام صوتی کاربر]: ${transcribedText}` }] });
           } else {
             contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی - خطا در تبدیل]' }] });
@@ -4431,6 +4443,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       } else if (m.parts[0].text?.trim()) {
         contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
       }
+    }
+
+    // Update chat history once after all transcriptions are done (not inside loop)
+    if (historyNeedsUpdate) {
+      setChatHistory([...newHistory]);
     }
 
     const payload = { contents: contentsForApi, systemInstruction: { parts: [{ text: systemPrompt }] } };
@@ -4503,33 +4520,35 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             currentAudioRef.current = audio;
 
             const beepDelay = defaultChatSettings.voiceConversationBeepDelay || 500;
+            let recordingTriggered = false; // Local flag to prevent duplicate recording starts
+
+            const triggerNextRecording = async () => {
+                // Prevent duplicate triggers from both onended and error handlers
+                if (recordingTriggered) return;
+                if (!voiceConversationModeRef.current) return;
+                if (isRecordingRef.current || recordingStartPendingRef.current) return;
+
+                recordingTriggered = true;
+                recordingStartPendingRef.current = true;
+
+                setTimeout(async () => {
+                    // Double-check all conditions before starting
+                    if (voiceConversationModeRef.current && !isRecordingRef.current) {
+                        await playBeepSound(800, 150);
+                        startVoiceRecording(true);
+                    }
+                    recordingStartPendingRef.current = false;
+                }, beepDelay);
+            };
 
             audio.onended = async () => {
                 currentAudioRef.current = null;
-                // Auto-start recording if voice conversation mode is still active (use ref to avoid stale closure)
-                if (voiceConversationModeRef.current) {
-                    // Wait for beep delay, then play beep, then start recording
-                    setTimeout(async () => {
-                        // Double-check ref before starting (user might have turned off mode during delay)
-                        if (voiceConversationModeRef.current) {
-                            await playBeepSound(800, 150); // Play beep sound
-                            startVoiceRecording(true); // Pass true for voice conversation mode
-                        }
-                    }, beepDelay);
-                }
+                await triggerNextRecording();
             };
 
             audio.play().catch(async err => {
                 console.error('Audio playback error:', err);
-                // Still try to start recording if in voice conversation mode (use ref)
-                if (voiceConversationModeRef.current) {
-                    setTimeout(async () => {
-                        if (voiceConversationModeRef.current) {
-                            await playBeepSound(800, 150);
-                            startVoiceRecording(true); // Pass true for voice conversation mode
-                        }
-                    }, beepDelay);
-                }
+                await triggerNextRecording();
             });
         }
     } catch(error) {
@@ -4571,7 +4590,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // useVoiceConversation parameter overrides the state check for immediate use when toggling
   const startVoiceRecording = async (useVoiceConversation = false) => {
     const isVoiceConvMode = useVoiceConversation || voiceConversationMode;
-    if (isRecording || isLoading) return;
+    // Use both state and ref to prevent race conditions
+    if (isRecording || isRecordingRef.current || isLoading) return;
 
     // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -4666,6 +4686,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
       mediaRecorderRef.current.onstop = () => {
         // Important: Reset recording state first so next recording can start
+        isRecordingRef.current = false;
         setIsRecording(false);
 
         // Cleanup silence detection
@@ -4704,6 +4725,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
+        isRecordingRef.current = false;
         setIsRecording(false);
         if (voiceConversationMode) {
           voiceConversationModeRef.current = false;
@@ -4713,6 +4735,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       };
 
       mediaRecorderRef.current.start();
+      isRecordingRef.current = true;
       setIsRecording(true);
     } catch (err) {
       console.error('Microphone error:', err);
@@ -4746,6 +4769,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
+    isRecordingRef.current = false;
     setIsRecording(false);
   };
 
