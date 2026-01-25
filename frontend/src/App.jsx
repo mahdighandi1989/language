@@ -4973,13 +4973,28 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         // Transcribe audio to text first
         setCurrentNode('audioTranscription');
         try {
+          // Check if abort was requested
+          if (abortController.signal.aborted) {
+            console.log('Transcription aborted');
+            return;
+          }
+
           const response = await fetch(m.parts[0].audioUrl);
+          if (!response.ok) {
+            throw new Error(`Blob fetch failed: ${response.status}`);
+          }
           const blob = await response.blob();
           const base64 = await new Promise((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result.split(',')[1]);
             reader.readAsDataURL(blob);
           });
+
+          // Check again if abort was requested
+          if (abortController.signal.aborted) {
+            console.log('Transcription aborted after blob fetch');
+            return;
+          }
 
           // Call Gemini to transcribe the audio
           const transcribeResponse = await fetch('/api/gemini/chat', {
@@ -4994,7 +5009,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                 ]
               }],
               includeAudio: true
-            })
+            }),
+            signal: abortController.signal
           });
 
           if (transcribeResponse.ok) {
@@ -5010,9 +5026,22 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی - خطا در تبدیل]' }] });
           }
         } catch (e) {
+          // Handle AbortError silently
+          if (e.name === 'AbortError') {
+            console.log('Transcription request aborted');
+            return;
+          }
           console.error('Error transcribing audio:', e);
-          if (m.parts[0].text?.trim()) {
+          // For expired/invalid blob URLs, use text if available, otherwise skip with placeholder
+          if (m.parts[0].text?.trim() && m.parts[0].text !== '[پیام صوتی]') {
             contentsForApi.push({ role: m.role, parts: [{ text: m.parts[0].text }] });
+          } else {
+            // Mark as transcription failed so we don't keep retrying invalid blob URLs
+            newHistory = newHistory.map((msg, idx) =>
+              idx === i ? { ...msg, parts: [{ ...msg.parts[0], transcribedText: '[پیام صوتی قدیمی]' }] } : msg
+            );
+            historyNeedsUpdate = true;
+            contentsForApi.push({ role: m.role, parts: [{ text: '[پیام صوتی قدیمی]' }] });
           }
         }
       } else if (m.parts[0].text?.trim()) {
