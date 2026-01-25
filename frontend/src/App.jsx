@@ -888,7 +888,7 @@ export default function App() {
     const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection, addPronunciationCorrection };
     switch (activeView) {
       case 'dashboard': return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
-      case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} />;
+      case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} addLesson={addLesson} />;
       case 'lesson': return selectedLesson ? <LessonDetail {...commonProps} key={selectedLesson.id} lesson={selectedLesson} updateLesson={updateLesson} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} knowledgeBase={data.knowledgeBase} /> : <div>درسی انتخاب نشده است.</div>;
       case 'quiz': return <QuizCenter {...commonProps} lessons={data.lessons} />;
       case 'planner': return <ProgressCenter {...commonProps} lessons={data.lessons} journal={data.journal} knowledgeBase={data.knowledgeBase} />;
@@ -1362,6 +1362,9 @@ function FlowVisualization() {
         quiz: '📝 آزمون'
     };
 
+    // Check if actively running
+    const isRunning = activeFlow && currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error';
+
     // Filter history
     const filteredHistory = selectedFlow === 'all'
         ? flowHistory
@@ -1519,10 +1522,11 @@ function FlowVisualization() {
 
             return (
                 <g key={nodeId} transform={`translate(${node.x - 50}, ${node.y - 18})`}>
-                    {/* Glow effect for active */}
+                    {/* Glow effect for active - using custom CSS animation for stability */}
                     {isActive && (
                         <ellipse cx="50" cy="18" rx="55" ry="22"
-                            fill={color} opacity="0.3" className="animate-pulse"
+                            fill={color}
+                            className="flow-active-glow"
                         />
                     )}
 
@@ -1550,9 +1554,12 @@ function FlowVisualization() {
                         {node.label}
                     </text>
 
-                    {/* Active indicator */}
+                    {/* Active indicator - ring animation + pulsing dot */}
                     {isActive && (
-                        <circle cx="95" cy="5" r="5" fill="#22c55e" className="animate-ping" />
+                        <>
+                            <circle cx="95" cy="5" r="5" fill="#22c55e" className="flow-active-ring" />
+                            <circle cx="95" cy="5" r="5" fill="#22c55e" className="flow-active-dot" />
+                        </>
                     )}
 
                     {/* Recent indicator - smaller, fading */}
@@ -1676,19 +1683,26 @@ function FlowVisualization() {
 
                 {/* Live status */}
                 <div className="mt-4 flex flex-wrap gap-3">
-                    <div className="px-4 py-2 bg-white/15 rounded-xl flex items-center gap-3">
+                    <div className={`px-4 py-2 rounded-xl flex items-center gap-3 ${
+                        isRunning ? 'bg-green-500/30 border-2 border-green-400' : 'bg-white/15'
+                    }`}>
                         <span className="text-sm opacity-80">وضعیت:</span>
                         <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-lg">
+                            {isRunning && (
+                                <span className="w-3 h-3 rounded-full flow-active-dot"
+                                      style={{ backgroundColor: flowColors[activeFlow] || '#22c55e' }}></span>
+                            )}
                             <span className="text-xl">{FLOW_NODES[currentNode]?.icon || '⏸️'}</span>
                             <span className="font-bold">{FLOW_NODES[currentNode]?.label || 'آماده'}</span>
                         </div>
                     </div>
-                    {activeFlow && currentNode !== 'idle' && currentNode !== 'complete' && currentNode !== 'error' && (
-                        <div className="px-4 py-2 rounded-xl flex items-center gap-3"
-                             style={{ backgroundColor: `${flowColors[activeFlow]}50` }}>
-                            <span className="w-2 h-2 rounded-full animate-ping"
+                    {isRunning && (
+                        <div className="px-4 py-2 rounded-xl flex items-center gap-3 border-2"
+                             style={{ backgroundColor: `${flowColors[activeFlow]}30`, borderColor: flowColors[activeFlow] }}>
+                            <span className="w-3 h-3 rounded-full flow-active-dot"
                                   style={{ backgroundColor: flowColors[activeFlow] }}></span>
                             <span className="font-bold">{flowTitles[activeFlow]}</span>
+                            <span className="text-xs opacity-70">در حال پردازش...</span>
                         </div>
                     )}
                     {/* Show recent nodes count */}
@@ -1776,6 +1790,31 @@ function FlowVisualization() {
                 @keyframes flowDash {
                     0% { stroke-dashoffset: 24; }
                     100% { stroke-dashoffset: 0; }
+                }
+                @keyframes activeGlow {
+                    0%, 100% { opacity: 0.4; transform: scale(1); }
+                    50% { opacity: 0.7; transform: scale(1.05); }
+                }
+                @keyframes activeRing {
+                    0% { r: 5; opacity: 1; }
+                    100% { r: 15; opacity: 0; }
+                }
+                @keyframes activePulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.4; }
+                }
+                .flow-active-glow {
+                    animation: activeGlow 1.5s ease-in-out infinite;
+                    transform-origin: center;
+                    will-change: opacity, transform;
+                }
+                .flow-active-ring {
+                    animation: activeRing 1.2s ease-out infinite;
+                    will-change: r, opacity;
+                }
+                .flow-active-dot {
+                    animation: activePulse 0.8s ease-in-out infinite;
+                    will-change: opacity;
                 }
             `}</style>
         </div>
@@ -1901,10 +1940,20 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
   );
 }
 
-function LessonList({ lessons, navigateTo, deleteLesson, editLesson }) {
+function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('newest');
     const [filterBy, setFilterBy] = useState('all'); // all, withContent, empty
+    const [newLessonTitle, setNewLessonTitle] = useState('');
+    const [showAddForm, setShowAddForm] = useState(false);
+
+    const handleAddLesson = () => {
+        if (newLessonTitle.trim()) {
+            addLesson(newLessonTitle.trim());
+            setNewLessonTitle('');
+            setShowAddForm(false);
+        }
+    };
 
     const filteredAndSortedLessons = useMemo(() => {
         return lessons
@@ -1941,7 +1990,48 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson }) {
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             {/* Fixed Header */}
             <div className="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-6">
-                <h2 className="text-2xl font-bold mb-4">📚 لیست دروس ({lessons.length} درس)</h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold">📚 لیست دروس ({lessons.length} درس)</h2>
+                    <button
+                        onClick={() => setShowAddForm(!showAddForm)}
+                        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg flex items-center gap-2 font-bold transition-all"
+                    >
+                        <Plus size={20} />
+                        درس جدید
+                    </button>
+                </div>
+
+                {/* Add New Lesson Form */}
+                {showAddForm && (
+                    <div className="bg-white/20 p-4 rounded-xl mb-4 border border-teal-400">
+                        <h3 className="font-bold mb-3">➕ ایجاد درس جدید</h3>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newLessonTitle}
+                                onChange={(e) => setNewLessonTitle(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddLesson()}
+                                placeholder="مثال: مکالمه در رستوران..."
+                                className="flex-1 p-3 rounded-lg bg-white text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-white focus:outline-none"
+                                autoFocus
+                            />
+                            <button
+                                onClick={handleAddLesson}
+                                disabled={!newLessonTitle.trim()}
+                                className="bg-white text-teal-600 px-5 py-3 rounded-lg hover:bg-teal-50 font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                <Plus size={18} />
+                                ایجاد
+                            </button>
+                            <button
+                                onClick={() => { setShowAddForm(false); setNewLessonTitle(''); }}
+                                className="bg-white/10 hover:bg-white/20 px-4 py-3 rounded-lg transition-all"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Search and Filters */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
