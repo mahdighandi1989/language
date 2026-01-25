@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, createContext, useContext, useCallback } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle, Square } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Import Firebase services for database and authentication.
@@ -185,6 +185,7 @@ function useLiveChat() {
       minimizeVoiceConv: () => {},
       maximizeVoiceConv: () => {},
       updateVoiceConvStatus: () => {},
+      stopVoiceConvAudio: () => false,
       voiceConvStatus: {},
       shouldAutoStartRecording: false,
       markAudioFinishedWhileMinimized: () => {},
@@ -297,6 +298,18 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     setVoiceConvChatHistory(prev => typeof updater === 'function' ? updater(prev) : updater);
   }, []);
 
+  // Stop any currently playing voice conversation audio
+  const stopVoiceConvAudio = useCallback(() => {
+    if (voiceConvAudioRef.current) {
+      voiceConvAudioRef.current.pause();
+      voiceConvAudioRef.current.onended = null;
+      voiceConvAudioRef.current = null;
+      setVoiceConvStatus(prev => ({ ...prev, isPlaying: false }));
+      return true; // Audio was stopped
+    }
+    return false; // No audio was playing
+  }, []);
+
   // Keep activeRef synced
   useEffect(() => {
     voiceConvActiveRef.current = isVoiceConvActive;
@@ -323,6 +336,7 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     minimizeVoiceConv,
     maximizeVoiceConv,
     updateVoiceConvStatus,
+    stopVoiceConvAudio,
     shouldAutoStartRecording,
     markAudioFinishedWhileMinimized,
     clearAutoStartRecording,
@@ -340,7 +354,7 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     navigateTo
   }), [
     isLiveChatActive, isMinimized, liveChatConfig, chatHistory, openLiveChat, closeLiveChat, minimizeLiveChat, maximizeLiveChat,
-    isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, voiceConvStatus, openVoiceConv, closeVoiceConv, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
+    isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, voiceConvStatus, openVoiceConv, closeVoiceConv, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus, stopVoiceConvAudio,
     shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording,
     voiceConvChatHistory, saveVoiceConvState, updateVoiceConvChatHistory,
     data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory, navigateTo
@@ -5526,6 +5540,24 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     }
   };
 
+  // Stop current audio playback without ending voice conversation mode
+  const stopCurrentAudio = () => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.onended = null;
+      currentAudioRef.current = null;
+      updateVoiceConvStatus({ isPlaying: false });
+      // Start recording again after a short delay
+      if (voiceConversationModeRef.current && !isRecordingRef.current && !isRecording) {
+        setTimeout(() => {
+          if (voiceConversationModeRef.current && !isRecordingRef.current) {
+            playBeepSound(800, 150).then(() => startVoiceRecording(true));
+          }
+        }, 300);
+      }
+    }
+  };
+
   const handleMicClick = async (e) => {
     e.preventDefault();
 
@@ -5596,10 +5628,19 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
               {!isRecording && !isLoading && currentAudioRef.current && <span className="text-sm bg-white/20 px-2 py-1 rounded-full flex items-center gap-1"><Volume2 size={14} /> استاد صحبت میکنه...</span>}
               {!isRecording && !isLoading && !currentAudioRef.current && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">منتظر بوق...</span>}
             </div>
-            <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-1" title="پایان مکالمه">
-              <PhoneOff size={18} />
-              <span className="text-xs">پایان</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Stop audio button - only show when audio is playing */}
+              {!isRecording && !isLoading && voiceConvStatus.isPlaying && (
+                <button onClick={stopCurrentAudio} className="bg-red-500/50 hover:bg-red-500 p-2 rounded-lg flex items-center gap-1" title="قطع صدا">
+                  <Square size={16} fill="currentColor" />
+                  <span className="text-xs">قطع</span>
+                </button>
+              )}
+              <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-1" title="پایان مکالمه">
+                <PhoneOff size={18} />
+                <span className="text-xs">پایان</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -5921,6 +5962,7 @@ const getWavUrl = (base64, mimeType) => {
 };
 
 function TTSButton({ textToSpeak, voice, audioUrl }) {
+    const { stopVoiceConvAudio } = useLiveChat();
     const [isLoading, setIsLoading] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
@@ -5935,6 +5977,9 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
             setIsPlaying(false);
             return;
         }
+
+        // Stop any voice conversation audio before playing to prevent double audio
+        stopVoiceConvAudio();
 
         // If we have a pre-generated audio URL, use it
         if (audioUrl) {
@@ -6022,6 +6067,12 @@ function FloatingVoiceConvWidget() {
   const isProcessingRef = useRef(false);
   const startRecordingRef = useRef(null); // Ref to avoid circular dependency
   const processRecordingRef = useRef(null); // Ref to get latest processRecording
+  const isVoiceConvMinimizedRef = useRef(isVoiceConvMinimized); // Ref to use in async callbacks
+
+  // Keep minimized ref in sync
+  useEffect(() => {
+    isVoiceConvMinimizedRef.current = isVoiceConvMinimized;
+  }, [isVoiceConvMinimized]);
 
   const { defaultChatSettings = {} } = data || {};
 
@@ -6214,10 +6265,10 @@ function FloatingVoiceConvWidget() {
         updateVoiceConvStatus({ isPlaying: false });
         isProcessingRef.current = false;
 
-        // Continue conversation if still active and minimized
-        if (voiceConvActiveRef.current && isVoiceConvMinimized) {
+        // Continue conversation if still active and minimized - use refs for all checks
+        if (voiceConvActiveRef.current && isVoiceConvMinimizedRef.current) {
           setTimeout(() => {
-            if (voiceConvActiveRef.current && isVoiceConvMinimized && startRecordingRef.current) {
+            if (voiceConvActiveRef.current && isVoiceConvMinimizedRef.current && startRecordingRef.current) {
               startRecordingRef.current();
             }
           }, defaultChatSettings.voiceConversationBeepDelay || 500);
@@ -6260,7 +6311,8 @@ function FloatingVoiceConvWidget() {
       if (!isRecordingRef.current && !isProcessingRef.current) {
         console.log('FloatingWidget: No audio, starting recording');
         const timer = setTimeout(() => {
-          if (voiceConvActiveRef.current && isVoiceConvMinimized && !isRecordingRef.current && !isProcessingRef.current && startRecordingRef.current) {
+          // Use refs for all checks to avoid stale closures
+          if (voiceConvActiveRef.current && isVoiceConvMinimizedRef.current && !isRecordingRef.current && !isProcessingRef.current && startRecordingRef.current) {
             startRecordingRef.current();
           }
         }, 500);
@@ -6278,9 +6330,9 @@ function FloatingVoiceConvWidget() {
       currentAudioRef.current = null;
       updateVoiceConvStatus({ isPlaying: false });
 
-      // Start recording after delay
+      // Start recording after delay - use refs for all checks
       setTimeout(() => {
-        if (voiceConvActiveRef.current && isVoiceConvMinimized && !isRecordingRef.current && !isProcessingRef.current && startRecordingRef.current) {
+        if (voiceConvActiveRef.current && isVoiceConvMinimizedRef.current && !isRecordingRef.current && !isProcessingRef.current && startRecordingRef.current) {
           startRecordingRef.current();
         }
       }, defaultChatSettings.voiceConversationBeepDelay || 500);
@@ -6348,6 +6400,29 @@ function FloatingVoiceConvWidget() {
     closeVoiceConv();
   };
 
+  // Stop current audio and start recording again
+  const handleStopAudio = () => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.onended = null;
+      currentAudioRef.current = null;
+    }
+    if (voiceConvAudioRef.current) {
+      voiceConvAudioRef.current.pause();
+      voiceConvAudioRef.current.onended = null;
+      voiceConvAudioRef.current = null;
+    }
+    updateVoiceConvStatus({ isPlaying: false });
+    isProcessingRef.current = false;
+
+    // Start recording after a short delay
+    setTimeout(() => {
+      if (voiceConvActiveRef.current && isVoiceConvMinimizedRef.current && !isRecordingRef.current && startRecordingRef.current) {
+        startRecordingRef.current();
+      }
+    }, 300);
+  };
+
   return (
     <div
       className="fixed bottom-24 right-6 z-50"
@@ -6388,15 +6463,27 @@ function FloatingVoiceConvWidget() {
 
         {/* Status */}
         <div className="p-4 flex items-center justify-center gap-3">
-          <div className={`w-16 h-16 rounded-full ${getStatusColor()} flex items-center justify-center shadow-lg`}>
-            {isLoading ? (
-              <Loader size={28} className="text-white animate-spin" />
-            ) : isRecording ? (
-              <Mic size={28} className="text-white" />
-            ) : isPlaying ? (
-              <Volume2 size={28} className="text-white animate-pulse" />
-            ) : (
-              <MicOff size={28} className="text-white" />
+          <div className="relative">
+            <div className={`w-16 h-16 rounded-full ${getStatusColor()} flex items-center justify-center shadow-lg`}>
+              {isLoading ? (
+                <Loader size={28} className="text-white animate-spin" />
+              ) : isRecording ? (
+                <Mic size={28} className="text-white" />
+              ) : isPlaying ? (
+                <Volume2 size={28} className="text-white animate-pulse" />
+              ) : (
+                <MicOff size={28} className="text-white" />
+              )}
+            </div>
+            {/* Stop audio button overlay - only show when playing */}
+            {isPlaying && (
+              <button
+                onClick={handleStopAudio}
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg transition-colors"
+                title="قطع صدا"
+              >
+                <Square size={12} fill="currentColor" className="text-white" />
+              </button>
             )}
           </div>
           <div className="text-white">
