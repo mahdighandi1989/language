@@ -186,6 +186,9 @@ function useLiveChat() {
       maximizeVoiceConv: () => {},
       updateVoiceConvStatus: () => {},
       voiceConvStatus: {},
+      shouldAutoStartRecording: false,
+      markAudioFinishedWhileMinimized: () => {},
+      clearAutoStartRecording: () => {},
     };
   }
   return context;
@@ -207,6 +210,7 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     isPlaying: false,
     isLoading: false,
   });
+  const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false); // Track if audio finished while minimized
 
   // ===== Live Chat Functions =====
   const openLiveChat = useCallback((config) => {
@@ -242,6 +246,7 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     setIsVoiceConvMinimized(false);
     setVoiceConvConfig(null);
     setVoiceConvStatus({ isRecording: false, isPlaying: false, isLoading: false });
+    setShouldAutoStartRecording(false); // Clear auto-start flag
   }, []);
 
   const minimizeVoiceConv = useCallback(() => {
@@ -254,6 +259,16 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
 
   const updateVoiceConvStatus = useCallback((status) => {
     setVoiceConvStatus(prev => ({ ...prev, ...status }));
+  }, []);
+
+  // Called when audio finishes while minimized - triggers auto-recording on return
+  const markAudioFinishedWhileMinimized = useCallback(() => {
+    setShouldAutoStartRecording(true);
+  }, []);
+
+  // Clear the auto-start flag when used or when conversation is closed
+  const clearAutoStartRecording = useCallback(() => {
+    setShouldAutoStartRecording(false);
   }, []);
 
   const value = useMemo(() => ({
@@ -277,6 +292,9 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
     minimizeVoiceConv,
     maximizeVoiceConv,
     updateVoiceConvStatus,
+    shouldAutoStartRecording,
+    markAudioFinishedWhileMinimized,
+    clearAutoStartRecording,
     // Shared
     data,
     setData,
@@ -287,6 +305,7 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
   }), [
     isLiveChatActive, isMinimized, liveChatConfig, chatHistory, openLiveChat, closeLiveChat, minimizeLiveChat, maximizeLiveChat,
     isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, voiceConvStatus, openVoiceConv, closeVoiceConv, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
+    shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording,
     data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory, navigateTo
   ]);
 
@@ -4625,15 +4644,34 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Live chat context - for floating voice chat (both Live and Voice Conversation)
   const {
     openLiveChat, isLiveChatActive, minimizeLiveChat,
-    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus
+    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
+    shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording
   } = useLiveChat();
 
   // Cleanup when component unmounts (NOT when dependencies change)
   // Using empty deps to only run on actual unmount
   useEffect(() => {
+    isMountedRef.current = true; // Mark as mounted
+
     return () => {
-      // DON'T change session ID here - let responses complete naturally
-      // The voiceConversationModeRef = false will prevent new recordings
+      isMountedRef.current = false; // Mark as unmounted for async callbacks
+
+      // Check if voice conversation is being minimized (still globally active)
+      // If so, DON'T do aggressive cleanup - let audio continue playing
+      if (isVoiceConvActiveRef.current) {
+        console.log('Voice conv minimizing - keeping audio and handlers alive');
+        // Only stop recording if in progress, but let audio continue
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+        // Keep voiceConversationModeRef true so audio onended knows conversation is still active
+        isRecordingRef.current = false;
+        recordingStartPendingRef.current = false;
+        return;
+      }
+
+      // Full cleanup when voice conversation is actually closed (not just minimized)
+      console.log('Voice conv closed - full cleanup');
 
       // DON'T pause audio here - let it finish playing
       // Just clear the onended handler to prevent triggering new recordings
@@ -4684,6 +4722,13 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     };
   }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv, context, saveChatHistory]);
 
+  // Keep refs synced with global voice conv state (for cleanup and onended handler decisions)
+  const markAudioFinishedWhileMinimizedRef = useRef(markAudioFinishedWhileMinimized);
+  useEffect(() => {
+    isVoiceConvActiveRef.current = isVoiceConvActive;
+    markAudioFinishedWhileMinimizedRef.current = markAudioFinishedWhileMinimized;
+  }, [isVoiceConvActive, markAudioFinishedWhileMinimized]);
+
   // Restore voice conversation mode when returning to page with active voice conv
   useEffect(() => {
     if (isVoiceConvActive && !isVoiceConvMinimized && voiceConvConfig?.context === context) {
@@ -4691,10 +4736,16 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       if (!voiceConversationModeRef.current) {
         voiceConversationModeRef.current = true;
         setVoiceConversationMode(true);
-        // Don't auto-start recording, let user continue naturally
+
+        // If audio finished while we were away, schedule auto-start recording
+        if (shouldAutoStartRecording) {
+          console.log('Scheduling auto-start recording after return - audio finished while minimized');
+          clearAutoStartRecording();
+          setPendingAutoStartRecording(true);
+        }
       }
     }
-  }, [isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, context]);
+  }, [isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, context, shouldAutoStartRecording, clearAutoStartRecording]);
 
   const chatWindowRef = useRef(null);
   const [customScenarioName, setCustomScenarioName] = useState('');
@@ -4715,6 +4766,9 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
   const currentAudioRef = useRef(null);
   const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses from triggering new recordings
+  const isVoiceConvActiveRef = useRef(false); // Ref to track global voice conv state for cleanup decisions
+  const isMountedRef = useRef(true); // Track if component is mounted for async callbacks
+  const [pendingAutoStartRecording, setPendingAutoStartRecording] = useState(false); // Flag to trigger auto-start after return
 
   // Silence detection refs for voice conversation mode
   const audioContextRef = useRef(null);
@@ -5103,6 +5157,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                     return;
                 }
                 if (!voiceConversationModeRef.current) return;
+
+                // Check if component is unmounted (minimized) - mark for auto-start on return
+                if (!isMountedRef.current) {
+                    console.log('Component unmounted (minimized) - marking for auto-start on return');
+                    recordingTriggered = true;
+                    if (markAudioFinishedWhileMinimizedRef.current) {
+                        markAudioFinishedWhileMinimizedRef.current();
+                    }
+                    return;
+                }
+
                 if (isRecordingRef.current || recordingStartPendingRef.current) return;
 
                 recordingTriggered = true;
@@ -5110,7 +5175,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
                 setTimeout(async () => {
                     // Double-check all conditions before starting (including session check)
-                    if (currentSessionId === sessionIdRef.current && voiceConversationModeRef.current && !isRecordingRef.current) {
+                    if (currentSessionId === sessionIdRef.current && voiceConversationModeRef.current && !isRecordingRef.current && isMountedRef.current) {
                         await playBeepSound(800, 150);
                         startVoiceRecording(true);
                     }
@@ -5120,10 +5185,17 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
             audio.onended = async () => {
                 currentAudioRef.current = null;
+                // Update status - audio finished
+                if (isMountedRef.current) {
+                    updateVoiceConvStatus({ isPlaying: false });
+                }
                 await triggerNextRecording();
             };
 
-            audio.play().catch(async err => {
+            audio.play().then(() => {
+                // Update status - audio playing
+                updateVoiceConvStatus({ isPlaying: true });
+            }).catch(async err => {
                 console.error('Audio playback error:', err);
                 await triggerNextRecording();
             });
@@ -5362,6 +5434,22 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     isRecordingRef.current = false;
     setIsRecording(false);
   };
+
+  // Effect to handle auto-start recording after returning from minimized state
+  useEffect(() => {
+    if (pendingAutoStartRecording && voiceConversationMode && !isRecording) {
+      setPendingAutoStartRecording(false);
+      // Small delay to let the component fully stabilize
+      const timer = setTimeout(() => {
+        if (voiceConversationModeRef.current && !isRecordingRef.current && !recordingStartPendingRef.current) {
+          console.log('Auto-starting recording now');
+          startVoiceRecording(true);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoStartRecording, voiceConversationMode, isRecording]);
 
   // Toggle voice conversation mode
   const toggleVoiceConversationMode = () => {
