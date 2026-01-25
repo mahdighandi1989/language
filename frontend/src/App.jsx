@@ -157,6 +157,80 @@ function ExecutionFlowProvider({ children }) {
 }
 
 
+// ============================================
+// LIVE CHAT CONTEXT - For floating voice chat
+// ============================================
+
+const LiveChatContext = createContext(null);
+
+function useLiveChat() {
+  const context = useContext(LiveChatContext);
+  if (!context) {
+    console.warn('⚠️ useLiveChat: No context available');
+    return {
+      isLiveChatActive: false,
+      isMinimized: false,
+      liveChatConfig: null,
+      openLiveChat: () => {},
+      closeLiveChat: () => {},
+      minimizeLiveChat: () => {},
+      maximizeLiveChat: () => {},
+    };
+  }
+  return context;
+}
+
+function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory }) {
+  const [isLiveChatActive, setIsLiveChatActive] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [liveChatConfig, setLiveChatConfig] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
+
+  const openLiveChat = useCallback((config) => {
+    setLiveChatConfig(config);
+    setIsLiveChatActive(true);
+    setIsMinimized(false);
+    setChatHistory(config.initialHistory || []);
+  }, []);
+
+  const closeLiveChat = useCallback(() => {
+    setIsLiveChatActive(false);
+    setIsMinimized(false);
+    setLiveChatConfig(null);
+  }, []);
+
+  const minimizeLiveChat = useCallback(() => {
+    setIsMinimized(true);
+  }, []);
+
+  const maximizeLiveChat = useCallback(() => {
+    setIsMinimized(false);
+  }, []);
+
+  const value = useMemo(() => ({
+    isLiveChatActive,
+    isMinimized,
+    liveChatConfig,
+    chatHistory,
+    setChatHistory,
+    openLiveChat,
+    closeLiveChat,
+    minimizeLiveChat,
+    maximizeLiveChat,
+    data,
+    setData,
+    addJournalEntry,
+    addPronunciationCorrection,
+    saveChatHistory
+  }), [isLiveChatActive, isMinimized, liveChatConfig, chatHistory, openLiveChat, closeLiveChat, minimizeLiveChat, maximizeLiveChat, data, setData, addJournalEntry, addPronunciationCorrection, saveChatHistory]);
+
+  return (
+    <LiveChatContext.Provider value={value}>
+      {children}
+    </LiveChatContext.Provider>
+  );
+}
+
 // --- Google Fonts ---
 // This component injects the Google Fonts stylesheet into the document head.
 const Fonts = () => (
@@ -903,39 +977,50 @@ export default function App() {
 
   return (
     <ExecutionFlowProvider>
-      <Fonts />
-      <div className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
-        <div className="flex flex-col md:flex-row min-h-screen">
-          <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} />
-          <main className="flex-1 p-4 sm:p-6 md:p-8 bg-slate-100">{renderContent()}</main>
-          <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
-          {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
-          <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
-            <Sparkles size={28} />
-          </button>
-          {isAssistantOpen && <GlobalAssistant onClose={() => setIsAssistantOpen(false)} updateKnowledgeBase={updateKnowledgeBase} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />}
-          {globalSelectionPopup && (
-              <button
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={() => {
-                      openSaveModal(globalSelectionPopup.text);
-                      setGlobalSelectionPopup(null);
-                  }}
-                  className="fixed bg-teal-500 text-white px-4 py-2 rounded-lg text-sm z-50 shadow-lg flex items-center gap-2"
-                  style={{ top: `${globalSelectionPopup.top}px`, left: `${globalSelectionPopup.left}px`, transform: 'translateX(-50%)' }}
-              >
-                  <Plus size={16}/> افزودن به مرکز دانش
-              </button>
-          )}
-          <SaveToKnowledgeBaseModal
-              isOpen={isSaveModalOpen}
-              onClose={() => setIsSaveModalOpen(false)}
-              item={itemToSave}
-              updateKnowledgeBase={updateKnowledgeBase}
-              addJournalEntry={addJournalEntry}
-          />
+      <LiveChatProvider
+        data={data}
+        setData={setData}
+        addJournalEntry={addJournalEntry}
+        addPronunciationCorrection={addPronunciationCorrection}
+        saveChatHistory={saveChatHistory}
+      >
+        <Fonts />
+        <div className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
+          <div className="flex flex-col md:flex-row min-h-screen">
+            <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} />
+            <main className="flex-1 p-4 sm:p-6 md:p-8 bg-slate-100">{renderContent()}</main>
+            <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
+            {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
+            <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
+              <Sparkles size={28} />
+            </button>
+            {isAssistantOpen && <GlobalAssistant onClose={() => setIsAssistantOpen(false)} updateKnowledgeBase={updateKnowledgeBase} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />}
+            {globalSelectionPopup && (
+                <button
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => {
+                        openSaveModal(globalSelectionPopup.text);
+                        setGlobalSelectionPopup(null);
+                    }}
+                    className="fixed bg-teal-500 text-white px-4 py-2 rounded-lg text-sm z-50 shadow-lg flex items-center gap-2"
+                    style={{ top: `${globalSelectionPopup.top}px`, left: `${globalSelectionPopup.left}px`, transform: 'translateX(-50%)' }}
+                >
+                    <Plus size={16}/> افزودن به مرکز دانش
+                </button>
+            )}
+            <SaveToKnowledgeBaseModal
+                isOpen={isSaveModalOpen}
+                onClose={() => setIsSaveModalOpen(false)}
+                item={itemToSave}
+                updateKnowledgeBase={updateKnowledgeBase}
+                addJournalEntry={addJournalEntry}
+            />
+          </div>
         </div>
-      </div>
+        {/* Global floating live voice chat - persists across page navigation */}
+        <GlobalLiveVoiceChat />
+        <FloatingLiveChatWidget />
+      </LiveChatProvider>
     </ExecutionFlowProvider>
   );
 }
@@ -3954,6 +4039,20 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
 
   // Execution flow tracking
   const { setCurrentNode } = useExecutionFlow();
+
+  // Live chat context - for floating voice chat
+  const { openLiveChat, isLiveChatActive, minimizeLiveChat } = useLiveChat();
+
+  // Auto-minimize live chat when leaving this page (unmounting)
+  useEffect(() => {
+    return () => {
+      // When ChatInterface unmounts and live chat is active, minimize it
+      if (isLiveChatActive) {
+        minimizeLiveChat();
+      }
+    };
+  }, [isLiveChatActive, minimizeLiveChat]);
+
   const chatWindowRef = useRef(null);
   const [customScenarioName, setCustomScenarioName] = useState('');
   const [customScenarioDetails, setCustomScenarioDetails] = useState('');
@@ -3970,7 +4069,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
   const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
   const currentAudioRef = useRef(null);
-  const [isLiveChatOpen, setIsLiveChatOpen] = useState(false);
 
   // Silence detection refs for voice conversation mode
   const audioContextRef = useRef(null);
@@ -4621,8 +4719,19 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                 <span className="text-xs font-bold hidden sm:inline">گفتگو</span>
               </button>
               <button
-                onClick={() => setIsLiveChatOpen(true)}
-                className="p-2 border rounded-xl flex items-center gap-1 hover:bg-pink-100 text-pink-600 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50"
+                onClick={() => openLiveChat({
+                  context,
+                  lessonTitle,
+                  selectedTopics,
+                  customScenarioName,
+                  customScenarioDetails,
+                  aiVoice,
+                  accentMode,
+                  knowledgeBase,
+                  initialHistory: chatHistory
+                })}
+                disabled={isLiveChatActive}
+                className={`p-2 border rounded-xl flex items-center gap-1 ${isLiveChatActive ? 'bg-pink-200 text-pink-400 border-pink-200 cursor-not-allowed' : 'hover:bg-pink-100 text-pink-600 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50'}`}
                 title="مکالمه زنده با جاد (Gemini Live)"
               >
                 <Phone size={20}/>
@@ -4633,25 +4742,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           </div>
         </div>
       </div>
-      <LiveVoiceChat
-        isOpen={isLiveChatOpen}
-        onClose={() => setIsLiveChatOpen(false)}
-        chatHistory={chatHistory}
-        setChatHistory={setChatHistory}
-        saveChatHistory={() => saveChatHistory(context, chatHistory)}
-        context={context}
-        lessonTitle={lessonTitle}
-        selectedTopics={selectedTopics}
-        customScenarioName={customScenarioName}
-        customScenarioDetails={customScenarioDetails}
-        aiVoice={aiVoice}
-        accentMode={accentMode}
-        addJournalEntry={addJournalEntry}
-        knowledgeBase={knowledgeBase}
-        pronunciationCorrections={data.pronunciationCorrections || []}
-        addPronunciationCorrection={addPronunciationCorrection}
-        customPrompts={data.customPrompts || {}}
-      />
+      {/* LiveVoiceChat is now rendered globally at App level via GlobalLiveVoiceChat */}
     </>
   );
 }
@@ -4997,10 +5088,134 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
     );
 }
 
+// --- Floating Live Chat Widget (minimized view) ---
+function FloatingLiveChatWidget() {
+  const {
+    isLiveChatActive,
+    isMinimized,
+    liveChatConfig,
+    maximizeLiveChat,
+    closeLiveChat
+  } = useLiveChat();
+
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Listen to global live chat state (will be set by LiveVoiceChat)
+  useEffect(() => {
+    const handleLiveChatStatus = (e) => {
+      if (e.detail) {
+        if (e.detail.connectionStatus !== undefined) setConnectionStatus(e.detail.connectionStatus);
+        if (e.detail.isListening !== undefined) setIsListening(e.detail.isListening);
+        if (e.detail.isSpeaking !== undefined) setIsSpeaking(e.detail.isSpeaking);
+      }
+    };
+    window.addEventListener('liveChatStatusUpdate', handleLiveChatStatus);
+    return () => window.removeEventListener('liveChatStatusUpdate', handleLiveChatStatus);
+  }, []);
+
+  if (!isLiveChatActive || !isMinimized) return null;
+
+  const getStatusColor = () => {
+    if (connectionStatus === 'disconnected') return 'bg-slate-500';
+    if (connectionStatus === 'connecting') return 'bg-yellow-500 animate-pulse';
+    if (connectionStatus === 'error') return 'bg-red-500';
+    if (isListening) return 'bg-red-500 animate-pulse';
+    if (isSpeaking) return 'bg-purple-500 animate-pulse';
+    return 'bg-green-500';
+  };
+
+  const getStatusText = () => {
+    if (connectionStatus === 'disconnected') return 'قطع';
+    if (connectionStatus === 'connecting') return 'اتصال...';
+    if (connectionStatus === 'error') return 'خطا';
+    if (isListening) return 'گوش دادن...';
+    if (isSpeaking) return 'صحبت می‌کند';
+    return 'متصل';
+  };
+
+  return (
+    <div
+      className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-4 duration-300"
+      style={{ animation: 'slideIn 0.3s ease-out' }}
+    >
+      <style>{`
+        @keyframes slideIn {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+      <div className="bg-gradient-to-br from-purple-800 via-purple-700 to-pink-800 rounded-2xl shadow-2xl border border-purple-500/30 overflow-hidden w-72">
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 bg-black/20">
+          <div className="flex items-center gap-2">
+            <Phone size={18} className="text-white" />
+            <span className="text-white font-medium text-sm">تماس با جاد</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={maximizeLiveChat}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+              title="بازگشت به تمام صفحه"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </button>
+            <button
+              onClick={closeLiveChat}
+              className="p-1.5 rounded-lg bg-red-500/50 hover:bg-red-500 text-white transition-colors"
+              title="پایان تماس"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Status */}
+        <div className="p-4 flex items-center justify-center gap-3">
+          <div className={`w-16 h-16 rounded-full ${getStatusColor()} flex items-center justify-center shadow-lg`}>
+            {connectionStatus === 'connecting' ? (
+              <Loader size={28} className="text-white animate-spin" />
+            ) : isListening ? (
+              <Mic size={28} className="text-white" />
+            ) : isSpeaking ? (
+              <Volume2 size={28} className="text-white animate-pulse" />
+            ) : connectionStatus === 'connected' ? (
+              <Phone size={28} className="text-white" />
+            ) : (
+              <PhoneOff size={28} className="text-white" />
+            )}
+          </div>
+          <div className="text-white">
+            <div className="font-medium">{getStatusText()}</div>
+            {liveChatConfig?.lessonTitle && (
+              <div className="text-white/60 text-sm truncate max-w-[120px]">
+                {liveChatConfig.lessonTitle}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Expand button */}
+        <button
+          onClick={maximizeLiveChat}
+          className="w-full py-2 bg-white/10 hover:bg-white/20 text-white text-sm transition-colors flex items-center justify-center gap-2"
+        >
+          <span>باز کردن تمام صفحه</span>
+          <ChevronUp size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Gemini Live API Real-time Voice Chat ---
 function LiveVoiceChat({
   isOpen,
   onClose,
+  onMinimize,
   chatHistory,
   setChatHistory,
   saveChatHistory,
@@ -5015,7 +5230,8 @@ function LiveVoiceChat({
   knowledgeBase,
   pronunciationCorrections = [],
   addPronunciationCorrection,
-  customPrompts = {}
+  customPrompts = {},
+  isMinimized = false
 }) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isListening, setIsListening] = useState(false);
@@ -5086,6 +5302,13 @@ function LiveVoiceChat({
   useEffect(() => {
     if (aiVoice && availableVoices[aiVoice]) setSelectedVoice(aiVoice);
   }, [aiVoice]);
+
+  // Broadcast status to floating widget
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('liveChatStatusUpdate', {
+      detail: { connectionStatus, isListening, isSpeaking }
+    }));
+  }, [connectionStatus, isListening, isSpeaking]);
 
   useEffect(() => {
     return () => disconnect();
@@ -5726,6 +5949,12 @@ ${conversationSummary}
 
   if (!isOpen) return null;
 
+  // When minimized, render nothing visible but keep the component mounted
+  // This allows the voice chat to continue working in background
+  if (isMinimized) {
+    return null; // The FloatingLiveChatWidget will show the minimized UI
+  }
+
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-pink-900 z-50 flex flex-col">
       <div className="flex justify-between items-center p-4 text-white">
@@ -5734,6 +5963,16 @@ ${conversationSummary}
           تماس زنده با جاد
         </h2>
         <div className="flex items-center gap-2">
+          {/* Minimize button - only show when connected */}
+          {connectionStatus !== 'disconnected' && onMinimize && (
+            <button
+              onClick={onMinimize}
+              className="p-2 rounded-full hover:bg-white/20 bg-white/10"
+              title="کوچک کردن"
+            >
+              <ChevronDown size={24} />
+            </button>
+          )}
           {connectionStatus !== 'disconnected' && (
             <button
               onClick={() => handleClose(true)}
@@ -5917,6 +6156,49 @@ ${conversationSummary}
         </div>
       )}
     </div>
+  );
+}
+
+// --- Global Live Voice Chat Wrapper (rendered at App level) ---
+function GlobalLiveVoiceChat() {
+  const {
+    isLiveChatActive,
+    isMinimized,
+    liveChatConfig,
+    chatHistory,
+    setChatHistory,
+    closeLiveChat,
+    minimizeLiveChat,
+    data,
+    addJournalEntry,
+    addPronunciationCorrection,
+    saveChatHistory
+  } = useLiveChat();
+
+  if (!isLiveChatActive || !liveChatConfig) return null;
+
+  return (
+    <LiveVoiceChat
+      isOpen={isLiveChatActive}
+      onClose={closeLiveChat}
+      onMinimize={minimizeLiveChat}
+      chatHistory={chatHistory}
+      setChatHistory={setChatHistory}
+      saveChatHistory={() => saveChatHistory(liveChatConfig.context, chatHistory)}
+      context={liveChatConfig.context}
+      lessonTitle={liveChatConfig.lessonTitle}
+      selectedTopics={liveChatConfig.selectedTopics}
+      customScenarioName={liveChatConfig.customScenarioName}
+      customScenarioDetails={liveChatConfig.customScenarioDetails}
+      aiVoice={liveChatConfig.aiVoice}
+      accentMode={liveChatConfig.accentMode}
+      addJournalEntry={addJournalEntry}
+      knowledgeBase={liveChatConfig.knowledgeBase}
+      pronunciationCorrections={data?.pronunciationCorrections || []}
+      addPronunciationCorrection={addPronunciationCorrection}
+      customPrompts={data?.customPrompts || {}}
+      isMinimized={isMinimized}
+    />
   );
 }
 
