@@ -5523,6 +5523,8 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       if (voiceConversationMode) {
         voiceConversationModeRef.current = false;
         setVoiceConversationMode(false);
+        // Also close global voice conversation state to prevent FloatingWidget from retrying
+        closeVoiceConv();
       }
 
       // Provide specific error messages
@@ -6243,8 +6245,10 @@ function FloatingVoiceConvWidget() {
       console.error('FloatingWidget: Microphone error:', err);
       cleanupRecording();
       updateVoiceConvStatus({ isRecording: false });
+      // Close voice conversation on microphone error to prevent infinite retry loop
+      closeVoiceConv();
     }
-  }, [cleanupRecording, defaultChatSettings, updateVoiceConvStatus]);
+  }, [cleanupRecording, defaultChatSettings, updateVoiceConvStatus, closeVoiceConv]);
 
   // Keep ref updated to avoid circular dependency
   useEffect(() => {
