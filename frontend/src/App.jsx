@@ -4759,7 +4759,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Live chat context - for floating voice chat (both Live and Voice Conversation)
   const {
     openLiveChat, isLiveChatActive, minimizeLiveChat,
-    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
+    openVoiceConv, closeVoiceConv, isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, voiceConvStatus, minimizeVoiceConv, maximizeVoiceConv, updateVoiceConvStatus,
     shouldAutoStartRecording, markAudioFinishedWhileMinimized, clearAutoStartRecording,
     saveVoiceConvState, voiceConvAudioRef
   } = useLiveChat();
@@ -5708,7 +5708,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             </div>
             <div className="flex items-center gap-2">
               {/* Stop audio button - only show when audio is playing */}
-              {!isRecording && !isLoading && voiceConvStatus.isPlaying && (
+              {!isRecording && !isLoading && voiceConvStatus?.isPlaying && (
                 <button onClick={stopCurrentAudio} className="bg-red-500/50 hover:bg-red-500 p-2 rounded-lg flex items-center gap-1" title="قطع صدا">
                   <Square size={16} fill="currentColor" />
                   <span className="text-xs">قطع</span>
