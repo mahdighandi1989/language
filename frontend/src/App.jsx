@@ -83,18 +83,64 @@ function useExecutionFlow() {
   return context;
 }
 
-// Provider component
-function ExecutionFlowProvider({ children }) {
+// Provider component - now with Firebase sync for cross-browser/device visibility
+function ExecutionFlowProvider({ children, firebaseServices, userId }) {
   const [currentNode, setCurrentNodeState] = useState('idle');
   const [flowHistory, setFlowHistory] = useState([]);
   const [activeFlow, setActiveFlowState] = useState(null);
   const activeFlowRef = useRef(null);
   const maxHistoryLength = 50;
+  const isLocalUpdateRef = useRef(false); // Track if update is from local action
 
   // Keep ref in sync with state
   useEffect(() => {
     activeFlowRef.current = activeFlow;
   }, [activeFlow]);
+
+  // Subscribe to Firebase flow updates for real-time cross-browser sync
+  useEffect(() => {
+    if (!firebaseServices?.db || !userId) return;
+
+    const flowDocRef = doc(firebaseServices.db, `artifacts/${userId}/flowState/current`);
+
+    const unsubscribe = onSnapshot(flowDocRef, (docSnap) => {
+      // Skip if this update was triggered by our own local action
+      if (isLocalUpdateRef.current) {
+        isLocalUpdateRef.current = false;
+        return;
+      }
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.currentNode) setCurrentNodeState(data.currentNode);
+        if (data.activeFlow !== undefined) setActiveFlowState(data.activeFlow);
+        if (data.flowHistory) setFlowHistory(data.flowHistory);
+        console.log('📡 Flow state synced from Firebase:', data.currentNode, data.activeFlow);
+      }
+    }, (error) => {
+      console.error('Error listening to flow state:', error);
+    });
+
+    return () => unsubscribe();
+  }, [firebaseServices?.db, userId]);
+
+  // Sync flow state to Firebase
+  const syncToFirebase = useCallback((nodeId, flowType, history) => {
+    if (!firebaseServices?.db || !userId) return;
+
+    isLocalUpdateRef.current = true; // Mark as local update to avoid echo
+    const flowDocRef = doc(firebaseServices.db, `artifacts/${userId}/flowState/current`);
+
+    setDoc(flowDocRef, {
+      currentNode: nodeId,
+      activeFlow: flowType,
+      flowHistory: history.slice(-20), // Only sync last 20 entries to keep it lightweight
+      lastUpdated: Date.now()
+    }, { merge: true }).catch(err => {
+      console.error('Error syncing flow state to Firebase:', err);
+      isLocalUpdateRef.current = false;
+    });
+  }, [firebaseServices?.db, userId]);
 
   const setActiveFlow = useCallback((flowType) => {
     activeFlowRef.current = flowType;
@@ -116,20 +162,24 @@ function ExecutionFlowProvider({ children }) {
       setActiveFlow(null);
     }
 
-    // Add to history
+    // Add to history and sync to Firebase
     setFlowHistory(prev => {
       const newEntry = { nodeId, timestamp, flowType: flowType || activeFlowRef.current };
-      const updated = [...prev, newEntry];
-      return updated.slice(-maxHistoryLength);
+      const updated = [...prev, newEntry].slice(-maxHistoryLength);
+
+      // Sync to Firebase for cross-browser visibility
+      syncToFirebase(nodeId, flowType || activeFlowRef.current, updated);
+
+      return updated;
     });
-  }, [setActiveFlow]);
+  }, [setActiveFlow, syncToFirebase]);
 
   const addToHistory = useCallback((nodeId, flowType = null) => {
     const timestamp = Date.now();
     setFlowHistory(prev => {
       const newEntry = { nodeId, timestamp, flowType: flowType || activeFlowRef.current };
-      const updated = [...prev, newEntry];
-      return updated.slice(-maxHistoryLength);
+      const updated = [...prev, newEntry].slice(-maxHistoryLength);
+      return updated;
     });
   }, []);
 
@@ -137,7 +187,18 @@ function ExecutionFlowProvider({ children }) {
     setFlowHistory([]);
     setCurrentNodeState('idle');
     setActiveFlow(null);
-  }, [setActiveFlow]);
+
+    // Also clear in Firebase
+    if (firebaseServices?.db && userId) {
+      const flowDocRef = doc(firebaseServices.db, `artifacts/${userId}/flowState/current`);
+      setDoc(flowDocRef, {
+        currentNode: 'idle',
+        activeFlow: null,
+        flowHistory: [],
+        lastUpdated: Date.now()
+      }).catch(err => console.error('Error clearing flow state in Firebase:', err));
+    }
+  }, [setActiveFlow, firebaseServices?.db, userId]);
 
   const value = useMemo(() => ({
     currentNode,
@@ -1243,7 +1304,7 @@ export default function App() {
   };
 
   return (
-    <ExecutionFlowProvider>
+    <ExecutionFlowProvider firebaseServices={firebaseServices} userId={userId}>
       <LiveChatProvider
         data={data}
         setData={setData}
@@ -4700,6 +4761,41 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     saveVoiceConvState, voiceConvAudioRef
   } = useLiveChat();
 
+  // === ALL REFS MUST BE DEFINED BEFORE useEffect HOOKS ===
+  const chatWindowRef = useRef(null);
+  const [customScenarioName, setCustomScenarioName] = useState('');
+  const [customScenarioDetails, setCustomScenarioDetails] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const isRecordingRef = useRef(false); // Ref to track recording state in async callbacks
+  const recordingStartPendingRef = useRef(false); // Prevent duplicate recording starts
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [itemToSave, setItemToSave] = useState(null);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const fileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const [voiceConversationMode, setVoiceConversationMode] = useState(false);
+  const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
+  const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
+  const currentAudioRef = useRef(null);
+  const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses from triggering new recordings
+  const isVoiceConvActiveRef = useRef(false); // Ref to track global voice conv state for cleanup decisions
+  const isMountedRef = useRef(true); // Track if component is mounted for async callbacks
+  const [pendingAutoStartRecording, setPendingAutoStartRecording] = useState(false); // Flag to trigger auto-start after return
+
+  // Silence detection refs for voice conversation mode
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const silenceTimeoutRef = useRef(null);
+  const silenceCheckIntervalRef = useRef(null);
+  const streamRef = useRef(null);
+  const hasSpokenRef = useRef(false); // Track if user has spoken at all
+  const markAudioFinishedWhileMinimizedRef = useRef(markAudioFinishedWhileMinimized);
+
+  // === NOW useEffect HOOKS CAN SAFELY USE ALL REFS ===
+
   // Cleanup when component unmounts (NOT when dependencies change)
   // Using empty deps to only run on actual unmount
   useEffect(() => {
@@ -4777,7 +4873,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   }, [isLiveChatActive, minimizeLiveChat, isVoiceConvActive, minimizeVoiceConv, context, saveChatHistory, saveVoiceConvState]);
 
   // Keep refs synced with global voice conv state (for cleanup and onended handler decisions)
-  const markAudioFinishedWhileMinimizedRef = useRef(markAudioFinishedWhileMinimized);
   useEffect(() => {
     isVoiceConvActiveRef.current = isVoiceConvActive;
     markAudioFinishedWhileMinimizedRef.current = markAudioFinishedWhileMinimized;
@@ -4800,37 +4895,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       }
     }
   }, [isVoiceConvActive, isVoiceConvMinimized, voiceConvConfig, context, shouldAutoStartRecording, clearAutoStartRecording]);
-
-  const chatWindowRef = useRef(null);
-  const [customScenarioName, setCustomScenarioName] = useState('');
-  const [customScenarioDetails, setCustomScenarioDetails] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const isRecordingRef = useRef(false); // Ref to track recording state in async callbacks
-  const recordingStartPendingRef = useRef(false); // Prevent duplicate recording starts
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [itemToSave, setItemToSave] = useState(null);
-  const [attachedFile, setAttachedFile] = useState(null);
-  const fileInputRef = useRef(null);
-  const recognitionRef = useRef(null);
-  const [voiceConversationMode, setVoiceConversationMode] = useState(false);
-  const voiceConversationModeRef = useRef(false); // Ref to track mode in callbacks
-  const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
-  const currentAudioRef = useRef(null);
-  const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses from triggering new recordings
-  const isVoiceConvActiveRef = useRef(false); // Ref to track global voice conv state for cleanup decisions
-  const isMountedRef = useRef(true); // Track if component is mounted for async callbacks
-  const [pendingAutoStartRecording, setPendingAutoStartRecording] = useState(false); // Flag to trigger auto-start after return
-
-  // Silence detection refs for voice conversation mode
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const silenceTimeoutRef = useRef(null);
-  const silenceCheckIntervalRef = useRef(null);
-  const streamRef = useRef(null);
-  const hasSpokenRef = useRef(false); // Track if user has spoken at all
   const wakeLockRef = useRef(null);
 
   // Wake Lock to prevent screen sleep during voice conversation
