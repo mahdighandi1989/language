@@ -5371,12 +5371,12 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const startVoiceRecording = async (useVoiceConversation = false) => {
     const isVoiceConvMode = useVoiceConversation || voiceConversationMode;
     // Use both state and ref to prevent race conditions
-    if (isRecording || isRecordingRef.current || isLoading) return;
+    if (isRecording || isRecordingRef.current || isLoading) return false;
 
     // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setModalConfig({ title: "خطا", message: "مرورگر شما از ضبط صدا پشتیبانی نمی‌کند. لطفاً از مرورگر دیگری استفاده کنید." });
-      return;
+      return false;
     }
 
     try {
@@ -5517,6 +5517,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       mediaRecorderRef.current.start();
       isRecordingRef.current = true;
       setIsRecording(true);
+      return true;
     } catch (err) {
       console.error('Microphone error:', err);
       cleanupSilenceDetection();
@@ -5542,6 +5543,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       }
 
       setModalConfig({ title: "خطای میکروفون", message: errorMessage });
+      return false;
     }
   };
 
@@ -5572,7 +5574,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   }, [pendingAutoStartRecording, voiceConversationMode, isRecording]);
 
   // Toggle voice conversation mode
-  const toggleVoiceConversationMode = () => {
+  const toggleVoiceConversationMode = async () => {
     if (voiceConversationMode) {
       // Turning off - stop any ongoing audio/recording
       voiceConversationModeRef.current = false;
@@ -5592,17 +5594,24 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       voiceConversationModeRef.current = true;
       setVoiceConversationMode(true);
       // Pass true to indicate voice conversation mode since state hasn't updated yet
-      startVoiceRecording(true);
-      // Open voice conv in context
-      openVoiceConv({
-        context,
-        lessonTitle,
-        selectedTopics,
-        customScenarioName,
-        customScenarioDetails,
-        aiVoice,
-        accentMode
-      });
+      // Wait for recording to start successfully before opening voice conv
+      const success = await startVoiceRecording(true);
+      if (success) {
+        // Only open voice conv context if recording started successfully
+        openVoiceConv({
+          context,
+          lessonTitle,
+          selectedTopics,
+          customScenarioName,
+          customScenarioDetails,
+          aiVoice,
+          accentMode
+        });
+      } else {
+        // Recording failed - reset state
+        voiceConversationModeRef.current = false;
+        setVoiceConversationMode(false);
+      }
     }
   };
 
