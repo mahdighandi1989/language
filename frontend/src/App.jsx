@@ -312,6 +312,9 @@ function LiveChatProvider({ children, data, setData, addJournalEntry, addPronunc
   }, []);
 
   const closeVoiceConv = useCallback(() => {
+    // Update ref synchronously FIRST to prevent any pending timeouts from starting new recordings
+    voiceConvActiveRef.current = false;
+
     // Stop any playing audio
     if (voiceConvAudioRef.current) {
       voiceConvAudioRef.current.pause();
@@ -6185,6 +6188,14 @@ function FloatingVoiceConvWidget() {
     console.log('FloatingWidget: Starting recording');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Double-check ref after async operation - voice conv might have been closed while waiting for mic
+      if (!voiceConvActiveRef.current) {
+        console.log('FloatingWidget: Voice conv closed during mic access, cleaning up');
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       streamRef.current = stream;
 
       const mediaRecorder = new MediaRecorder(stream);
