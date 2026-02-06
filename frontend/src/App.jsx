@@ -1,55 +1,102 @@
 
 // 🌉 Inspector Bridge Script - Auto-injected
-// این کد را در ابتدای فایل اصلی پروژه اضافه کنید
+// ارتباط با Inspector از طریق WebSocket (حل مشکل cross-origin)
 if (typeof window !== 'undefined' && !window.__inspectorBridgeLoaded) {
   window.__inspectorBridgeLoaded = true;
 
   const isInIframe = window !== window.parent;
+  const WS_URL = 'wss://ai-creator-backend-q677.onrender.com/api/render/ws/bridge/gh_mahdighandi1989_language';
+  let ws = null;
+  let wsReady = false;
+  let messageQueue = [];
+
+  console.log('🌉 Inspector Bridge: Active (WebSocket mode)');
+
+  // اتصال WebSocket
+  const connectWS = () => {
+    if (!WS_URL || WS_URL === 'wss://ai-creator-backend-q677.onrender.com/api/render/ws/bridge/gh_mahdighandi1989_language') return;
+    try {
+      ws = new WebSocket(WS_URL);
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'register', role: 'bridge' })); };
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'registered') {
+            wsReady = true;
+            console.log('🌉 Inspector Bridge: WebSocket connected');
+            messageQueue.forEach(m => ws.send(JSON.stringify(m)));
+            messageQueue = [];
+            ws.send(JSON.stringify({ type: 'inspector-bridge-ready', pageUrl: window.location.href, isInIframe, timestamp: Date.now() }));
+          } else if (msg.type === 'command') {
+            handleCommand(msg);
+          }
+        } catch (e) {}
+      };
+      ws.onclose = () => { wsReady = false; setTimeout(connectWS, 3000); };
+      ws.onerror = () => {};
+    } catch (e) {}
+  };
+
+  const handleCommand = (msg) => {
+    if (msg.command === 'click') {
+      const el = document.querySelector(msg.selector);
+      if (el) el.click();
+    } else if (msg.command === 'navigate') {
+      window.location.href = msg.url;
+    } else if (msg.command === 'get-elements') {
+      const elements = [];
+      document.querySelectorAll('a, button, input, textarea, select, [role="button"]').forEach((el, i) => {
+        elements.push({ index: i, tag: el.tagName.toLowerCase(), text: (el.innerText || el.value || '').trim().slice(0, 50), id: el.id, href: el.href || '' });
+      });
+      sendToInspector('elements-list', { elements });
+    }
+  };
+
+  const sendToInspector = (action, data) => {
+    const message = {
+      type: 'inspector-bridge-event', action,
+      elementInfo: data.elementInfo || '', position: data.position || { xPercent: 50, yPercent: 50 },
+      pageUrl: window.location.href, timestamp: Date.now()
+    };
+    if (ws && wsReady) ws.send(JSON.stringify(message));
+    else if (ws) messageQueue.push(message);
+    if (isInIframe) { try { window.parent.postMessage(message, '*'); } catch(e) {} }
+  };
+
+  const getElementInfo = (el) => {
+    if (!el) return '';
+    const text = (el.innerText || el.value || '').trim().slice(0, 30);
+    const tag = el.tagName?.toLowerCase() || '';
+    return text ? `${tag} "${text}"` : tag;
+  };
+
+  document.addEventListener('click', (e) => {
+    sendToInspector('click', { elementInfo: getElementInfo(e.target) });
+  }, true);
+
+  document.addEventListener('input', (e) => {
+    if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') {
+      sendToInspector('input', { elementInfo: getElementInfo(e.target) });
+    }
+  }, true);
+
+  let scrollTimeout;
+  document.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => { sendToInspector('scroll', { elementInfo: 'page' }); }, 200);
+  }, true);
+
+  connectWS();
+  setInterval(() => { if (ws && wsReady) try { ws.send(JSON.stringify({ type: 'ping' })); } catch(e) {} }, 25000);
+
+  // فالبک postMessage
   if (isInIframe) {
-    console.log('🌉 Inspector Bridge: Active in iframe');
-
-    const sendToInspector = (action, data) => {
-      try {
-        window.parent.postMessage({
-          type: 'inspector-bridge-event',
-          action,
-          elementInfo: data.elementInfo || '',
-          position: data.position || { xPercent: 50, yPercent: 50 },
-          pageUrl: window.location.href,
-          timestamp: Date.now()
-        }, '*');
-      } catch (e) { console.warn('Bridge send failed:', e); }
-    };
-
-    const getElementInfo = (el) => {
-      if (!el) return '';
-      const text = (el.innerText || el.value || '').trim().slice(0, 30);
-      const tag = el.tagName?.toLowerCase() || '';
-      return text ? `${tag} "${text}"` : tag;
-    };
-
-    document.addEventListener('click', (e) => {
-      sendToInspector('click', { elementInfo: getElementInfo(e.target) });
-    }, true);
-
-    document.addEventListener('input', (e) => {
-      if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') {
-        sendToInspector('input', { elementInfo: getElementInfo(e.target) });
-      }
-    }, true);
-
-    let scrollTimeout;
-    document.addEventListener('scroll', () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        sendToInspector('scroll', { elementInfo: 'صفحه' });
-      }, 200);
-    }, true);
-
-    window.parent.postMessage({ type: 'inspector-bridge-ready', pageUrl: window.location.href }, '*');
+    try { window.parent.postMessage({ type: 'inspector-bridge-ready', pageUrl: window.location.href }, '*'); } catch(e) {}
   }
 }
 // 🌉 End of Inspector Bridge Script
+
+
 
 import React, { useState, useEffect, useRef, useMemo, createContext, useContext, useCallback } from 'react';
 import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle, Square } from 'lucide-react';
