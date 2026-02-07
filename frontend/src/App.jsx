@@ -86,6 +86,35 @@ if (typeof window !== 'undefined' && !window.__inspectorBridgeLoaded) {
     scrollTimeout = setTimeout(() => { sendToInspector('scroll', { elementInfo: 'page' }); }, 200);
   }, true);
 
+  // 🔴 گیرنده خطاهای جاوااسکریپت فرانت‌اند
+  let errorCount = 0;
+  const MAX_ERRORS = 20;
+
+  window.onerror = (message, source, lineno) => {
+    if (errorCount >= MAX_ERRORS) return;
+    errorCount++;
+    let errorInfo = String(message || 'Unknown error').slice(0, 150);
+    if (source) errorInfo += ` (at ${source.split('/').pop()}:${lineno})`;
+    sendToInspector('error', { elementInfo: errorInfo });
+  };
+
+  window.addEventListener('unhandledrejection', (e) => {
+    if (errorCount >= MAX_ERRORS) return;
+    errorCount++;
+    const reason = (e.reason?.message || e.reason?.toString()) || 'Promise rejected';
+    sendToInspector('error', { elementInfo: String(reason).slice(0, 150) });
+  });
+
+  const origConsoleError = console.error;
+  console.error = (...args) => {
+    origConsoleError.apply(console, args);
+    if (errorCount >= MAX_ERRORS) return;
+    errorCount++;
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a).slice(0, 80) : String(a).slice(0, 80)).join(' ').slice(0, 150);
+    if (msg.includes('Inspector Bridge')) return;
+    sendToInspector('console-error', { elementInfo: msg });
+  };
+
   connectWS();
   setInterval(() => { if (ws && wsReady) try { ws.send(JSON.stringify({ type: 'ping' })); } catch(e) {} }, 25000);
 
@@ -95,6 +124,8 @@ if (typeof window !== 'undefined' && !window.__inspectorBridgeLoaded) {
   }
 }
 // 🌉 End of Inspector Bridge Script
+
+
 
 
 
