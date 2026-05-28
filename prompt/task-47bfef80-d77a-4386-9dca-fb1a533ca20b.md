@@ -3,14 +3,14 @@ task_id: 47bfef80-d77a-4386-9dca-fb1a533ca20b
 title: امن‌سازی متغیرهای محیطی
 type: bug
 priority: critical
-execution_priority: 1000
-status: pending
+execution_priority: 1300
+status: awaiting_review
 external_status: pending
-verification_status: pending
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-09T07:29:40.376160+00:00'
-updated_at: '2026-05-27T20:42:43.885178+00:00'
+updated_at: '2026-05-28T10:12:18.262319+00:00'
 ---
 
 # امن‌سازی متغیرهای محیطی
