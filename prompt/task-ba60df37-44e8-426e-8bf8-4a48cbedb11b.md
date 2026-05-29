@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:41:49.269752+00:00'
-updated_at: '2026-05-23T07:37:37.855138+00:00'
+updated_at: '2026-05-29T20:15:50.276344+00:00'
 ---
 
 # [Effectiveness] عدم پوشش سناریوهای خطا در Inspector Bridge
