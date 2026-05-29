@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-09T07:29:40.376160+00:00'
-updated_at: '2026-05-29T18:29:12.766431+00:00'
+updated_at: '2026-05-29T20:06:17.355073+00:00'
 ---
 
 # امن‌سازی متغیرهای محیطی
