@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.242074+00:00'
-updated_at: '2026-05-23T09:44:11.036920+00:00'
+updated_at: '2026-05-29T20:27:39.827770+00:00'
 ---
 
 # [Effectiveness] وابستگی به فایل‌های package-lock.json بدون بررسی تغییرات
