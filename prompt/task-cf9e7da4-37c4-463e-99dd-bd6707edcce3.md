@@ -10,7 +10,7 @@ verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:39:58.690012+00:00'
-updated_at: '2026-05-29T22:14:24.726774+00:00'
+updated_at: '2026-05-30T07:41:19.632971+00:00'
 target_files:
 - frontend/index.html
 ---
@@ -23,6 +23,9 @@ target_files:
 ---
 [scan #2 at 2026-05-16T07:39:58.697704+00:00]
 در frontend/index.html خطوط 11-18، Firebase configuration شامل apiKey، authDomain، projectId، storageBucket و appId به صورت plain text در کد HTML قرار گرفته است. این اطلاعات حساس در معرض دید همه کاربران قرار دارد و امکان سوءاستفاده از سرویس Firebase را فراهم می‌کند. همچنین در frontend/src/App.jsx خط
+---
+[scan #3 at 2026-05-30T07:41:19.632958+00:00]
+در فایل frontend/index.html (خطوط 11-19)، Firebase configuration شامل apiKey، authDomain، projectId، storageBucket، messagingSenderId و appId به صورت plain text در HTML تزریق شده است. این اطلاعات در client bundle نهایی (frontend/dist) قرار می‌گیرد و هر کاربری می‌تواند آن را مشاهده کند. اگرچه Firebas
 
 ## Prompt
 
