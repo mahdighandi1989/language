@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:26:59.533826+00:00",
+  "generated_at": "2026-06-01T19:27:50.752354+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 32,
+  "total": 31,
   "tasks": [
     {
       "task_id": "d741bf1f-608e-446e-823c-745e5328dd7b",
@@ -88,30 +88,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:44:27.431407+00:00",
       "updated_at": "2026-06-01T18:49:29.643804+00:00"
-    },
-    {
-      "task_id": "ce49131c-eb52-4fbe-a84a-d0b51342124d",
-      "title": "تعریف و پیاده‌سازی KPIs برای سنجش outcome",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-ce49131c-eb52-4fbe-a84a-d0b51342124d.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:45:10.213112+00:00",
-      "updated_at": "2026-06-01T18:52:45.290169+00:00"
-    },
-    {
-      "task_id": "2b8c87a0-e0b3-4fdb-81bf-07d6825be3a0",
-      "title": "افزودن نوتیفیکیشن برای رویداد 'verify_failed'",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-2b8c87a0-e0b3-4fdb-81bf-07d6825be3a0.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:45:52.498607+00:00",
-      "updated_at": "2026-06-01T18:50:09.855738+00:00"
     },
     {
       "task_id": "d13296fb-53a8-45a4-919b-de4f984a5a64",
@@ -204,10 +180,22 @@
       "execution_priority": 2000,
       "status": "pending",
       "external_status": "pending",
-      "path": null,
+      "path": "prompt/task-task_9172abbf97f5.md",
       "external_attempts": 0,
       "created_at": "2026-06-01T19:26:36.892083+00:00",
       "updated_at": "2026-06-01T19:26:36.892086+00:00"
+    },
+    {
+      "task_id": "task_ce963d814d52",
+      "title": "پیاده‌سازی سیستم پایش عملکرد و سنجش KPI",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": null,
+      "external_attempts": 0,
+      "created_at": "2026-06-01T19:27:46.879724+00:00",
+      "updated_at": "2026-06-01T19:27:46.879729+00:00"
     },
     {
       "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
