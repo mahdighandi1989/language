@@ -3,14 +3,14 @@ task_id: f101ec5e-3bdd-474c-9dcc-99d3b92f27b7
 title: 'فایل با هدف مبهم: App.jsx'
 type: audit
 priority: medium
-execution_priority: 3000
-status: suggested
+execution_priority: 3300
+status: awaiting_review
 external_status: pending
-verification_status: pending
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:37:10.116496+00:00'
-updated_at: '2026-05-29T20:27:34.498528+00:00'
+updated_at: '2026-06-01T19:02:05.356833+00:00'
 target_files:
 - frontend/src/App.jsx
 ---
