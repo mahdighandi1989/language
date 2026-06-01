@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:57:35.803997+00:00",
+  "generated_at": "2026-06-01T18:57:45.546527+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 32,
@@ -367,7 +367,7 @@
     },
     {
       "task_id": "8d5aac8c-2e65-4d59-b4d1-0a8661a45644",
-      "title": "WebSocket Server در backend/server.js تعریف شده اما در Inspector Bridge استفاده نمی‌شود",
+      "title": "جداسازی WebSocket از Inspector Bridge",
       "priority": "medium",
       "execution_priority": 3300,
       "status": "awaiting_review",
@@ -375,7 +375,7 @@
       "path": "prompt/task-8d5aac8c-2e65-4d59-b4d1-0a8661a45644.md",
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.871650+00:00",
-      "updated_at": "2026-06-01T18:57:27.344764+00:00"
+      "updated_at": "2026-06-01T18:57:40.548774+00:00"
     },
     {
       "task_id": "60b4eaa6-6812-4e1b-976a-84e47016dddc",
