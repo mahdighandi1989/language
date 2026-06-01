@@ -4,13 +4,13 @@ title: فایل‌های frontend/vite.config.js و frontend/postcss.config.js �
 type: bug
 priority: low
 execution_priority: 4000
-status: suggested
+status: pending
 external_status: pending
 verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.268417+00:00'
-updated_at: '2026-05-29T20:27:42.759614+00:00'
+updated_at: '2026-06-01T19:03:31.904248+00:00'
 target_files:
 - frontend/vite.config.js
 ---
