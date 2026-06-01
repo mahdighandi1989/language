@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:06:00.022040+00:00",
+  "generated_at": "2026-06-01T19:06:55.381249+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 46,
+  "total": 47,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -304,6 +304,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:36:07.869280+00:00",
       "updated_at": "2026-06-01T18:56:09.616620+00:00"
+    },
+    {
+      "task_id": "e133db5b-6713-4ed8-bdc3-d3f4dc9ce773",
+      "title": "فایل backend/server.js بیش از ۱۴۰۰ خط و فاقد جداسازی لایه‌ای است",
+      "priority": "high",
+      "execution_priority": 2300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-e133db5b-6713-4ed8-bdc3-d3f4dc9ce773.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-30T07:41:50.871037+00:00",
+      "updated_at": "2026-06-01T19:06:47.719067+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
