@@ -1,22 +1,10 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:15:47.398811+00:00",
+  "generated_at": "2026-06-01T19:18:16.954167+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 59,
+  "total": 53,
   "tasks": [
-    {
-      "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
-      "title": "انتقال Firebase credentials به متغیرهای محیطی",
-      "priority": "critical",
-      "execution_priority": 1000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-cf9e7da4-37c4-463e-99dd-bd6707edcce3.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:39:58.690012+00:00",
-      "updated_at": "2026-06-01T18:32:42.530306+00:00"
-    },
     {
       "task_id": "755e8cbd-c769-415e-8372-b625eb716a5c",
       "title": "Make Inspector Bridge WebSocket URL configurable",
@@ -66,40 +54,16 @@
       "updated_at": "2026-06-01T19:08:21.927519+00:00"
     },
     {
-      "task_id": "47bfef80-d77a-4386-9dca-fb1a533ca20b",
-      "title": "امن‌سازی متغیرهای محیطی",
+      "task_id": "task_0193aa4e943f",
+      "title": "تقویت امنیت سیستم: مدیریت متغیرهای محیطی و پیکربندی هدرها",
       "priority": "critical",
-      "execution_priority": 1300,
-      "status": "awaiting_review",
+      "execution_priority": 1000,
+      "status": "pending",
       "external_status": "pending",
-      "path": "prompt/task-47bfef80-d77a-4386-9dca-fb1a533ca20b.md",
+      "path": null,
       "external_attempts": 0,
-      "created_at": "2026-05-09T07:29:40.376160+00:00",
-      "updated_at": "2026-06-01T18:24:10.161470+00:00"
-    },
-    {
-      "task_id": "f1a8e5dd-c1fa-4558-8603-d9200b6a5ce4",
-      "title": "Secure Firebase config and verify backend tokens",
-      "priority": "critical",
-      "execution_priority": 1300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-f1a8e5dd-c1fa-4558-8603-d9200b6a5ce4.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:39:58.697868+00:00",
-      "updated_at": "2026-06-01T18:34:19.133955+00:00"
-    },
-    {
-      "task_id": "fdba8076-dc5d-470c-b7af-049761996be5",
-      "title": "حذف hardcode کلیدهای Firebase از frontend",
-      "priority": "critical",
-      "execution_priority": 1300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-fdba8076-dc5d-470c-b7af-049761996be5.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:36:07.769941+00:00",
-      "updated_at": "2026-06-01T18:54:14.602007+00:00"
+      "created_at": "2026-06-01T19:17:50.430047+00:00",
+      "updated_at": "2026-06-01T19:17:50.430050+00:00"
     },
     {
       "task_id": "5bd04995-7545-4582-acb9-20c453d383a9",
@@ -112,18 +76,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-30T07:41:19.663924+00:00",
       "updated_at": "2026-06-01T19:05:16.139510+00:00"
-    },
-    {
-      "task_id": "c7474d4f-8730-4531-b8ec-50de5a444b82",
-      "title": "پیاده‌سازی هدرهای امنیتی و CORS",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-c7474d4f-8730-4531-b8ec-50de5a444b82.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-09T07:29:40.376315+00:00",
-      "updated_at": "2026-06-01T18:34:00.657845+00:00"
     },
     {
       "task_id": "8e301658-c941-415b-9489-9a76397d2d13",
@@ -318,18 +270,6 @@
       "updated_at": "2026-06-01T18:48:30.681483+00:00"
     },
     {
-      "task_id": "b4991688-efec-4865-9aff-88d71d9a0127",
-      "title": "پیکربندی CORS با دامنه‌های مجاز",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-b4991688-efec-4865-9aff-88d71d9a0127.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:36:07.805303+00:00",
-      "updated_at": "2026-06-01T18:54:36.819237+00:00"
-    },
-    {
       "task_id": "9129c3f0-3212-454b-80ae-dd043a36db18",
       "title": "حذف کد مرده Inspector Bridge",
       "priority": "high",
@@ -424,18 +364,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.847710+00:00",
       "updated_at": "2026-06-01T18:57:08.754754+00:00"
-    },
-    {
-      "task_id": "60221f9c-c1b1-4274-9512-9c022c1dd65c",
-      "title": "یکپارچه‌سازی اعتبارسنجی GEMINI_API_KEY در endpointها",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-60221f9c-c1b1-4274-9512-9c022c1dd65c.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:09.896442+00:00",
-      "updated_at": "2026-06-01T18:58:52.686365+00:00"
     },
     {
       "task_id": "dd2427f0-2f36-4f38-82f1-94e419c20d77",
