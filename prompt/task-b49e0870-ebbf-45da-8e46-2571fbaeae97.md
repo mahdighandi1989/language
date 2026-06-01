@@ -1,6 +1,6 @@
 ---
 task_id: b49e0870-ebbf-45da-8e46-2571fbaeae97
-title: 'Anti-pattern: AI بدون validation (response استفاده می‌شود بدون چ'
+title: Implement AI response validation
 type: bug_fix
 priority: high
 execution_priority: 2300
@@ -10,12 +10,12 @@ verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:44:27.391318+00:00'
-updated_at: '2026-06-01T18:48:46.006534+00:00'
+updated_at: '2026-06-01T18:48:54.594067+00:00'
 target_files:
 - backend/server.js
 ---
 
-# Anti-pattern: AI بدون validation (response استفاده می‌شود بدون چ
+# Implement AI response validation
 
 ## Raw Idea
 
