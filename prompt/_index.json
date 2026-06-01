@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:49:27.572355+00:00",
+  "generated_at": "2026-06-01T18:49:34.691656+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 19,
@@ -103,7 +103,7 @@
     },
     {
       "task_id": "1470edf2-a90f-43ec-b54a-255674ed6c86",
-      "title": "Anti-pattern: Threshold-Outcome mismatch",
+      "title": "Resolve Threshold-Outcome mismatch anti-pattern",
       "priority": "high",
       "execution_priority": 2000,
       "status": "pending",
@@ -111,7 +111,7 @@
       "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
       "external_attempts": 0,
       "created_at": "2026-05-16T07:44:27.431407+00:00",
-      "updated_at": "2026-06-01T18:49:20.326963+00:00"
+      "updated_at": "2026-06-01T18:49:29.643804+00:00"
     },
     {
       "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
