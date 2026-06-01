@@ -4,13 +4,13 @@ title: '[Effectiveness] وابستگی به فایل‌های package-lock.json 
 type: logic_audit
 priority: medium
 execution_priority: 3000
-status: suggested
+status: pending
 external_status: pending
 verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.242074+00:00'
-updated_at: '2026-05-29T20:27:39.827770+00:00'
+updated_at: '2026-06-01T19:05:40.930911+00:00'
 ---
 
 # [Effectiveness] وابستگی به فایل‌های package-lock.json بدون بررسی تغییرات
@@ -131,7 +131,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: بازنویسی outcome target به‌صورت measurable و اضافه کردن metric/log برای تشخیص نرخ outcome در production
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل بازنویسی هدف مطلوب (کاهش خطاهای ناسازگاری وابستگی‌ها به صفر در ۳۰ روز) به‌صورت قابل اندازه‌گیری (مثلاً تعداد خطاهای ناسازگاری در روز، درصد موفقیت buildها) و اضافه کردن metric یا log در کد (احتمالاً در CI/CD pipeline یا backend) است تا نرخ outcome در production قابل تشخیص باشد. خارج از این مرحله: تغییر در frontend UI، نوشتن تست E2E، یا اصلاح lint/type-check. نکته حیاتی: outcome target باید به‌صورت عددی و قابل ردیابی باشد، نه vague.
 **Excerpt:**
 ```
@@ -144,7 +144,7 @@ _(مستقل)_
 ```
 
 ### Step 2: تغییر کد برای محقق کردن outcome target (اضافه کردن بررسی وابستگی‌ها در CI/CD و npm audit)
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل تغییر کد (احتمالاً در فایل‌های CI/CD مانند GitHub Actions workflows یا scripts در frontend/backend) برای اضافه کردن مرحله بررسی و به‌روزرسانی وابستگی‌ها و اجرای منظم npm audit است. هدف: اطمینان از اینکه وابستگی‌ها به‌روز و بدون آسیب‌پذیری هستند. خارج از این مرحله: نوشتن تست E2E، اصلاح lint/type-check، یا تغییر در UI. نکته حیاتی: باید هم برای frontend و هم backend اجرا شود.
 **Excerpt:**
 ```
@@ -156,7 +156,7 @@ _(مستقل)_
 ```
 
 ### Step 3: نوشتن تست E2E که outcome را اندازه می‌گیرد (ناسازگاری وابستگی‌ها)
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک تست E2E (احتمالاً با ابزاری مانند Cypress یا Playwright برای frontend، یا تست integration برای backend) است که outcome مطلوب (کاهش خطاهای ناسازگاری وابستگی‌ها) را اندازه‌گیری می‌کند. تست باید سناریویی را شبیه‌سازی کند که وابستگی‌ها ناسازگار هستند و بررسی کند که سیستم خطا را به‌درستی گزارش می‌دهد یا از آن جلوگیری می‌کند. خارج از این مرحله: تغییر در CI/CD pipeline، اصلاح lint/type-check. نکته حیاتی: تست باید outcome را اندازه بگیرد، نه فقط وجود فایل/خط.
 **Excerpt:**
 ```
@@ -168,7 +168,7 @@ _(مستقل)_
 ```
 
 ### Step 4: اضافه کردن metric/log برای تشخیص نرخ outcome در production (تکمیل)
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله تکمیل‌کننده مرحله ۱ است و شامل اضافه کردن metric یا log دقیق‌تر در production (مثلاً در backend یا frontend) برای تشخیص نرخ outcome (مثلاً تعداد دفعاتی که وابستگی‌ها ناسازگار تشخیص داده می‌شوند) است. این metric باید در dashboard یا log aggregator قابل مشاهده باشد. خارج از این مرحله: تغییر در CI/CD pipeline، نوشتن تست. نکته حیاتی: metric باید به‌صورت real-time یا near-real-time باشد.
 **Excerpt:**
 ```
@@ -177,7 +177,7 @@ _(مستقل)_
 ```
 
 ### Step 5: اطمینان از عبور همه تست‌ها (npm run test / pytest) بدون fail
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای تمام تست‌های موجود (unit, integration, E2E) با دستورات `npm run test` (برای frontend) و `pytest` (برای backend) و اطمینان از اینکه هیچ تستی fail نمی‌شود. اگر تستی fail شد، باید رفع شود (ممکن است نیاز به اصلاح کد یا تست باشد). خارج از این مرحله: نوشتن تست جدید، تغییر در CI/CD. نکته حیاتی: این مرحله باید بعد از تغییرات قبلی انجام شود تا مطمئن شویم رگرشنی ایجاد نشده.
 **Excerpt:**
 ```
@@ -186,7 +186,7 @@ _(مستقل)_
 ```
 
 ### Step 6: اطمینان از عبور linter بدون warning
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای linter (مثلاً ESLint برای frontend، pylint/flake8 برای backend) و اطمینان از اینکه هیچ warning یا خطایی وجود ندارد. اگر warning وجود داشت، باید رفع شود (مثلاً با اصلاح کد یا تنظیمات linter). خارج از این مرحله: تغییر در تست‌ها، CI/CD. نکته حیاتی: linter باید با تنظیمات پروژه اجرا شود.
 **Excerpt:**
 ```
@@ -195,7 +195,7 @@ _(مستقل)_
 ```
 
 ### Step 7: اطمینان از موفقیت type-check (tsc --noEmit / mypy)
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای type-checker (TypeScript با `tsc --noEmit` برای frontend، mypy برای backend) و اطمینان از اینکه هیچ type error وجود ندارد. اگر خطایی وجود داشت، باید رفع شود. خارج از این مرحله: تغییر در تست‌ها، linter. نکته حیاتی: type-check باید با تنظیمات پروژه (tsconfig.json, mypy.ini) اجرا شود.
 **Excerpt:**
 ```
