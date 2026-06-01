@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:08:52.078031+00:00",
+  "generated_at": "2026-06-01T19:09:08.281226+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 50,
+  "total": 51,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -196,6 +196,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.765140+00:00",
       "updated_at": "2026-06-01T18:58:23.910363+00:00"
+    },
+    {
+      "task_id": "d13296fb-53a8-45a4-919b-de4f984a5a64",
+      "title": "Anti-pattern: Conditional inconsistency",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-d13296fb-53a8-45a4-919b-de4f984a5a64.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-30T07:41:51.103405+00:00",
+      "updated_at": "2026-06-01T19:09:00.781257+00:00"
     },
     {
       "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
