@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:05:48.416228+00:00",
+  "generated_at": "2026-06-01T19:06:00.022040+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 46,
@@ -415,7 +415,7 @@
     },
     {
       "task_id": "a5f3ced3-5841-4c4c-adef-06da565203ed",
-      "title": "[Effectiveness] وابستگی به فایل‌های package-lock.json بدون بررسی تغییرات",
+      "title": "افزودن بررسی وابستگی‌ها به CI/CD",
       "priority": "medium",
       "execution_priority": 3000,
       "status": "pending",
@@ -423,7 +423,7 @@
       "path": "prompt/task-a5f3ced3-5841-4c4c-adef-06da565203ed.md",
       "external_attempts": 0,
       "created_at": "2026-05-23T07:38:10.242074+00:00",
-      "updated_at": "2026-06-01T19:05:40.930911+00:00"
+      "updated_at": "2026-06-01T19:05:55.139671+00:00"
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
