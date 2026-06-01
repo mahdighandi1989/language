@@ -1,6 +1,6 @@
 ---
 task_id: e133db5b-6713-4ed8-bdc3-d3f4dc9ce773
-title: فایل backend/server.js بیش از ۱۴۰۰ خط و فاقد جداسازی لایه‌ای است
+title: جداسازی لایه‌ها در backend/server.js
 type: refactor
 priority: high
 execution_priority: 2300
@@ -10,12 +10,12 @@ verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-30T07:41:50.871037+00:00'
-updated_at: '2026-06-01T19:06:47.719067+00:00'
+updated_at: '2026-06-01T19:06:59.681005+00:00'
 target_files:
 - backend/server.js
 ---
 
-# فایل backend/server.js بیش از ۱۴۰۰ خط و فاقد جداسازی لایه‌ای است
+# جداسازی لایه‌ها در backend/server.js
 
 ## Raw Idea
 
