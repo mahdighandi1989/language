@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:23:56.072118+00:00",
+  "generated_at": "2026-06-01T19:26:59.533826+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 40,
+  "total": 32,
   "tasks": [
     {
       "task_id": "d741bf1f-608e-446e-823c-745e5328dd7b",
@@ -114,18 +114,6 @@
       "updated_at": "2026-06-01T18:50:09.855738+00:00"
     },
     {
-      "task_id": "7c1da858-e52e-4791-9121-82794c82c52a",
-      "title": "مستندسازی هدف کامپوننت‌های کلیدی و معماری",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-7c1da858-e52e-4791-9121-82794c82c52a.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:09.765140+00:00",
-      "updated_at": "2026-06-01T18:58:23.910363+00:00"
-    },
-    {
       "task_id": "d13296fb-53a8-45a4-919b-de4f984a5a64",
       "title": "Resolve conditional inconsistency anti-pattern",
       "priority": "high",
@@ -199,15 +187,27 @@
     },
     {
       "task_id": "task_3b614e2e1960",
-      "title": "اعتبارسنجی پاسخ‌های AI و رفع الگوهای طراحی نامناسب",
+      "title": "اعتبارسنجی پاسخ AI و رفع anti-pattern",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_3b614e2e1960.md",
+      "external_attempts": 0,
+      "created_at": "2026-06-01T19:23:50.486184+00:00",
+      "updated_at": "2026-06-01T19:23:58.039198+00:00"
+    },
+    {
+      "task_id": "task_9172abbf97f5",
+      "title": "مستندسازی جامع پروژه و بهبود فرآیند راه‌اندازی",
       "priority": "high",
       "execution_priority": 2000,
       "status": "pending",
       "external_status": "pending",
       "path": null,
       "external_attempts": 0,
-      "created_at": "2026-06-01T19:23:50.486184+00:00",
-      "updated_at": "2026-06-01T19:23:50.486189+00:00"
+      "created_at": "2026-06-01T19:26:36.892083+00:00",
+      "updated_at": "2026-06-01T19:26:36.892086+00:00"
     },
     {
       "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
@@ -270,42 +270,6 @@
       "updated_at": "2026-05-29T20:08:32.693677+00:00"
     },
     {
-      "task_id": "5564037e-a6ff-4ad6-a190-ec9a7783c825",
-      "title": "Add LICENSE file and resolve dependency conflicts",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-5564037e-a6ff-4ad6-a190-ec9a7783c825.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:09.956733+00:00",
-      "updated_at": "2026-06-01T18:59:51.892695+00:00"
-    },
-    {
-      "task_id": "ac140bf8-b8db-4a11-83fe-5816b110603b",
-      "title": "مستندسازی و نامگذاری index.html",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-ac140bf8-b8db-4a11-83fe-5816b110603b.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:10.069596+00:00",
-      "updated_at": "2026-06-01T19:01:28.175716+00:00"
-    },
-    {
-      "task_id": "cae62312-11d9-47af-bc8e-9c0fadd3caf1",
-      "title": "مستندسازی هدف package-lock.json",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-cae62312-11d9-47af-bc8e-9c0fadd3caf1.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:10.093134+00:00",
-      "updated_at": "2026-06-01T19:01:45.659447+00:00"
-    },
-    {
       "task_id": "a5f3ced3-5841-4c4c-adef-06da565203ed",
       "title": "افزودن بررسی وابستگی‌ها به CI/CD",
       "priority": "medium",
@@ -340,54 +304,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-09T07:29:40.376224+00:00",
       "updated_at": "2026-06-01T18:31:20.568260+00:00"
-    },
-    {
-      "task_id": "e00a1855-25c4-483d-b3b6-465d34383e3f",
-      "title": "Create .env.example for frontend variables",
-      "priority": "medium",
-      "execution_priority": 3300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-e00a1855-25c4-483d-b3b6-465d34383e3f.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:45:52.549400+00:00",
-      "updated_at": "2026-06-01T18:51:48.038757+00:00"
-    },
-    {
-      "task_id": "c826e12b-dc51-42a4-8c4c-61f446ddccca",
-      "title": "Add license file to repository",
-      "priority": "medium",
-      "execution_priority": 3300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-c826e12b-dc51-42a4-8c4c-61f446ddccca.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:45:52.576252+00:00",
-      "updated_at": "2026-06-01T18:53:12.028743+00:00"
-    },
-    {
-      "task_id": "dfc945a2-9d3b-4808-9e4b-2c93b8d8b00e",
-      "title": "مستندسازی و تغییر نام server.js",
-      "priority": "medium",
-      "execution_priority": 3300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-dfc945a2-9d3b-4808-9e4b-2c93b8d8b00e.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:10.047953+00:00",
-      "updated_at": "2026-06-01T19:00:38.548354+00:00"
-    },
-    {
-      "task_id": "f101ec5e-3bdd-474c-9dcc-99d3b92f27b7",
-      "title": "روشن کردن هدف App.jsx",
-      "priority": "medium",
-      "execution_priority": 3300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-f101ec5e-3bdd-474c-9dcc-99d3b92f27b7.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:10.116496+00:00",
-      "updated_at": "2026-06-01T19:02:15.680746+00:00"
     },
     {
       "task_id": "b3d7759b-2054-457f-a5ce-54dc346fb960",
@@ -472,18 +388,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:38:10.294582+00:00",
       "updated_at": "2026-06-01T19:03:20.509446+00:00"
-    },
-    {
-      "task_id": "60b4eaa6-6812-4e1b-976a-84e47016dddc",
-      "title": "تعریف GEMINI_API_KEY در .env.example",
-      "priority": "low",
-      "execution_priority": 4300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-60b4eaa6-6812-4e1b-976a-84e47016dddc.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:45:52.685061+00:00",
-      "updated_at": "2026-06-01T18:53:51.491279+00:00"
     }
   ]
 }
