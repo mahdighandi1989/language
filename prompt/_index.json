@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:55:51.139084+00:00",
+  "generated_at": "2026-06-01T18:56:07.622617+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 29,
+  "total": 30,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -256,6 +256,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:36:07.831987+00:00",
       "updated_at": "2026-06-01T18:55:46.017150+00:00"
+    },
+    {
+      "task_id": "bca62f9c-0e65-448c-99e1-3ffcfb473a34",
+      "title": "WebSocket server در backend تعریف شده اما هیچ handler یا route برای live voice پیاده‌سازی نشده است",
+      "priority": "high",
+      "execution_priority": 2300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-bca62f9c-0e65-448c-99e1-3ffcfb473a34.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-23T07:36:07.869280+00:00",
+      "updated_at": "2026-06-01T18:56:02.888371+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
