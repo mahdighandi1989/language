@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:50:57.621574+00:00",
+  "generated_at": "2026-06-01T18:51:53.641894+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 21,
+  "total": 22,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -256,6 +256,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-09T07:29:40.376256+00:00",
       "updated_at": "2026-06-01T18:30:03.027347+00:00"
+    },
+    {
+      "task_id": "e00a1855-25c4-483d-b3b6-465d34383e3f",
+      "title": "Create .env.example for frontend variables",
+      "priority": "medium",
+      "execution_priority": 3300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-e00a1855-25c4-483d-b3b6-465d34383e3f.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-16T07:45:52.549400+00:00",
+      "updated_at": "2026-06-01T18:51:48.038757+00:00"
     }
   ]
 }
