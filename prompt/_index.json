@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:14:00.217817+00:00",
+  "generated_at": "2026-06-01T19:15:01.931082+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 56,
+  "total": 57,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -640,6 +640,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-30T07:43:05.912050+00:00",
       "updated_at": "2026-06-01T19:11:54.628106+00:00"
+    },
+    {
+      "task_id": "6d989ea3-b525-4566-994a-ce401ae7373a",
+      "title": "فایل با هدف مبهم: task-8ac8249d-e1de-40f8-ad4b-36e271a1b237.md",
+      "priority": "medium",
+      "execution_priority": 3300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-6d989ea3-b525-4566-994a-ce401ae7373a.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-30T07:43:06.013216+00:00",
+      "updated_at": "2026-06-01T19:14:54.297233+00:00"
     },
     {
       "task_id": "719922d4-efde-4fe8-abaa-435738adb4c9",
