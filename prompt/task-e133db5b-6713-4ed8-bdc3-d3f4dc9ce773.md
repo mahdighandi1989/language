@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-30T07:41:50.871037+00:00'
-updated_at: '2026-05-30T07:41:50.871039+00:00'
+updated_at: '2026-06-01T17:03:54.939169+00:00'
 target_files:
 - backend/server.js
 ---
@@ -493,10 +493,10 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. پوشه‌های controllers, services, routes, middleware, utils در backend ایجاد شوند
-2. همه route handlers از server.js به فایل‌های جداگانه منتقل شوند
-3. همه توابع سرویس (analyzeWithGemini, uploadToGeminiFileAPI و ...) به فایل‌های services منتقل شوند
-4. همه middlewareها (handleMulterError) به فایل middleware منتقل شوند
-5. همه توابع کمکی (splitIntoChunks) به فایل utils منتقل شوند
-6. server.js پس از refactor کمتر از ۱۰۰ خط باشد و فقط importها و تنظیمات global را شامل شود
-7. برنامه پس از refactor بدون خطا اجرا شود و تمام endpointهای قبلی کار کنند
+1. پوشه‌های controllers, services, routes, middleware, utils در backend ایجاد شوند _(verify: static)_
+2. همه route handlers از server.js به فایل‌های جداگانه منتقل شوند _(verify: static)_
+3. همه توابع سرویس (analyzeWithGemini, uploadToGeminiFileAPI و ...) به فایل‌های services منتقل شوند _(verify: static)_
+4. همه middlewareها (handleMulterError) به فایل middleware منتقل شوند _(verify: static)_
+5. همه توابع کمکی (splitIntoChunks) به فایل utils منتقل شوند _(verify: static)_
+6. server.js پس از refactor کمتر از ۱۰۰ خط باشد و فقط importها و تنظیمات global را شامل شود _(verify: static)_
+7. برنامه پس از refactor بدون خطا اجرا شود و تمام endpointهای قبلی کار کنند _(verify: api_response)_
