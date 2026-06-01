@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:11:51.360052+00:00",
+  "generated_at": "2026-06-01T19:12:00.122156+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 53,
@@ -595,7 +595,7 @@
     },
     {
       "task_id": "2a0673ad-13dd-4131-9c72-18a093d60686",
-      "title": "فایل با هدف مبهم: task-2d1f95e8-b5ea-413f-b1ec-11b7bed6eeb7.md",
+      "title": "روشن کردن هدف و نام‌گذاری مجدد فایل",
       "priority": "medium",
       "execution_priority": 3300,
       "status": "awaiting_review",
@@ -603,7 +603,7 @@
       "path": "prompt/task-2a0673ad-13dd-4131-9c72-18a093d60686.md",
       "external_attempts": 0,
       "created_at": "2026-05-30T07:43:05.912050+00:00",
-      "updated_at": "2026-06-01T19:11:43.672844+00:00"
+      "updated_at": "2026-06-01T19:11:54.628106+00:00"
     },
     {
       "task_id": "719922d4-efde-4fe8-abaa-435738adb4c9",
