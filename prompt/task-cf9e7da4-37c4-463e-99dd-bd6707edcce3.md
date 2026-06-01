@@ -3,14 +3,14 @@ task_id: cf9e7da4-37c4-463e-99dd-bd6707edcce3
 title: انتقال Firebase credentials به متغیرهای محیطی
 type: security
 priority: critical
-execution_priority: 1300
-status: awaiting_review
+execution_priority: 1000
+status: pending
 external_status: pending
-verification_status: partial
+verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:39:58.690012+00:00'
-updated_at: '2026-06-01T10:16:32.667824+00:00'
+updated_at: '2026-06-01T18:32:42.530306+00:00'
 target_files:
 - frontend/index.html
 ---
