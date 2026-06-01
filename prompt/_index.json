@@ -1,34 +1,10 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:22:00.753503+00:00",
+  "generated_at": "2026-06-01T19:23:19.238782+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 45,
+  "total": 41,
   "tasks": [
-    {
-      "task_id": "755e8cbd-c769-415e-8372-b625eb716a5c",
-      "title": "Make Inspector Bridge WebSocket URL configurable",
-      "priority": "critical",
-      "execution_priority": 1000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-755e8cbd-c769-415e-8372-b625eb716a5c.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:39:58.701518+00:00",
-      "updated_at": "2026-06-01T18:34:33.545215+00:00"
-    },
-    {
-      "task_id": "ba60df37-44e8-426e-8bf8-4a48cbedb11b",
-      "title": "پوشش سناریوهای خطا در Inspector Bridge",
-      "priority": "critical",
-      "execution_priority": 1000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-ba60df37-44e8-426e-8bf8-4a48cbedb11b.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:41:49.269752+00:00",
-      "updated_at": "2026-06-01T18:38:47.373035+00:00"
-    },
     {
       "task_id": "d741bf1f-608e-446e-823c-745e5328dd7b",
       "title": "حذف Inspector Bridge Script از production",
@@ -64,6 +40,18 @@
       "external_attempts": 0,
       "created_at": "2026-06-01T19:17:50.430047+00:00",
       "updated_at": "2026-06-01T19:18:20.609870+00:00"
+    },
+    {
+      "task_id": "task_410fe171a0cb",
+      "title": "توسعه و بهبود Inspector Bridge: پیکربندی و مدیریت WebSocket",
+      "priority": "critical",
+      "execution_priority": 1000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": null,
+      "external_attempts": 0,
+      "created_at": "2026-06-01T19:22:56.705850+00:00",
+      "updated_at": "2026-06-01T19:22:56.705856+00:00"
     },
     {
       "task_id": "5bd04995-7545-4582-acb9-20c453d383a9",
@@ -199,27 +187,15 @@
     },
     {
       "task_id": "task_bf3013b41bbd",
-      "title": "افزایش پایداری با تست‌های خودکار: بک‌اند و فرانت‌اند",
+      "title": "راه‌اندازی زیرساخت تست Pytest بک‌اند",
       "priority": "high",
       "execution_priority": 2000,
       "status": "pending",
       "external_status": "pending",
-      "path": null,
+      "path": "prompt/task-task_bf3013b41bbd.md",
       "external_attempts": 0,
       "created_at": "2026-06-01T19:21:26.867239+00:00",
-      "updated_at": "2026-06-01T19:21:26.867245+00:00"
-    },
-    {
-      "task_id": "8cebc933-b60e-42f6-9f49-5dbb6e2c203a",
-      "title": "Correct frontend WebSocket endpoint connection",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-8cebc933-b60e-42f6-9f49-5dbb6e2c203a.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:42:40.681735+00:00",
-      "updated_at": "2026-06-01T18:40:27.020314+00:00"
+      "updated_at": "2026-06-01T19:22:06.944538+00:00"
     },
     {
       "task_id": "a2b20416-5230-4547-a8ba-472b511942b0",
@@ -256,18 +232,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:44:27.421347+00:00",
       "updated_at": "2026-06-01T18:48:30.681483+00:00"
-    },
-    {
-      "task_id": "bca62f9c-0e65-448c-99e1-3ffcfb473a34",
-      "title": "پیاده‌سازی هندلر WebSocket برای صدای زنده",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-bca62f9c-0e65-448c-99e1-3ffcfb473a34.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:36:07.869280+00:00",
-      "updated_at": "2026-06-01T18:56:09.616620+00:00"
     },
     {
       "task_id": "e133db5b-6713-4ed8-bdc3-d3f4dc9ce773",
@@ -316,18 +280,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-12T11:13:22.960230+00:00",
       "updated_at": "2026-05-29T20:08:32.693677+00:00"
-    },
-    {
-      "task_id": "01a42a22-f6da-4ba2-90e5-2ac7d1e55eae",
-      "title": "Configure frontend WebSocket bridge endpoint",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-01a42a22-f6da-4ba2-90e5-2ac7d1e55eae.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:09.847710+00:00",
-      "updated_at": "2026-06-01T18:57:08.754754+00:00"
     },
     {
       "task_id": "5564037e-a6ff-4ad6-a190-ec9a7783c825",
