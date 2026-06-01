@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:55:42.045956+00:00",
+  "generated_at": "2026-06-01T18:55:51.139084+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 29,
@@ -247,7 +247,7 @@
     },
     {
       "task_id": "9129c3f0-3212-454b-80ae-dd043a36db18",
-      "title": "حذف کد مرده Inspector Bridge از frontend/index.html و frontend/src/App.jsx",
+      "title": "حذف کد مرده Inspector Bridge",
       "priority": "high",
       "execution_priority": 2300,
       "status": "awaiting_review",
@@ -255,7 +255,7 @@
       "path": "prompt/task-9129c3f0-3212-454b-80ae-dd043a36db18.md",
       "external_attempts": 0,
       "created_at": "2026-05-23T07:36:07.831987+00:00",
-      "updated_at": "2026-06-01T18:55:36.813561+00:00"
+      "updated_at": "2026-06-01T18:55:46.017150+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
