@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:29:24.757351+00:00",
+  "generated_at": "2026-06-01T19:31:02.630927+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 24,
+  "total": 23,
   "tasks": [
     {
       "task_id": "d741bf1f-608e-446e-823c-745e5328dd7b",
@@ -43,15 +43,15 @@
     },
     {
       "task_id": "task_f55414420332",
-      "title": "بهبود تعریف، نام‌گذاری و رفع ابهامات پرامپت‌های AI/LLM",
+      "title": "استانداردسازی و رفع ابهام پرامپت‌های AI/LLM",
       "priority": "critical",
       "execution_priority": 1000,
       "status": "pending",
       "external_status": "pending",
-      "path": null,
+      "path": "prompt/task-task_f55414420332.md",
       "external_attempts": 0,
       "created_at": "2026-06-01T19:28:59.068953+00:00",
-      "updated_at": "2026-06-01T19:28:59.068958+00:00"
+      "updated_at": "2026-06-01T19:29:28.833273+00:00"
     },
     {
       "task_id": "5bd04995-7545-4582-acb9-20c453d383a9",
@@ -88,30 +88,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:44:27.431407+00:00",
       "updated_at": "2026-06-01T18:49:29.643804+00:00"
-    },
-    {
-      "task_id": "645bbdc2-f205-479f-b01f-f8b8ad4ef2e4",
-      "title": "تعریف و یکپارچه‌سازی ارکستراسیون پایپ‌لاین AI_LLM",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-645bbdc2-f205-479f-b01f-f8b8ad4ef2e4.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-30T07:42:20.910790+00:00",
-      "updated_at": "2026-06-01T19:13:29.014518+00:00"
-    },
-    {
-      "task_id": "ec7094fc-6705-4f66-9781-8c7365e08495",
-      "title": "بررسی ناسازگاری مدل AI و پارسر خروجی",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-ec7094fc-6705-4f66-9781-8c7365e08495.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-30T07:42:42.944974+00:00",
-      "updated_at": "2026-06-01T19:13:11.862657+00:00"
     },
     {
       "task_id": "task_2cd58167a90c",
@@ -184,6 +160,18 @@
       "external_attempts": 0,
       "created_at": "2026-06-01T19:27:46.879724+00:00",
       "updated_at": "2026-06-01T19:27:56.807293+00:00"
+    },
+    {
+      "task_id": "task_068445d6ae13",
+      "title": "مستندسازی و یکپارچه‌سازی معماری پایپ‌لاین AI/LLM",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": null,
+      "external_attempts": 0,
+      "created_at": "2026-06-01T19:30:57.201755+00:00",
+      "updated_at": "2026-06-01T19:30:57.201759+00:00"
     },
     {
       "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
