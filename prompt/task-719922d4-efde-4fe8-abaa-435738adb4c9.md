@@ -1,6 +1,6 @@
 ---
 task_id: 719922d4-efde-4fe8-abaa-435738adb4c9
-title: فایل‌های frontend/vite.config.js و frontend/postcss.config.js و frontend/tailwind.config.js فاقد تست هستند
+title: تست تنظیمات Vite/PostCSS/Tailwind
 type: bug
 priority: low
 execution_priority: 4000
@@ -10,12 +10,12 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.268417+00:00'
-updated_at: '2026-06-01T19:03:31.904248+00:00'
+updated_at: '2026-06-01T19:03:42.873117+00:00'
 target_files:
 - frontend/vite.config.js
 ---
 
-# فایل‌های frontend/vite.config.js و frontend/postcss.config.js و frontend/tailwind.config.js فاقد تست هستند
+# تست تنظیمات Vite/PostCSS/Tailwind
 
 ## Raw Idea
 
