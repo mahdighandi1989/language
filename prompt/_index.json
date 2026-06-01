@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:58:28.805159+00:00",
+  "generated_at": "2026-06-01T18:58:48.046933+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 33,
+  "total": 34,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -316,6 +316,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.847710+00:00",
       "updated_at": "2026-06-01T18:57:08.754754+00:00"
+    },
+    {
+      "task_id": "60221f9c-c1b1-4274-9512-9c022c1dd65c",
+      "title": "کد تکراری برای اعتبارسنجی GEMINI_API_KEY در چندین endpoint",
+      "priority": "medium",
+      "execution_priority": 3000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-60221f9c-c1b1-4274-9512-9c022c1dd65c.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-23T07:37:09.896442+00:00",
+      "updated_at": "2026-06-01T18:58:40.679121+00:00"
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
