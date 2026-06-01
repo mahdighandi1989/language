@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:45:13.505644+00:00",
+  "generated_at": "2026-06-01T18:46:15.472244+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 13,
+  "total": 14,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -88,6 +88,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:42:40.674179+00:00",
       "updated_at": "2026-06-01T18:43:27.951044+00:00"
+    },
+    {
+      "task_id": "31236cc5-eb3f-4b4e-be02-ee2362ecc8c4",
+      "title": "فایل backend/server.js شامل File Analysis API بدون محدودیت حجم و نوع فایل",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-31236cc5-eb3f-4b4e-be02-ee2362ecc8c4.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-16T07:44:27.355859+00:00",
+      "updated_at": "2026-06-01T18:46:07.922263+00:00"
     },
     {
       "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
