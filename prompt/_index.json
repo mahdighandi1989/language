@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:20:44.403967+00:00",
+  "generated_at": "2026-06-01T19:22:00.753503+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 47,
+  "total": 45,
   "tasks": [
     {
       "task_id": "755e8cbd-c769-415e-8372-b625eb716a5c",
@@ -192,22 +192,22 @@
       "execution_priority": 2000,
       "status": "pending",
       "external_status": "pending",
-      "path": null,
+      "path": "prompt/task-task_78af588c4541.md",
       "external_attempts": 0,
       "created_at": "2026-06-01T19:20:22.192691+00:00",
       "updated_at": "2026-06-01T19:20:22.192695+00:00"
     },
     {
-      "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
-      "title": "پیاده‌سازی تست‌های خودکار بک‌اند",
+      "task_id": "task_bf3013b41bbd",
+      "title": "افزایش پایداری با تست‌های خودکار: بک‌اند و فرانت‌اند",
       "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
+      "execution_priority": 2000,
+      "status": "pending",
       "external_status": "pending",
-      "path": "prompt/task-8ac8249d-e1de-40f8-ad4b-36e271a1b237.md",
+      "path": null,
       "external_attempts": 0,
-      "created_at": "2026-05-09T07:29:40.376125+00:00",
-      "updated_at": "2026-06-01T18:26:40.141497+00:00"
+      "created_at": "2026-06-01T19:21:26.867239+00:00",
+      "updated_at": "2026-06-01T19:21:26.867245+00:00"
     },
     {
       "task_id": "8cebc933-b60e-42f6-9f49-5dbb6e2c203a",
@@ -220,18 +220,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:42:40.681735+00:00",
       "updated_at": "2026-06-01T18:40:27.020314+00:00"
-    },
-    {
-      "task_id": "554b0bf9-fdee-4f74-bbd0-54f4835b96d4",
-      "title": "افزودن تست واحد برای endpointهای اصلی API",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-554b0bf9-fdee-4f74-bbd0-54f4835b96d4.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:44:27.337735+00:00",
-      "updated_at": "2026-06-01T18:44:45.196505+00:00"
     },
     {
       "task_id": "a2b20416-5230-4547-a8ba-472b511942b0",
@@ -352,18 +340,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.956733+00:00",
       "updated_at": "2026-06-01T18:59:51.892695+00:00"
-    },
-    {
-      "task_id": "4a025b18-0bde-429c-8f67-a7b4ffb00039",
-      "title": "افزودن تست رندر کامپوننت App",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-4a025b18-0bde-429c-8f67-a7b4ffb00039.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:09.976084+00:00",
-      "updated_at": "2026-06-01T19:00:13.583786+00:00"
     },
     {
       "task_id": "ac140bf8-b8db-4a11-83fe-5816b110603b",
