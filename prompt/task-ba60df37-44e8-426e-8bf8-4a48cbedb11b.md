@@ -1,6 +1,6 @@
 ---
 task_id: ba60df37-44e8-426e-8bf8-4a48cbedb11b
-title: '[Effectiveness] عدم پوشش سناریوهای خطا در Inspector Bridge'
+title: پوشش سناریوهای خطا در Inspector Bridge
 type: logic_audit
 priority: critical
 execution_priority: 1000
@@ -10,10 +10,10 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:41:49.269752+00:00'
-updated_at: '2026-06-01T18:38:32.159406+00:00'
+updated_at: '2026-06-01T18:38:47.373035+00:00'
 ---
 
-# [Effectiveness] عدم پوشش سناریوهای خطا در Inspector Bridge
+# پوشش سناریوهای خطا در Inspector Bridge
 
 ## Raw Idea
 
