@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:50:14.778303+00:00",
+  "generated_at": "2026-06-01T18:50:49.164185+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 20,
+  "total": 21,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -220,6 +220,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-12T11:13:22.960230+00:00",
       "updated_at": "2026-05-29T20:08:32.693677+00:00"
+    },
+    {
+      "task_id": "5e62b869-2d97-4688-a4f2-eccb39f844ae",
+      "title": "پروژه فاقد فایل‌های کامپوننت مجزا و ساختار پوشه‌ای استاندارد React است",
+      "priority": "medium",
+      "execution_priority": 3000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-5e62b869-2d97-4688-a4f2-eccb39f844ae.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-16T07:45:52.535724+00:00",
+      "updated_at": "2026-06-01T18:50:41.497087+00:00"
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
