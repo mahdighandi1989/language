@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:53:17.210091+00:00",
+  "generated_at": "2026-06-01T18:53:48.533880+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 25,
+  "total": 26,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -304,6 +304,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:45:52.576252+00:00",
       "updated_at": "2026-06-01T18:53:12.028743+00:00"
+    },
+    {
+      "task_id": "60b4eaa6-6812-4e1b-976a-84e47016dddc",
+      "title": "متغیر محیطی GEMINI_API_KEY در backend/server.js خط 53 خوانده می‌شود اما در .env.example تعریف نشده است",
+      "priority": "low",
+      "execution_priority": 4300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-60b4eaa6-6812-4e1b-976a-84e47016dddc.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-16T07:45:52.685061+00:00",
+      "updated_at": "2026-06-01T18:53:43.395662+00:00"
     }
   ]
 }
