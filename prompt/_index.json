@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:01:41.494596+00:00",
+  "generated_at": "2026-06-01T19:01:51.270739+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 40,
@@ -379,7 +379,7 @@
     },
     {
       "task_id": "cae62312-11d9-47af-bc8e-9c0fadd3caf1",
-      "title": "فایل با هدف مبهم: package-lock.json",
+      "title": "مستندسازی هدف package-lock.json",
       "priority": "medium",
       "execution_priority": 3000,
       "status": "pending",
@@ -387,7 +387,7 @@
       "path": "prompt/task-cae62312-11d9-47af-bc8e-9c0fadd3caf1.md",
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:10.093134+00:00",
-      "updated_at": "2026-06-01T19:01:33.305909+00:00"
+      "updated_at": "2026-06-01T19:01:45.659447+00:00"
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
