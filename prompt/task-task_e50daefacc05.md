@@ -1,6 +1,6 @@
 ---
 task_id: task_e50daefacc05
-title: بهینه‌سازی و افزایش امنیت تنظیمات فرانت‌اند
+title: پاکسازی و افزایش امنیت بیلد فرانت‌اند
 type: other
 priority: critical
 execution_priority: 1000
@@ -10,13 +10,13 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-01T19:32:16.378850+00:00'
+updated_at: '2026-06-01T19:32:29.768775+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# بهینه‌سازی و افزایش امنیت تنظیمات فرانت‌اند
+# پاکسازی و افزایش امنیت بیلد فرانت‌اند
 
 ## Raw Idea
 
