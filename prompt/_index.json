@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:52:16.297405+00:00",
+  "generated_at": "2026-06-01T18:52:26.667041+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 23,
@@ -271,7 +271,7 @@
     },
     {
       "task_id": "29816f08-1985-4c0b-960d-8c99039fd3d6",
-      "title": "فایل backend/server.js در خط 400 قطع شده و ادامه فایل (شامل endpointهای تحلیل فایل) ناقص است",
+      "title": "بازسازی server.js: رفع قطعی، انتقال مسیرها",
       "priority": "medium",
       "execution_priority": 3300,
       "status": "awaiting_review",
@@ -279,7 +279,7 @@
       "path": "prompt/task-29816f08-1985-4c0b-960d-8c99039fd3d6.md",
       "external_attempts": 0,
       "created_at": "2026-05-16T07:45:52.561847+00:00",
-      "updated_at": "2026-06-01T18:52:08.914107+00:00"
+      "updated_at": "2026-06-01T18:52:21.720709+00:00"
     }
   ]
 }
