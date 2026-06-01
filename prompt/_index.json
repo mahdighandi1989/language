@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:58:48.046933+00:00",
+  "generated_at": "2026-06-01T18:59:03.982603+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 34,
+  "total": 35,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -319,7 +319,7 @@
     },
     {
       "task_id": "60221f9c-c1b1-4274-9512-9c022c1dd65c",
-      "title": "کد تکراری برای اعتبارسنجی GEMINI_API_KEY در چندین endpoint",
+      "title": "یکپارچه‌سازی اعتبارسنجی GEMINI_API_KEY در endpointها",
       "priority": "medium",
       "execution_priority": 3000,
       "status": "pending",
@@ -327,7 +327,19 @@
       "path": "prompt/task-60221f9c-c1b1-4274-9512-9c022c1dd65c.md",
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.896442+00:00",
-      "updated_at": "2026-06-01T18:58:40.679121+00:00"
+      "updated_at": "2026-06-01T18:58:52.686365+00:00"
+    },
+    {
+      "task_id": "dd2427f0-2f36-4f38-82f1-94e419c20d77",
+      "title": "فایل‌های dependency package-lock.json و package.json در ریشه و frontend/backend تکراری و ناهماهنگ هستند",
+      "priority": "medium",
+      "execution_priority": 3000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-dd2427f0-2f36-4f38-82f1-94e419c20d77.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-23T07:37:09.934495+00:00",
+      "updated_at": "2026-06-01T18:58:57.177510+00:00"
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
