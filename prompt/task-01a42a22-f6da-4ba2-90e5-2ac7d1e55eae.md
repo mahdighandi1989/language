@@ -1,6 +1,6 @@
 ---
 task_id: 01a42a22-f6da-4ba2-90e5-2ac7d1e55eae
-title: WebSocket bridge در frontend به یک endpoint خارجی متصل می‌شود که hardcoded شده است
+title: Configure frontend WebSocket bridge endpoint
 type: security
 priority: medium
 execution_priority: 3000
@@ -10,10 +10,10 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:37:09.847710+00:00'
-updated_at: '2026-06-01T18:56:58.392193+00:00'
+updated_at: '2026-06-01T18:57:08.754754+00:00'
 ---
 
-# WebSocket bridge در frontend به یک endpoint خارجی متصل می‌شود که hardcoded شده است
+# Configure frontend WebSocket bridge endpoint
 
 ## Raw Idea
 
