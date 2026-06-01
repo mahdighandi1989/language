@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:13:02.034527+00:00",
+  "generated_at": "2026-06-01T19:13:26.791286+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 54,
+  "total": 55,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -210,8 +210,20 @@
       "updated_at": "2026-06-01T19:09:10.553836+00:00"
     },
     {
+      "task_id": "645bbdc2-f205-479f-b01f-f8b8ad4ef2e4",
+      "title": "[منطق] عدم وجود جزئیات جریان و ارکستراسیون پایپ‌لاین",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-645bbdc2-f205-479f-b01f-f8b8ad4ef2e4.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-30T07:42:20.910790+00:00",
+      "updated_at": "2026-06-01T19:13:17.035762+00:00"
+    },
+    {
       "task_id": "ec7094fc-6705-4f66-9781-8c7365e08495",
-      "title": "[منطق] عدم ارائه اطلاعات برای بررسی سازگاری با مدل AI و پارسر خروجی",
+      "title": "بررسی ناسازگاری مدل AI و پارسر خروجی",
       "priority": "high",
       "execution_priority": 2000,
       "status": "pending",
@@ -219,7 +231,7 @@
       "path": "prompt/task-ec7094fc-6705-4f66-9781-8c7365e08495.md",
       "external_attempts": 0,
       "created_at": "2026-05-30T07:42:42.944974+00:00",
-      "updated_at": "2026-06-01T19:12:54.381976+00:00"
+      "updated_at": "2026-06-01T19:13:11.862657+00:00"
     },
     {
       "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
