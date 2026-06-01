@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:18:16.954167+00:00",
+  "generated_at": "2026-06-01T19:19:44.469554+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 53,
+  "total": 49,
   "tasks": [
     {
       "task_id": "755e8cbd-c769-415e-8372-b625eb716a5c",
@@ -55,15 +55,15 @@
     },
     {
       "task_id": "task_0193aa4e943f",
-      "title": "تقویت امنیت سیستم: مدیریت متغیرهای محیطی و پیکربندی هدرها",
+      "title": "امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری",
       "priority": "critical",
       "execution_priority": 1000,
       "status": "pending",
       "external_status": "pending",
-      "path": null,
+      "path": "prompt/task-task_0193aa4e943f.md",
       "external_attempts": 0,
       "created_at": "2026-06-01T19:17:50.430047+00:00",
-      "updated_at": "2026-06-01T19:17:50.430050+00:00"
+      "updated_at": "2026-06-01T19:18:20.609870+00:00"
     },
     {
       "task_id": "5bd04995-7545-4582-acb9-20c453d383a9",
@@ -76,18 +76,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-30T07:41:19.663924+00:00",
       "updated_at": "2026-06-01T19:05:16.139510+00:00"
-    },
-    {
-      "task_id": "8e301658-c941-415b-9489-9a76397d2d13",
-      "title": "استخراج کامپوننت‌ها از App.jsx",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-8e301658-c941-415b-9489-9a76397d2d13.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:42:40.674179+00:00",
-      "updated_at": "2026-06-01T18:43:27.951044+00:00"
     },
     {
       "task_id": "31236cc5-eb3f-4b4e-be02-ee2362ecc8c4",
@@ -186,6 +174,18 @@
       "updated_at": "2026-06-01T19:13:11.862657+00:00"
     },
     {
+      "task_id": "task_2cd58167a90c",
+      "title": "بهینه‌سازی معماری فرانت‌اند: جداسازی کامپوننت‌ها و حذف کد زائد",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": null,
+      "external_attempts": 0,
+      "created_at": "2026-06-01T19:19:25.307394+00:00",
+      "updated_at": "2026-06-01T19:19:25.307400+00:00"
+    },
+    {
       "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
       "title": "پیاده‌سازی تست‌های خودکار بک‌اند",
       "priority": "high",
@@ -270,18 +270,6 @@
       "updated_at": "2026-06-01T18:48:30.681483+00:00"
     },
     {
-      "task_id": "9129c3f0-3212-454b-80ae-dd043a36db18",
-      "title": "حذف کد مرده Inspector Bridge",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-9129c3f0-3212-454b-80ae-dd043a36db18.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:36:07.831987+00:00",
-      "updated_at": "2026-06-01T18:55:46.017150+00:00"
-    },
-    {
       "task_id": "bca62f9c-0e65-448c-99e1-3ffcfb473a34",
       "title": "پیاده‌سازی هندلر WebSocket برای صدای زنده",
       "priority": "high",
@@ -340,18 +328,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-12T11:13:22.960230+00:00",
       "updated_at": "2026-05-29T20:08:32.693677+00:00"
-    },
-    {
-      "task_id": "5e62b869-2d97-4688-a4f2-eccb39f844ae",
-      "title": "استانداردسازی ساختار پوشه و کامپوننت‌های React",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-5e62b869-2d97-4688-a4f2-eccb39f844ae.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-16T07:45:52.535724+00:00",
-      "updated_at": "2026-06-01T18:50:52.264787+00:00"
     },
     {
       "task_id": "01a42a22-f6da-4ba2-90e5-2ac7d1e55eae",
@@ -462,18 +438,6 @@
       "updated_at": "2026-06-01T18:31:20.568260+00:00"
     },
     {
-      "task_id": "59cbc244-8dbe-4b9d-9a39-a3633ffd0464",
-      "title": "بازسازی معماری برای جداسازی نگرانی‌ها",
-      "priority": "medium",
-      "execution_priority": 3300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-59cbc244-8dbe-4b9d-9a39-a3633ffd0464.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-09T07:29:40.376256+00:00",
-      "updated_at": "2026-06-01T18:30:03.027347+00:00"
-    },
-    {
       "task_id": "e00a1855-25c4-483d-b3b6-465d34383e3f",
       "title": "Create .env.example for frontend variables",
       "priority": "medium",
@@ -508,18 +472,6 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:45:52.576252+00:00",
       "updated_at": "2026-06-01T18:53:12.028743+00:00"
-    },
-    {
-      "task_id": "8d5aac8c-2e65-4d59-b4d1-0a8661a45644",
-      "title": "جداسازی WebSocket از Inspector Bridge",
-      "priority": "medium",
-      "execution_priority": 3300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-8d5aac8c-2e65-4d59-b4d1-0a8661a45644.md",
-      "external_attempts": 0,
-      "created_at": "2026-05-23T07:37:09.871650+00:00",
-      "updated_at": "2026-06-01T18:57:40.548774+00:00"
     },
     {
       "task_id": "dfc945a2-9d3b-4808-9e4b-2c93b8d8b00e",
