@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:39:13.891350+00:00",
+  "generated_at": "2026-06-01T18:40:23.717793+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 10,
+  "total": 11,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -88,6 +88,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-09T07:29:40.376125+00:00",
       "updated_at": "2026-06-01T18:26:40.141497+00:00"
+    },
+    {
+      "task_id": "8cebc933-b60e-42f6-9f49-5dbb6e2c203a",
+      "title": "WebSocket endpoint mismatch: frontend connects to external URL instead of backend's /ws/live",
+      "priority": "high",
+      "execution_priority": 2300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-8cebc933-b60e-42f6-9f49-5dbb6e2c203a.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-16T07:42:40.681735+00:00",
+      "updated_at": "2026-06-01T18:40:16.111946+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
