@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:24:19.103541+00:00",
+  "generated_at": "2026-06-01T18:26:37.751844+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 4,
+  "total": 5,
   "tasks": [
     {
       "task_id": "47bfef80-d77a-4386-9dca-fb1a533ca20b",
@@ -40,6 +40,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-09T07:29:40.376060+00:00",
       "updated_at": "2026-05-30T07:44:37.426554+00:00"
+    },
+    {
+      "task_id": "8ac8249d-e1de-40f8-ad4b-36e271a1b237",
+      "title": "عدم وجود تست‌های خودکار",
+      "priority": "high",
+      "execution_priority": 2300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-8ac8249d-e1de-40f8-ad4b-36e271a1b237.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-09T07:29:40.376125+00:00",
+      "updated_at": "2026-06-01T18:26:31.116673+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
