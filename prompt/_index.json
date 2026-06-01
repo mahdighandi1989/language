@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:08:26.741930+00:00",
+  "generated_at": "2026-06-01T19:08:42.861914+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 49,
+  "total": 50,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -340,6 +340,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-30T07:41:50.946010+00:00",
       "updated_at": "2026-06-01T19:07:23.198610+00:00"
+    },
+    {
+      "task_id": "38433cce-3e63-4851-89bc-4320f55f4d19",
+      "title": "Anti-pattern: Under-engineering / Threshold-Outcome mismatch",
+      "priority": "high",
+      "execution_priority": 2300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-38433cce-3e63-4851-89bc-4320f55f4d19.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-30T07:41:51.067760+00:00",
+      "updated_at": "2026-06-01T19:08:34.823948+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
