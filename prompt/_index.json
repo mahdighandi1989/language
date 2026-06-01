@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:48:52.947888+00:00",
+  "generated_at": "2026-06-01T18:48:59.525048+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 18,
@@ -163,7 +163,7 @@
     },
     {
       "task_id": "b49e0870-ebbf-45da-8e46-2571fbaeae97",
-      "title": "Anti-pattern: AI بدون validation (response استفاده می‌شود بدون چ",
+      "title": "Implement AI response validation",
       "priority": "high",
       "execution_priority": 2300,
       "status": "awaiting_review",
@@ -171,7 +171,7 @@
       "path": "prompt/task-b49e0870-ebbf-45da-8e46-2571fbaeae97.md",
       "external_attempts": 0,
       "created_at": "2026-05-16T07:44:27.391318+00:00",
-      "updated_at": "2026-06-01T18:48:46.006534+00:00"
+      "updated_at": "2026-06-01T18:48:54.594067+00:00"
     },
     {
       "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
