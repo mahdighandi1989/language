@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:43:32.669649+00:00",
+  "generated_at": "2026-06-01T18:44:42.832407+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 12,
+  "total": 13,
   "tasks": [
     {
       "task_id": "cf9e7da4-37c4-463e-99dd-bd6707edcce3",
@@ -112,6 +112,18 @@
       "external_attempts": 0,
       "created_at": "2026-05-16T07:42:40.681735+00:00",
       "updated_at": "2026-06-01T18:40:27.020314+00:00"
+    },
+    {
+      "task_id": "554b0bf9-fdee-4f74-bbd0-54f4835b96d4",
+      "title": "عدم وجود تست واحد برای endpointهای اصلی API در backend",
+      "priority": "high",
+      "execution_priority": 2300,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-554b0bf9-fdee-4f74-bbd0-54f4835b96d4.md",
+      "external_attempts": 0,
+      "created_at": "2026-05-16T07:44:27.337735+00:00",
+      "updated_at": "2026-06-01T18:44:35.813206+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
