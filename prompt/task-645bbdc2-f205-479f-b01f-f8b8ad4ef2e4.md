@@ -1,6 +1,6 @@
 ---
 task_id: 645bbdc2-f205-479f-b01f-f8b8ad4ef2e4
-title: '[منطق] عدم وجود جزئیات جریان و ارکستراسیون پایپ‌لاین'
+title: تعریف و یکپارچه‌سازی ارکستراسیون پایپ‌لاین AI_LLM
 type: logic_audit
 priority: high
 execution_priority: 2000
@@ -10,10 +10,10 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-30T07:42:20.910790+00:00'
-updated_at: '2026-06-01T19:13:17.035762+00:00'
+updated_at: '2026-06-01T19:13:29.014518+00:00'
 ---
 
-# [منطق] عدم وجود جزئیات جریان و ارکستراسیون پایپ‌لاین
+# تعریف و یکپارچه‌سازی ارکستراسیون پایپ‌لاین AI_LLM
 
 ## Raw Idea
 
