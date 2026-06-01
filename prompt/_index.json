@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T19:07:19.244820+00:00",
+  "generated_at": "2026-06-01T19:07:28.636863+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 48,
@@ -319,7 +319,7 @@
     },
     {
       "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
-      "title": "عدم مدیریت خطا در WebSocket connection و پیام‌های دریافتی",
+      "title": "پیاده‌سازی مدیریت خطا برای WebSocket و پیام‌ها",
       "priority": "high",
       "execution_priority": 2300,
       "status": "awaiting_review",
@@ -327,7 +327,7 @@
       "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
       "external_attempts": 0,
       "created_at": "2026-05-30T07:41:50.946010+00:00",
-      "updated_at": "2026-06-01T19:07:11.207977+00:00"
+      "updated_at": "2026-06-01T19:07:23.198610+00:00"
     },
     {
       "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
