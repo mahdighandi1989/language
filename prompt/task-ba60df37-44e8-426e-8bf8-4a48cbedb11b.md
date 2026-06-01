@@ -4,13 +4,13 @@ title: '[Effectiveness] عدم پوشش سناریوهای خطا در Inspector
 type: logic_audit
 priority: critical
 execution_priority: 1000
-status: suggested
+status: pending
 external_status: pending
 verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:41:49.269752+00:00'
-updated_at: '2026-05-30T07:43:05.736760+00:00'
+updated_at: '2026-06-01T18:38:32.159406+00:00'
 ---
 
 # [Effectiveness] عدم پوشش سناریوهای خطا در Inspector Bridge
@@ -161,7 +161,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: بررسی وضعیت فعلی Inspector Bridge و Error Boundary در repo
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل جستجوی کامل در repo برای یافتن پیاده‌سازی‌های موجود از Inspector Bridge، Error Boundary، رهگیری خطاهای runtime، و هرگونه مکانیزم گزارش خطا به والد iframe است. باید فایل‌های مرتبط مانند App.jsx، InspectorBridge.js، هر کامپوننت Error Boundary موجود، و هرگونه رهگیری خطا در Firebase catch بلاک‌ها شناسایی شوند. خارج از این مرحله: ایجاد تغییرات یا اصلاح کد. نکته حیاتی: این مرحله صرفاً برای کشف وضعیت موجود است و باید مستند شود که چه چیزی از قبل وجود دارد و چه چیزی缺失 است.
 **Excerpt:**
 ```
@@ -169,7 +169,7 @@ _(مستقل)_
 ```
 
 ### Step 2: ایجاد Error Boundary در سطح App.jsx برای رهگیری خطاهای catch نشده
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد یک کامپوننت Error Boundary جدید (مثلاً ErrorBoundary.jsx) و قرار دادن آن در بالاترین سطح App.jsx است. این Error Boundary باید تمام خطاهای runtime catch نشده (شامل خطاهای رندر، خطاهای lifecycle، و خطاهای event handler) را رهگیری کند. خارج از این مرحله: رهگیری خطاهای Promise (که در مرحله بعدی انجام می‌شود) و رهگیری خطاهای Firebase (که در مرحله بعدی انجام می‌شود). نکته حیاتی: Error Boundary باید از متدهای componentDidCatch یا getDerivedStateFromError استفاده کند و خطا را به Inspector Bridge ارسال کند.
 **Excerpt:**
 ```
@@ -177,7 +177,7 @@ _(مستقل)_
 ```
 
 ### Step 3: رهگیری خطاهای Promise (unhandled rejection) و ارسال به Inspector Bridge
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اضافه کردن یک event listener برای رویداد 'unhandledrejection' در سطح window است. این listener باید تمام Promise rejectionهای catch نشده را رهگیری کرده و از طریق Inspector Bridge به والد iframe ارسال کند. خارج از این مرحله: رهگیری خطاهای Firebase (که در مرحله بعدی انجام می‌شود). نکته حیاتی: این listener باید در ابتدای بارگذاری برنامه (مثلاً در App.jsx یا یک فایل جداگانه) ثبت شود و خطاها را با جزئیات کافی (پیام، stack trace) ارسال کند.
 **Excerpt:**
 ```
@@ -185,7 +185,7 @@ _(مستقل)_
 ```
 
 ### Step 4: رهگیری خطاهای Firebase در catch بلاک‌ها و ارسال به Inspector Bridge
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی تمام مکان‌هایی در کد که از Firebase SDK استفاده می‌شود (مانند firestore، auth، storage) و اضافه کردن رهگیری خطا در catch بلاک‌های مربوطه است. برای هر catch بلاک Firebase، باید خطا از طریق Inspector Bridge به والد iframe ارسال شود. خارج از این مرحله: رهگیری خطاهای عمومی runtime یا Promise (که در مراحل قبلی انجام شده). نکته حیاتی: باید از یک تابع کمکی (helper) برای ارسال خطاهای Firebase به Inspector Bridge استفاده شود تا از تکرار کد جلوگیری شود.
 **Excerpt:**
 ```
@@ -193,7 +193,7 @@ _(مستقل)_
 ```
 
 ### Step 5: به‌روزرسانی Inspector Bridge برای پشتیبانی از رویدادهای خطا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل به‌روزرسانی Inspector Bridge (فایل InspectorBridge.js یا معادل آن) برای پشتیبانی از ارسال رویدادهای خطا به والد iframe است. باید یک متد جدید مانند 'reportError' یا 'sendError' به Inspector Bridge اضافه شود که خطا را با جزئیات (پیام، stack trace، نوع خطا، timestamp) به والد iframe ارسال کند. خارج از این مرحله: ایجاد Error Boundary یا رهگیری خطاها (که در مراحل قبلی انجام شده). نکته حیاتی: Inspector Bridge باید از همان مکانیزم ارتباطی موجود (مانند postMessage) برای ارسال رویدادهای خطا استفاده کند.
 **Excerpt:**
 ```
@@ -201,7 +201,7 @@ _(مستقل)_
 ```
 
 ### Step 6: به‌روزرسانی والد iframe برای دریافت و پردازش رویدادهای خطا
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل به‌روزرسانی کد والد iframe (که در پروژه والد یا یک پروژه جداگانه قرار دارد) برای دریافت رویدادهای خطا از Inspector Bridge و پردازش آن‌ها است. والد iframe باید رویدادهای خطا را دریافت کرده و آن‌ها را در outcome data (مانند error_rate) ثبت کند. خارج از این مرحله: ایجاد Inspector Bridge یا Error Boundary (که در مراحل قبلی انجام شده). نکته حیاتی: والد iframe باید رویدادهای خطا را با استفاده از event listener برای 'message' دریافت کند و آن‌ها را به‌درستی parse کند.
 **Excerpt:**
 ```
@@ -209,7 +209,7 @@ _(مستقل)_
 ```
 
 ### Step 7: نوشتن تست E2E برای رهگیری خطاهای runtime
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک تست E2E است که بررسی می‌کند خطاهای runtime catch نشده (مانند خطاهای رندر) توسط Error Boundary رهگیری شده و از طریق Inspector Bridge به والد iframe گزارش می‌شوند. تست باید یک خطای عمدی ایجاد کند و سپس بررسی کند که رویداد خطا به والد iframe ارسال شده است. خارج از این مرحله: تست خطاهای Promise یا Firebase (که در مراحل بعدی انجام می‌شود). نکته حیاتی: تست باید از ابزارهای E2E مانند Cypress یا Playwright استفاده کند و outcome را اندازه‌گیری کند، نه فقط وجود فایل.
 **Excerpt:**
 ```
@@ -217,7 +217,7 @@ test E2E که outcome را اندازه می‌گیرد عبور می‌کند
 ```
 
 ### Step 8: نوشتن تست E2E برای رهگیری خطاهای Promise
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک تست E2E است که بررسی می‌کند خطاهای Promise (unhandled rejection) توسط event listener رهگیری شده و از طریق Inspector Bridge به والد iframe گزارش می‌شوند. تست باید یک Promise rejection بدون catch ایجاد کند و سپس بررسی کند که رویداد خطا به والد iframe ارسال شده است. خارج از این مرحله: تست خطاهای runtime یا Firebase. نکته حیاتی: تست باید از ابزارهای E2E استفاده کند و outcome را اندازه‌گیری کند.
 **Excerpt:**
 ```
@@ -225,7 +225,7 @@ test E2E که outcome را اندازه می‌گیرد عبور می‌کند
 ```
 
 ### Step 9: نوشتن تست E2E برای رهگیری خطاهای Firebase
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک تست E2E است که بررسی می‌کند خطاهای Firebase در catch بلاک‌ها توسط Inspector Bridge به والد iframe گزارش می‌شوند. تست باید یک خطای Firebase (مثلاً با قطع اینترنت یا استفاده از یک query نامعتبر) ایجاد کند و سپس بررسی کند که رویداد خطا به والد iframe ارسال شده است. خارج از این مرحله: تست خطاهای runtime یا Promise. نکته حیاتی: تست باید از ابزارهای E2E استفاده کند و outcome را اندازه‌گیری کند.
 **Excerpt:**
 ```
@@ -233,7 +233,7 @@ test E2E که outcome را اندازه می‌گیرد عبور می‌کند
 ```
 
 ### Step 10: به‌روزرسانی metric/logging برای ثبت error_rate واقعی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل به‌روزرسانی سیستم metric/logging (در والد iframe یا یک سرویس جداگانه) برای ثبت error_rate واقعی بر اساس رویدادهای خطای دریافتی از Inspector Bridge است. باید اطمینان حاصل شود که error_rate دیگر صفر نیست و به‌درستی محاسبه می‌شود. خارج از این مرحله: رهگیری خطاها (که در مراحل قبلی انجام شده). نکته حیاتی: metric/logging باید error_rate را به‌صورت real-time یا near-real-time به‌روزرسانی کند.
 **Excerpt:**
 ```
