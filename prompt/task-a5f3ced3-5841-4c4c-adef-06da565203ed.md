@@ -1,6 +1,6 @@
 ---
 task_id: a5f3ced3-5841-4c4c-adef-06da565203ed
-title: '[Effectiveness] وابستگی به فایل‌های package-lock.json بدون بررسی تغییرات'
+title: افزودن بررسی وابستگی‌ها به CI/CD
 type: logic_audit
 priority: medium
 execution_priority: 3000
@@ -10,10 +10,10 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.242074+00:00'
-updated_at: '2026-06-01T19:05:40.930911+00:00'
+updated_at: '2026-06-01T19:05:55.139671+00:00'
 ---
 
-# [Effectiveness] وابستگی به فایل‌های package-lock.json بدون بررسی تغییرات
+# افزودن بررسی وابستگی‌ها به CI/CD
 
 ## Raw Idea
 
