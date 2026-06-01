@@ -3,14 +3,14 @@ task_id: c826e12b-dc51-42a4-8c4c-61f446ddccca
 title: No license file found in repository
 type: docs
 priority: medium
-execution_priority: 3000
-status: suggested
+execution_priority: 3300
+status: awaiting_review
 external_status: pending
-verification_status: pending
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:45:52.576252+00:00'
-updated_at: '2026-05-29T20:16:28.028718+00:00'
+updated_at: '2026-06-01T18:53:03.661054+00:00'
 target_files:
 - LICENSE
 - package.json
