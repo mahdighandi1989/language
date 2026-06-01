@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-06-01T18:59:49.699068+00:00",
+  "generated_at": "2026-06-01T18:59:56.377000+00:00",
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
   "total": 36,
@@ -343,7 +343,7 @@
     },
     {
       "task_id": "5564037e-a6ff-4ad6-a190-ec9a7783c825",
-      "title": "Missing LICENSE file and potential dependency license conflicts",
+      "title": "Add LICENSE file and resolve dependency conflicts",
       "priority": "medium",
       "execution_priority": 3000,
       "status": "pending",
@@ -351,7 +351,7 @@
       "path": "prompt/task-5564037e-a6ff-4ad6-a190-ec9a7783c825.md",
       "external_attempts": 0,
       "created_at": "2026-05-23T07:37:09.956733+00:00",
-      "updated_at": "2026-06-01T18:59:42.452966+00:00"
+      "updated_at": "2026-06-01T18:59:51.892695+00:00"
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
