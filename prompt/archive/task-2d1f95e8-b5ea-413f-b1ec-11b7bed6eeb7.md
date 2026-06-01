@@ -1,6 +1,6 @@
 ---
 task_id: 2d1f95e8-b5ea-413f-b1ec-11b7bed6eeb7
-title: عدم وجود CI/CD و quality gates
+title: پیاده‌سازی CI/CD و Quality Gates
 type: feature_request
 priority: medium
 execution_priority: 3000
@@ -10,7 +10,7 @@ verification_status: done
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-09T07:29:40.376193+00:00'
-updated_at: '2026-06-01T18:28:55.541726+00:00'
+updated_at: '2026-06-01T18:29:05.254782+00:00'
 archived: true
 archived_at: '2026-06-01T18:28:55.541723+00:00'
 target_files:
@@ -27,7 +27,7 @@ target_files:
 - frontend/vite.config.js
 ---
 
-# عدم وجود CI/CD و quality gates
+# پیاده‌سازی CI/CD و Quality Gates
 
 ## Raw Idea
 
