@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 7,
+  "total": 6,
   "tasks": [
-    {
-      "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
-      "title": "بازبینی مدیریت خطای WebSocket و پیام‌ها",
-      "priority": "high",
-      "execution_priority": 2100,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
-      "external_attempts": 2
-    },
     {
       "task_id": "task_2cd58167a90c",
       "title": "بازسازی معماری بک‌اند",
