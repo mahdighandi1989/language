@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2400
-status: pending
+execution_priority: 2700
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T23:52:01.680762+00:00'
+updated_at: '2026-06-02T23:57:43.939053+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -19787,7 +19787,7 @@ app.post('/api/gemini/tts', async (req, res) => {
 ```
 
 ### Step 58: نوشتن تست‌های واحد برای ماژول مدیریت تمرین‌ها (Exercises)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع ماژول exercises است: generate_exercise, check_answer, get_exercise_types, calculate_score. تست‌ها باید انواع مختلف تمرین (چندگزینه‌ای، جورکردنی، پرکردن جای خالی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI. نکته حیاتی: ریسک اصلی این است که استخراج توابع از backend/server.js ممکن است باعث شکستن route handlers موجود شود اگر وابستگی‌ها به درستی مدیریت نشوند. endpoint /api/gemini/tts (خط 117) و بخش audio در /api/analyze-files (خط 790) به متغیر GEMINI_API_KEY وابسته هستند که باید به عنوان پارامتر به توابع جدید پاس داده شود. تابع uploadToGeminiFileAPI (خط 297) به GEMINI_API_KEY و fs و fetch وابسته است که باید در تست‌ها mock شوند. getPhoneticSpelling یک تابع جدید است و ممکن است پیاده‌سازی اولیه آن کامل نباشد. backend/package.json فاقد Jest است و اضافه کردن آن ممکن است با وابستگی‌های موجود تداخل داشته باشد.
 — [merged] این بخش شامل نوشتن تست‌های واحد برای توابع ماژول exercises (مانند generate_exercise, check_answer, get_exercise_types, calculate_score) است. تست‌ها باید انواع مختلف تمرین (چندگزینه‌ای، جورکردنی، پرکردن جای خالی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI. ماژول exercises در حال حاضر وجود ندارد و باید ایجاد شود. فایل‌های تست در backend/tests/exercises.test.js ایجاد می‌شوند.
 **Excerpt:**
@@ -19817,7 +19817,7 @@ _(مستقل)_
 ```
 
 ### Step 59: ایجاد سرویس تمرین‌های آموزشی و تست‌های واحد آن در بک‌اند
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل سرویس backend/services/exercises.js با چهار تابع مشخص و فایل تست backend/tests/exercises.test.js با تست‌های واحد برای هر تابع است. تست‌ها باید انواع تمرین (multiple_choice, fill_in_blank, matching) و موارد خطا (نوع نامعتبر، پاسخ خالی) را پوشش دهند. همچنین نصب vitest و تنظیم اسکریپت test در package.json الزامی است. فایل‌های موجود در مسیرهای داده شده (مانند emailService) خارج از این بخش هستند.
 **Excerpt:**
 ```
@@ -19848,7 +19848,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 60: ایجاد سرویس exercises و تست‌های آن برای تولید و ارزیابی تمرینات
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل سرویس exercises.js در backend/services و فایل تست exercises.test.js در backend/tests است. سرویس شامل توابع generateExercise, checkAnswer, getExerciseTypes, calculateScore می‌باشد. تست‌ها با استفاده از vitest نوشته شده و تمام توابع را پوشش می‌دهند. این بخش فقط به backend مربوط است و frontend را شامل نمی‌شود.
 **Excerpt:**
 ```
