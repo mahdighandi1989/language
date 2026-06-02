@@ -1318,7 +1318,7 @@ export default function App() {
         navigateTo={navigateTo}
       >
         <Fonts />
-        <div className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
+        <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
             <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} />
             <main className="flex-1 p-4 sm:p-6 md:p-8 bg-slate-100">{renderContent()}</main>

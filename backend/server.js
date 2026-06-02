@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
@@ -10,8 +11,18 @@ import fs from 'fs';
 import os from 'os';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
+import { validateEnv } from './config/validateEnv.js';
+import { decrypt } from './utils/encryption.js';
+import { generalLimiter, analysisLimiter } from './middleware/rateLimiter.js';
+import { validate } from './middleware/validate.js';
+import { chatSchema, ttsSchema, analyzeFilesSchema } from './validators/schemas.js';
+import { requireAuth, optionalAuth } from './middleware/firebaseAuth.js';
 
 dotenv.config();
+
+// Validate required environment variables before doing anything else. This
+// exits the process with a clear FATAL message if any value is missing/invalid.
+validateEnv();
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -61,26 +72,120 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust the first proxy (Render/hosting) so req.ip and rate limiting use the
+// real client address from X-Forwarded-For.
+app.set('trust proxy', 1);
+
 // Create HTTP server
 const server = createServer(app);
 
 // Create WebSocket server
 const wss = new WebSocketServer({ server, path: '/ws/live' });
 
-app.use(cors());
+// Security HTTP headers (X-Content-Type-Options, X-Frame-Options,
+// Strict-Transport-Security, etc.). Must be the first middleware.
+app.use(helmet());
+
+// Relax the Content-Security-Policy so the SPA can still reach the Gemini and
+// Firebase APIs while keeping the rest of helmet's protections.
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+      "script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data: blob:; " +
+      "media-src 'self' data: blob:; " +
+      "connect-src 'self' https://*.googleapis.com wss://*.googleapis.com " +
+      'https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com ' +
+      'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;'
+  );
+  next();
+});
+
+// CORS: allow only explicitly configured origins (no wildcard). Production
+// origins come from CORS_ORIGIN / FRONTEND_URL (comma-separated); the Vite dev
+// server origin is always permitted.
+const DEV_ORIGIN = 'http://localhost:5173';
+const allowedOrigins = Array.from(
+  new Set(
+    `${process.env.CORS_ORIGIN || ''},${process.env.FRONTEND_URL || ''},${DEV_ORIGIN}`
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean)
+  )
+);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow same-origin / non-browser requests (no Origin header).
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+
+// Translate CORS rejections into a 403 JSON response.
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'دسترسی از این دامنه مجاز نیست (CORS)' });
+  }
+  return next(err);
+});
+
 app.use(express.json({ limit: '10mb' }));
+
+// Apply the general rate limiter to every /api/* route. The WebSocket path
+// (/ws/live) is not under /api and is therefore unaffected.
+app.use('/api', generalLimiter);
 
 // Serve static files from frontend build
 app.use(express.static(join(__dirname, '../frontend/dist')));
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Firebase config sourced from environment variables (never hard-coded). Used
+// for ID token verification and to expose a safe client config to the frontend.
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+};
 
-// Gemini Chat API
-app.post('/api/gemini/chat', async (req, res) => {
+// The Gemini API key may be stored encrypted in the environment; decrypt it
+// here (decrypt() transparently passes through plaintext values).
+const GEMINI_API_KEY = decrypt(process.env.GEMINI_API_KEY);
+
+// Replaces any occurrence of the real API key (or other Google API keys) in a
+// string with [REDACTED] so secrets never end up in logs or responses.
+function redactSensitiveData(input) {
+  if (input === undefined || input === null) return input;
+  let str = typeof input === 'string' ? input : JSON.stringify(input);
+  if (GEMINI_API_KEY) {
+    str = str.split(GEMINI_API_KEY).join('[REDACTED]');
+  }
+  str = str.replace(/AIza[0-9A-Za-z_-]{10,}/g, '[REDACTED]');
+  str = str.replace(/([?&]key=)[^&\s"']+/g, '$1[REDACTED]');
+  return str;
+}
+
+// Shared guard so the API-key check is defined once instead of duplicated in
+// every Gemini endpoint.
+const requireGeminiKey = (req, res, next) => {
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'API key not configured' });
   }
+  next();
+};
 
+// Gemini Chat API
+app.post('/api/gemini/chat', validate(chatSchema), optionalAuth, requireGeminiKey, async (req, res) => {
   try {
     const payload = req.body;
     const includeAudio = payload.includeAudio;
@@ -137,11 +242,7 @@ app.post('/api/gemini/chat', async (req, res) => {
 });
 
 // Gemini TTS API
-app.post('/api/gemini/tts', async (req, res) => {
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
+app.post('/api/gemini/tts', validate(ttsSchema), optionalAuth, requireGeminiKey, async (req, res) => {
   try {
     const { prompt, voice = 'Kore' } = req.body;
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${GEMINI_API_KEY}`;
@@ -191,35 +292,33 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// List available models
-app.get('/api/list-models', async (req, res) => {
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
+// Authenticated status endpoint for /api/gemini/*. Requires a valid Firebase ID
+// token; unauthenticated requests receive 401.
+app.get('/api/gemini/status', requireAuth, (req, res) => {
+  res.json({ status: 'ok', configured: Boolean(GEMINI_API_KEY) });
+});
 
+// List available models
+app.get('/api/list-models', requireGeminiKey, async (req, res) => {
   try {
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`;
     const response = await fetch(apiUrl);
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data, keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...' });
+      return res.status(response.status).json({ error: redactSensitiveData(data) });
     }
 
     // Return just model names for easier reading
     const modelNames = data.models?.map(m => m.name) || [];
-    res.json({ models: modelNames, count: modelNames.length, keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...' });
+    res.json({ models: modelNames, count: modelNames.length });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: redactSensitiveData(error.message) });
   }
 });
 
 // Test Gemini API directly
-app.get('/api/test-gemini', async (req, res) => {
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured', keyExists: false });
-  }
-
+app.get('/api/test-gemini', requireGeminiKey, async (req, res) => {
   try {
     const testPayload = {
       contents: [{ role: 'user', parts: [{ text: 'Say hello in Lebanese Arabic' }] }]
@@ -227,7 +326,7 @@ app.get('/api/test-gemini', async (req, res) => {
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-    console.log('Testing Gemini API with URL:', apiUrl.replace(GEMINI_API_KEY, 'HIDDEN'));
+    console.log('Testing Gemini API with URL:', redactSensitiveData(apiUrl));
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -237,14 +336,13 @@ app.get('/api/test-gemini', async (req, res) => {
 
     const responseText = await response.text();
     console.log('Gemini test response status:', response.status);
-    console.log('Gemini test response:', responseText);
+    console.log('Gemini test response:', redactSensitiveData(responseText));
 
     if (!response.ok) {
       return res.status(response.status).json({
         error: 'Gemini API failed',
         status: response.status,
-        response: responseText,
-        keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...'
+        response: redactSensitiveData(responseText)
       });
     }
 
@@ -253,12 +351,11 @@ app.get('/api/test-gemini', async (req, res) => {
 
     res.json({
       success: true,
-      text: text,
-      keyPrefix: GEMINI_API_KEY.substring(0, 10) + '...'
+      text: text
     });
   } catch (error) {
-    console.error('Test error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Test error:', redactSensitiveData(error.message));
+    res.status(500).json({ error: redactSensitiveData(error.message) });
   }
 });
 
@@ -724,13 +821,8 @@ const handleMulterError = (err, req, res, next) => {
 };
 
 // Main file analysis endpoint
-app.post('/api/analyze-files', upload.array('files', MAX_FILES), handleMulterError, async (req, res) => {
+app.post('/api/analyze-files', analysisLimiter, upload.array('files', MAX_FILES), handleMulterError, validate(analyzeFilesSchema), optionalAuth, requireGeminiKey, async (req, res) => {
   console.log('Received file analysis request');
-
-  if (!GEMINI_API_KEY) {
-    console.error('API key not configured');
-    return res.status(500).json({ error: 'API key not configured' });
-  }
 
   try {
     const files = req.files || [];

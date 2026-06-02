@@ -6,22 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="اپلیکیشن آموزش لهجه لبنانی با هوش مصنوعی" />
     <title>آموزش لهجه لبنانی</title>
-    <script>
-      // Firebase Configuration
-      var __firebase_config = JSON.stringify({
-        apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
-        authDomain: "labaneseapp.firebaseapp.com",
-        projectId: "labaneseapp",
-        storageBucket: "labaneseapp.firebasestorage.app",
-        messagingSenderId: "951874597795",
-        appId: "1:951874597795:web:00745327993adad760a016"
-      });
-      var __app_id = "labaneseapp";
+    <script type="module">
+      // Firebase configuration is injected from VITE_ environment variables at
+      // build time (see src/firebaseConfig.js and .env.example). No secrets are
+      // hard-coded in this file.
+      import { firebaseConfig, hasFirebaseConfig } from '/src/firebaseConfig.js';
+      if (hasFirebaseConfig()) {
+        window.__firebase_config = JSON.stringify(firebaseConfig);
+      }
+      window.__app_id = import.meta.env.VITE_PROJECT_ID || 'default-app-id';
     </script>
-  
-
-
-
 
 
 
