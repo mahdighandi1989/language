@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 4,
+  "total": 3,
   "tasks": [
-    {
-      "task_id": "dc721af2-f84f-424d-a491-91e8ab3624c0",
-      "title": "میخوام برای این پروژه هم نوتیفیکشن از طریق تلگرام فراهم بشه و تلگرام دو طرفه کار (6 مرحله)",
-      "priority": "medium",
-      "execution_priority": 3000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-dc721af2-f84f-424d-a491-91e8ab3624c0.md",
-      "external_attempts": 0
-    },
     {
       "task_id": "task_ef0945bccb18",
       "title": "افزودن بررسی وابستگی‌ها و npm audit به CI/CD",
