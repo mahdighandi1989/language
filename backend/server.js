@@ -40,6 +40,14 @@ app.set('trust proxy', 1);
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/live' });
 
+// Surface server-level WebSocket failures (e.g. a failed upgrade or an
+// 'unexpected-response' from the underlying HTTP server) instead of letting the
+// 'ws' library emit an unhandled 'error' event, which would crash the process.
+// Per-connection errors are handled in services/liveProxyService.js.
+wss.on('error', (err) => {
+  console.error('WebSocket server error:', redactSensitiveData(err?.stack || err?.message || String(err)));
+});
+
 // Security headers, CSP and CORS allow-list.
 applySecurity(app);
 

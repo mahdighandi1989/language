@@ -126,6 +126,17 @@ ${getPrompt('liveVoiceClosing')}`;
       clientWs.send(JSON.stringify({ error: `خطا در Gemini Live: ${error.message}` }));
     });
 
+    // A non-101 handshake response (e.g. 401/403 from a bad API key, or a 5xx)
+    // arrives as 'unexpected-response'. Without this listener 'ws' would still
+    // emit 'error', but here we can relay the HTTP status code so the client
+    // gets an actionable message instead of a generic socket error.
+    geminiWs.on('unexpected-response', (_request, response) => {
+      const status = response?.statusCode ?? 'unknown';
+      console.error('Gemini WebSocket unexpected response, status:', status);
+      clientWs.send(JSON.stringify({ error: `اتصال به Gemini Live ناموفق بود (HTTP ${status})` }));
+      geminiWs.terminate();
+    });
+
     geminiWs.on('close', (code, reason) => {
       const reasonStr = reason?.toString() || 'Unknown';
       console.log('Gemini connection closed - Code:', code, 'Reason:', reasonStr);
