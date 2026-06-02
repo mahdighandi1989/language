@@ -85,14 +85,14 @@
       "external_attempts": 3
     },
     {
-      "task_id": "task_2cd58167a90c",
-      "title": "بازسازی معماری بک‌اند",
-      "priority": "high",
-      "execution_priority": 2200,
+      "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
+      "title": "ممیزی commit‌های Inspector Bridge Script",
+      "priority": "medium",
+      "execution_priority": 3100,
       "status": "pending",
       "external_status": "pending",
-      "path": "prompt/task-task_2cd58167a90c.md",
-      "external_attempts": 4
+      "path": "prompt/task-92c9dd21-d951-426b-9f25-709bbff53ef8.md",
+      "external_attempts": 2
     },
     {
       "task_id": "task_ef0945bccb18",
