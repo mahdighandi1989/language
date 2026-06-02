@@ -10,7 +10,7 @@ verification_status: applied_externally_pending_verify
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:44:27.355859+00:00'
-updated_at: '2026-06-02T08:12:16.763268+00:00'
+updated_at: '2026-06-02T17:50:52.399259+00:00'
 ---
 
 # پیاده‌سازی File Analysis API بدون محدودیت در backend/server.js
