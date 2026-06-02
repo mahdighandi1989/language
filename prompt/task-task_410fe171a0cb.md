@@ -3,14 +3,14 @@ task_id: task_410fe171a0cb
 title: پیکربندی Inspector Bridge و پیاده‌سازی ردیابی خطا
 type: other
 priority: critical
-execution_priority: 1350
-status: pending
+execution_priority: 1650
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:22:56.705850+00:00'
-updated_at: '2026-06-02T23:26:37.587912+00:00'
+updated_at: '2026-06-02T23:34:00.956642+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1715,7 +1715,7 @@ outcome target به‌صورت measurable بازنویسی شد [verify_method=s
 ```
 
 ### Step 5: Add Error Boundary in App.jsx for catching runtime errors
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on adding an Error Boundary component in frontend/src/App.jsx to catch all uncaught runtime errors (including Promise rejections) and report them via Inspector Bridge to the parent iframe. The Error Boundary should wrap the main application component. This step does NOT modify backend files or add tests.
 **Excerpt:**
 ```
@@ -1731,7 +1731,7 @@ outcome target به‌صورت measurable بازنویسی شد [verify_method=s
 ```
 
 ### Step 7: Add Firebase error tracking in catch blocks
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on adding error tracking in Firebase-related catch blocks throughout the frontend codebase. Errors from Firebase operations should be caught and reported via Inspector Bridge to the parent iframe. This step does NOT modify backend files or add tests.
 **Excerpt:**
 ```
@@ -1747,7 +1747,7 @@ outcome target به‌صورت measurable بازنویسی شد [verify_method=s
 ```
 
 ### Step 9: Add metrics/logging for error_rate in production
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on adding metrics or logging to track error_rate in production. This could include console.log statements, Firebase analytics events, or custom metrics. The logging should be added to frontend/src/inspectorBridge.js and/or backend/app/monitoring.py. This step does NOT add E2E tests.
 **Excerpt:**
 ```
@@ -1763,7 +1763,7 @@ metric/log اضافه شد تا در production outcome rate قابل تشخیص
 ```
 
 ### Step 11: Write E2E test for runtime error tracking
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on writing an end-to-end test in tests/e2e/test_inspector_bridge.py that verifies runtime errors are tracked and reported. The test should simulate a runtime error and verify it is captured by the Inspector Bridge and reported to the parent iframe. This step does NOT modify application code.
 — [merged] This step focuses on writing an end-to-end test in tests/e2e/test_inspector_bridge.py that verifies unhandled Promise rejections are tracked and reported. The test should simulate an unhandled Promise rejection and verify it is captured by the Inspector Bridge. This step does NOT modify application code.
 — [merged] This step focuses on writing an end-to-end test in tests/e2e/test_inspector_bridge.py that verifies Firebase operation errors are tracked and reported. The test should simulate a Firebase error and verify it is captured by the Inspector Bridge. This step does NOT modify application code.
