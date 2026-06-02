@@ -15,14 +15,14 @@
       "external_attempts": 1
     },
     {
-      "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
-      "title": "Address Over/Under-Engineering Anti-pattern",
+      "task_id": "1470edf2-a90f-43ec-b54a-255674ed6c86",
+      "title": "Resolve Threshold-Outcome mismatch anti-pattern",
       "priority": "high",
-      "execution_priority": 2050,
+      "execution_priority": 2100,
       "status": "pending",
       "external_status": "pending",
-      "path": "prompt/task-e4229cce-5083-4ed9-b7d7-4275cf77ec8e.md",
-      "external_attempts": 1
+      "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
+      "external_attempts": 2
     },
     {
       "task_id": "task_068445d6ae13",
