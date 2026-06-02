@@ -24,6 +24,7 @@ import InspectorBridge, { handleCommand } from './InspectorBridge';
 import { playBeepSound, getWavUrl } from '../utils/audio';
 import { initFirebase } from '../hooks/useFirebase';
 import { resolveLiveWsUrl } from '../utils/wsUrl';
+import { nextReconnectDelay, shouldReconnect } from '../utils/wsReconnect';
 import { installGlobalErrorTracking, reportError } from '../inspectorBridge.js';
 
 // --- Analytics ---
@@ -6349,6 +6350,15 @@ function LiveVoiceChat({
   const audioQueueRef = useRef([]);
   const isPlayingRef = useRef(false);
 
+  // Reconnect bookkeeping for the Live Voice socket. `userClosedRef` distinguishes
+  // a deliberate disconnect (user pressed stop) from an unexpected drop so we only
+  // auto-reconnect the latter; `reconnectAttemptsRef` drives the exponential
+  // backoff (see ../utils/wsReconnect.js) and `reconnectTimerRef` holds the
+  // pending retry timer so it can be cancelled on disconnect/unmount.
+  const userClosedRef = useRef(false);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef(null);
+
   // Recording refs
   const conversationRef = useRef([]); // Stores {role, text, audioData, mimeType}
   const currentAiAudioChunksRef = useRef([]); // Collects audio chunks for current AI response
@@ -6420,6 +6430,14 @@ function LiveVoiceChat({
   }, [isOpen]);
 
   const connect = () => {
+    // A fresh user-initiated connect clears any pending auto-reconnect and the
+    // "user closed" flag so the backoff curve starts over for this session.
+    userClosedRef.current = false;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+
     // Reset state for new connection
     if (wsRef.current) {
       wsRef.current.close();
@@ -6441,7 +6459,12 @@ function LiveVoiceChat({
 
     try {
       wsRef.current = new WebSocket(wsUrl);
-      wsRef.current.onopen = () => console.log('WebSocket connected');
+      wsRef.current.onopen = () => {
+        console.log('WebSocket connected');
+        // A successful handshake resets the backoff so the next unexpected drop
+        // retries quickly (1s) rather than continuing a long backoff curve.
+        reconnectAttemptsRef.current = 0;
+      };
       wsRef.current.onmessage = (event) => {
         try {
           handleGeminiMessage(JSON.parse(event.data));
@@ -6456,15 +6479,43 @@ function LiveVoiceChat({
       };
       wsRef.current.onclose = (e) => {
         console.log('WebSocket closed:', e.code, e.reason);
-        setConnectionStatus('disconnected');
         setCurrentNode('idle', 'liveVoice');
         stopListening();
+        scheduleReconnect();
       };
     } catch (error) {
       console.error('Connection error:', error);
       setConnectionStatus('error');
       setCurrentNode('error', 'liveVoice');
+      scheduleReconnect();
     }
+  };
+
+  // Schedule an automatic reconnect after an UNEXPECTED close using bounded
+  // exponential backoff (1s, 2s, 4s, 8s, 16s, 30s; see ../utils/wsReconnect.js).
+  // A deliberate disconnect (userClosedRef) or exhausting the attempt budget
+  // leaves the socket disconnected and surfaces that to the user via
+  // connectionStatus instead of retrying forever and flooding the server.
+  const scheduleReconnect = () => {
+    if (userClosedRef.current) {
+      setConnectionStatus('disconnected');
+      return;
+    }
+    if (!shouldReconnect(reconnectAttemptsRef.current)) {
+      console.error('WebSocket reconnect attempts exhausted; giving up');
+      setConnectionStatus('error');
+      setCurrentNode('error', 'liveVoice');
+      return;
+    }
+    reconnectAttemptsRef.current += 1;
+    const delay = nextReconnectDelay(reconnectAttemptsRef.current);
+    console.warn(`WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
+    setConnectionStatus('connecting');
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      if (!userClosedRef.current) connect();
+    }, delay);
   };
 
   // Combine multiple audio chunks into one
@@ -6512,6 +6563,14 @@ function LiveVoiceChat({
   };
 
   const disconnect = () => {
+    // Mark this as a deliberate close so the socket's onclose handler does NOT
+    // auto-reconnect, and cancel any retry already scheduled by a prior drop.
+    userClosedRef.current = true;
+    reconnectAttemptsRef.current = 0;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     stopListening();
     if (wsRef.current) {
       wsRef.current.close();
