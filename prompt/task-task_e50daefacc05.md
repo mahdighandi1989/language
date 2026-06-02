@@ -3,14 +3,14 @@ task_id: task_e50daefacc05
 title: پاکسازی و افزایش امنیت بیلد فرانت‌اند
 type: other
 priority: critical
-execution_priority: 1050
+execution_priority: 1100
 status: pending
 external_status: claimed
 verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-02T08:04:11.087666+00:00'
+updated_at: '2026-06-02T08:49:53.219712+00:00'
 tags:
 - consolidated
 - post_verify_merge
