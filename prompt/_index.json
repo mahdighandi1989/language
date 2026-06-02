@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 15,
+  "total": 14,
   "tasks": [
     {
       "task_id": "task_2c28ca0737f1",
@@ -113,16 +113,6 @@
       "external_status": "pending",
       "path": "prompt/task-task_9172abbf97f5.md",
       "external_attempts": 3
-    },
-    {
-      "task_id": "task_78af588c4541",
-      "title": "تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند",
-      "priority": "high",
-      "execution_priority": 2200,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_78af588c4541.md",
-      "external_attempts": 4
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
