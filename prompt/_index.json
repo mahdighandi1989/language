@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 3,
+  "total": 2,
   "tasks": [
-    {
-      "task_id": "task_ef0945bccb18",
-      "title": "افزودن بررسی وابستگی‌ها و npm audit به CI/CD",
-      "priority": "medium",
-      "execution_priority": 3100,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_ef0945bccb18.md",
-      "external_attempts": 2
-    },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
       "title": "ممیزی commit messages مشکوک و غیراستاندارد",
