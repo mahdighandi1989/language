@@ -25,6 +25,12 @@ target_files:
 - .github/workflows/codeql-analysis.yml
 - .github/dependabot.yml
 - frontend/vite.config.js
+pipeline: ai_llm
+purpose: تعریف و راه‌اندازی خط‌لوله CI/CD و Quality Gates پروژه (lint، build، تست، تحلیل امنیتی).
+responsibility: تضمین این‌که هر تغییر کد پیش از merge از gateهای کیفیت و امنیت عبور کند.
+expected_inputs: تغییرات کد در frontend/backend و رویدادهای push/PR در GitHub Actions.
+expected_outputs: workflowهای ci.yml و codeql-analysis.yml و پیکربندی dependabot برای اجرای خودکار بررسی‌ها.
+interacts_with: خط‌لوله ai_llm — همراه با تسک‌های تست بک‌اند، error handling و معماری اجرا می‌شود.
 ---
 
 # پیاده‌سازی CI/CD و Quality Gates

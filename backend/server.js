@@ -1253,8 +1253,30 @@ function cleanupTempFiles(files) {
 }
 
 // Serve frontend for all other routes (SPA)
+// Any /api/* request that reached here matched no route above. Return a
+// consistent JSON 404 instead of falling through to the SPA catch-all (which
+// would answer an API call with index.html).
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'یافت نشد (Not Found)' });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../frontend/dist/index.html'));
+});
+
+// Final, catch-all error handler. The CORS handler above only translates CORS
+// rejections and forwards every other error via next(err); without this
+// terminal handler those errors would hit Express's default handler and return
+// an HTML stack trace, so error responses were inconsistent across the app.
+// This guarantees every unhandled error becomes a redacted JSON 500.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', redactSensitiveData(err?.stack || err?.message || String(err)));
+  if (res.headersSent) {
+    return next(err);
+  }
+  const status = Number.isInteger(err?.status) ? err.status : 500;
+  res.status(status).json({ error: 'خطای داخلی سرور (Internal Server Error)' });
 });
 
 // ============================================
