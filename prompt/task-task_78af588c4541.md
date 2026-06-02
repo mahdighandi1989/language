@@ -1,22 +1,22 @@
 ---
 task_id: task_78af588c4541
-title: 'بازسازی بک‌اند: بهینه‌سازی server.js و مدیریت وابستگی‌ها'
+title: تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند
 type: other
 priority: high
-execution_priority: 2350
-status: awaiting_review
-external_status: done
+execution_priority: 2050
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-02T19:46:27.015969+00:00'
+updated_at: '2026-06-02T19:46:44.276356+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# بازسازی بک‌اند: بهینه‌سازی server.js و مدیریت وابستگی‌ها
+# تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند
 
 ## Raw Idea
 
