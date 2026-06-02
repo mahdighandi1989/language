@@ -2,11 +2,16 @@
   "name": "lebanese-dialect-learning",
   "version": "1.0.0",
   "description": "Lebanese Arabic Learning App with AI",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "install:all": "cd frontend && npm install && cd ../backend && npm install",
-    "dev": "cd backend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "start": "cd backend && npm start"
+    "install:all": "npm install",
+    "dev": "npm run dev --workspace backend",
+    "build": "npm run build --workspace frontend",
+    "start": "npm start --workspace backend"
   },
   "keywords": ["lebanese", "arabic", "language-learning", "gemini", "ai"],
   "license": "MIT"
