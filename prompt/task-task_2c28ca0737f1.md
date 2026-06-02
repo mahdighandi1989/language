@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند و رفع خطاهای راه‌اندازی
 type: other
 priority: critical
-execution_priority: 1200
-status: pending
+execution_priority: 1500
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-02T20:09:18.755214+00:00'
+updated_at: '2026-06-02T22:09:20.309911+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2356,7 +2356,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: اضافه کردن وابستگی‌های گمشده به backend/package.json
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اضافه کردن وابستگی‌های multer, fluent-ffmpeg, ffmpeg-static, pdf-parse به بخش dependencies در فایل backend/package.json است. خارج از این مرحله: نصب وابستگی‌ها (npm install) در مرحله بعد انجام می‌شود. نکته حیاتی: نسخه‌های دقیق مشخص شده در نمونه قبل/بعد باید استفاده شوند.
 **Excerpt:**
 ```
