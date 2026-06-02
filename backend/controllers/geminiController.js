@@ -73,8 +73,8 @@ export async function chat(req, res) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('Gemini API error:', errorData);
-      return res.status(response.status).json({ error: errorData });
+      console.error('Gemini API error:', redactSensitiveData(errorData));
+      return res.status(response.status).json({ error: redactSensitiveData(errorData) });
     }
 
     const result = await response.json();
@@ -98,8 +98,8 @@ export async function chat(req, res) {
       res.json({ text });
     }
   } catch (error) {
-    console.error('Chat API error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Chat API error:', redactSensitiveData(error?.message || String(error)));
+    res.status(500).json({ error: redactSensitiveData(error?.message || 'Internal Server Error') });
   }
 }
 
@@ -129,8 +129,8 @@ export async function tts(req, res) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      console.error('TTS API error:', errorData);
-      return res.status(response.status).json({ error: errorData });
+      console.error('TTS API error:', redactSensitiveData(errorData));
+      return res.status(response.status).json({ error: redactSensitiveData(errorData) });
     }
 
     const result = await response.json();
@@ -144,8 +144,8 @@ export async function tts(req, res) {
       res.status(500).json({ error: 'Invalid audio data' });
     }
   } catch (error) {
-    console.error('TTS API error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('TTS API error:', redactSensitiveData(error?.message || String(error)));
+    res.status(500).json({ error: redactSensitiveData(error?.message || 'Internal Server Error') });
   }
 }
 
