@@ -182,6 +182,19 @@ The critical `verify_failed` event now alerts via
 `silent=False`; delivered to Telegram when `NOTIFY_TELEGRAM_*` env vars are set,
 otherwise logged).
 
+## Audio processing
+
+`POST /api/audio/process` is a credential-free audio endpoint built on the
+bundled static ffmpeg binary (`ffmpeg-static` + `fluent-ffmpeg`). With no body
+it returns a 200 readiness snapshot — `{ "status": "ok", "result": { "ready":
+true, "ffmpegAvailable": true, "supportedFormats": [...] } }` — confirming the
+pipeline works without any Gemini key. With a multipart `file` field it
+normalizes the upload to a compact 22 kHz mono MP3 and returns the processing
+result (`{ "status": "ok", "result": { "processed": true, "outputFormat":
+"mp3", "outputSizeBytes": ... } }`). Implementation:
+`backend/controllers/audioController.js` + `backend/services/audioService.js`;
+covered by `tests/test_audio_processing.py`.
+
 ## Two-way Telegram bot (optional)
 
 The backend ships an optional two-way Telegram bot that adds: **notifications**

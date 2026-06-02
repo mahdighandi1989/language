@@ -15,6 +15,7 @@ import {
 } from '../controllers/geminiController.js';
 import { analyzeFiles } from '../controllers/analysisController.js';
 import { ingestAnalytics, getAnalytics } from '../controllers/analyticsController.js';
+import { processAudio } from '../controllers/audioController.js';
 
 // Aggregates every /api route. Mounted at the app root so the absolute paths
 // below match the original API contract exactly.
@@ -42,6 +43,17 @@ apiRouter.post(
   optionalAuth,
   requireGeminiKey,
   analyzeFiles
+);
+
+// Audio processing: credential-free ffmpeg-backed endpoint. With no body it
+// returns a readiness snapshot; with an uploaded `file` it probes the audio and
+// returns its metadata. Both answer with the stable { status, result } shape.
+apiRouter.post(
+  '/api/audio/process',
+  upload.single('file'),
+  handleMulterError,
+  optionalAuth,
+  processAudio
 );
 
 // Product analytics: the frontend tracker posts session summaries here so the
