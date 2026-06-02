@@ -3,14 +3,14 @@ task_id: task_2cd58167a90c
 title: بازسازی معماری بک‌اند
 type: other
 priority: high
-execution_priority: 2100
+execution_priority: 2150
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-02T20:08:39.920116+00:00'
+updated_at: '2026-06-02T20:48:56.601803+00:00'
 tags:
 - consolidated
 - post_verify_merge
