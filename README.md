@@ -80,7 +80,10 @@ npm run build
   `FIREBASE_*`).
 - Frontend variables are documented in `frontend/.env.example`. They **must**
   use the `VITE_` prefix because Vite only exposes `VITE_*` variables to client
-  code via `import.meta.env`.
+  code via `import.meta.env`. The optional `VITE_WS_URL` configures the Live
+  Voice / Inspector Bridge WebSocket endpoint; leave it empty to derive the
+  socket from this origin's `/ws/live` backend path (no third-party URL is ever
+  hard-coded — see `frontend/src/utils/wsUrl.js`).
 - Deployment defaults live in `render.yaml`; secrets there are marked
   `sync: false` and must be set in the hosting dashboard.
 

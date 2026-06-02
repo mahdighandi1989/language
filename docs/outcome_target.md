@@ -40,6 +40,35 @@ outcome_rate = mean(chat_success_rate, user_engagement_rate, conversion_rate, sp
   یک دستهٔ مصنوعی از نشست‌ها را عبور می‌دهد و تأیید می‌کند همهٔ KPIها محاسبه و
   `outcome_rate` تولید می‌شود.
 
+## پوشش خطای Inspector Bridge به‌صورت قابل اندازه‌گیری (`error_rate`)
+
+**outcome target (قابل اندازه‌گیری):** ۱۰۰٪ از منابع خطای کاربر باید توسط
+Inspector Bridge رهگیری شوند تا نرخ خطای واقعی (`error_rate`) قابل مشاهده باشد و
+دیگر به‌اشتباه صفر گزارش نشود. سه منبعی که باید پوشش داده شوند:
+
+| منبع خطا | hook رهگیری | محل |
+| --- | --- | --- |
+| خطاهای runtime catch‌نشده | `window.addEventListener('error', …)` | `frontend/src/inspectorBridge.js` |
+| rejection‌های catch‌نشدهٔ Promise | `window.addEventListener('unhandledrejection', …)` | `frontend/src/inspectorBridge.js` |
+| خطاهای Firebase/شبکه | `reportError(err, { source: 'firebase' })` | `frontend/src/components/App.jsx` |
+
+هر خطا از طریق `reportError` به یک سینک مرکزی می‌رود که `metric_name=error_rate`
+و `outcome_rate` (= `1 − error_rate`) را با همان قالب لاگ `backend/app/monitoring.py`
+منتشر می‌کند. این مقدار **measurable** است: `error_rate = total_errors / interactions`
+(کلیپ‌شده در بازهٔ ‎[۰، ۱]‎). تعریف رسمی outcome target اینجاست تا verify بتواند
+به‌جای صرفِ وجود فایل، خود outcome (پوشش خطا) را اندازه بگیرد.
+
+> **تصمیم طراحی:** خطاها به والد iframe ارسال **نمی‌شوند** و روی هیچ سوکت خارجی
+> منتشر نمی‌گردند — اسکریپت قدیمیِ «phone-home» عمداً حذف شده است
+> (نگهبان: `tests/test_inspector_bridge_no_iframe.py`). الزامِ «گزارش رویدادهای
+> خطا برای اندازه‌گیری» اینجا با یک سینک متریک درون‌برنامه‌ای برآورده می‌شود که هر
+> log scraper می‌تواند آن را بخواند.
+
+- **بک‌اند (Node):** `backend/server.js` چرخهٔ عمر اتصال `/ws/live` را رصد می‌کند و
+  متریک `live_ws_error_rate` / `outcome_rate` را برای خطاهای سمت سوکت منتشر می‌کند.
+- **تست E2E:** `tests/e2e/test_inspector_bridge.py::test_error_tracking` پوشش این سه
+  hook را به‌صورت یک `outcome_rate` ایستا محاسبه می‌کند و تأیید می‌کند به ۱۰۰٪ می‌رسد.
+
 ## رویدادهای بحرانی و نوتیفیکیشن
 
 رویداد بحرانی `verify_failed` اکنون از طریق `backend/app/notifications.py`

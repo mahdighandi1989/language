@@ -23,6 +23,8 @@ import { LiveChatProvider, useLiveChat } from '../contexts/LiveChatContext';
 import InspectorBridge, { handleCommand } from './InspectorBridge';
 import { playBeepSound, getWavUrl } from '../utils/audio';
 import { initFirebase } from '../hooks/useFirebase';
+import { resolveLiveWsUrl } from '../utils/wsUrl';
+import { installGlobalErrorTracking, reportError } from '../inspectorBridge.js';
 
 // --- Analytics ---
 // Client-side product analytics tracker. Records chat interactions and flushes
@@ -545,6 +547,12 @@ export default function App() {
     dataRef.current = data;
   }, [data]);
 
+  // Install Inspector Bridge global error tracking once on mount: uncaught
+  // runtime errors and unhandled promise rejections are captured and reported
+  // to the structured logger as error_rate/outcome_rate metrics (see
+  // ../inspectorBridge.js). Returns an uninstall fn for clean teardown.
+  useEffect(() => installGlobalErrorTracking(), []);
+
   useEffect(() => {
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -659,6 +667,8 @@ export default function App() {
           setIsAuthReady(true);
         }, (error) => {
             console.error("Error listening to document:", error);
+            // Report the Firebase/Firestore failure so it counts toward error_rate.
+            reportError(error, { source: 'firebase' });
             // Fallback to localStorage if Firestore fails
             const savedData = loadFromLocalStorage();
             setData(savedData);
@@ -669,6 +679,8 @@ export default function App() {
         return unsubscribe;
       } catch (error) {
         console.error("Authentication failed:", error);
+        // Report the Firebase auth failure so it counts toward error_rate.
+        reportError(error, { source: 'firebase' });
         // Fallback to localStorage
         const savedData = loadFromLocalStorage();
         setData(savedData);
@@ -6423,8 +6435,9 @@ function LiveVoiceChat({
     setCurrentNode('wsConnecting', 'liveVoice');
     setTranscript([]);
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/live`;
+    // Resolve the Live Voice endpoint: honours VITE_WS_URL when set, otherwise
+    // falls back to this origin's /ws/live (see ../utils/wsUrl.js).
+    const wsUrl = resolveLiveWsUrl();
 
     try {
       wsRef.current = new WebSocket(wsUrl);

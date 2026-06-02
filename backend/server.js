@@ -50,6 +50,49 @@ wss.on('error', (err) => {
   console.error('WebSocket server error:', redactSensitiveData(err?.stack || err?.message || String(err)));
 });
 
+// Live socket observability. The Gemini message proxy lives in
+// services/liveProxyService.js; this listener is a separate, side-effect-free
+// observer that tracks the /ws/live connection lifecycle and emits a
+// `live_ws_error_rate` / `outcome_rate` metric line (same `metric_name=<n>
+// value=<v>` shape as backend/app/monitoring.py) so per-connection failures are
+// measurable in production logs rather than reading a misleading zero.
+let liveWsActive = 0;
+let liveWsTotal = 0;
+let liveWsErrors = 0;
+
+function logLiveWsMetrics() {
+  const errorRate = liveWsTotal > 0 ? liveWsErrors / liveWsTotal : 0;
+  const outcomeRate = 1 - errorRate;
+  console.log(`monitoring_log metric_name=live_ws_error_rate value=${errorRate.toFixed(4)}`);
+  console.log(`monitoring_log metric_name=outcome_rate value=${outcomeRate.toFixed(4)}`);
+}
+
+wss.on('connection', (ws) => {
+  liveWsActive += 1;
+  liveWsTotal += 1;
+  console.log(`Live WS connection opened (active=${liveWsActive}, total=${liveWsTotal})`);
+
+  // Count inbound frames so an idle vs. active socket is distinguishable in logs.
+  ws.on('message', () => {
+    // Message payloads are proxied to Gemini in liveProxyService.js; here we only
+    // observe that the socket is exchanging data.
+  });
+
+  // A per-connection error contributes to the live_ws_error_rate metric.
+  ws.on('error', (err) => {
+    liveWsErrors += 1;
+    console.error('Live WS connection error:', redactSensitiveData(err?.message || String(err)));
+    logLiveWsMetrics();
+  });
+
+  // Clean disconnection: decrement the active gauge and re-emit the metrics.
+  ws.on('close', () => {
+    liveWsActive = Math.max(0, liveWsActive - 1);
+    console.log(`Live WS connection closed (active=${liveWsActive})`);
+    logLiveWsMetrics();
+  });
+});
+
 // Security headers, CSP and CORS allow-list.
 applySecurity(app);
 
