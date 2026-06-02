@@ -21,6 +21,8 @@ import { generalLimiter } from './middleware/rateLimiter.js';
 import { apiRouter } from './routes/index.js';
 import { apiNotFound, serveSpa } from './controllers/fallbackController.js';
 import { attachLiveProxy } from './services/liveProxyService.js';
+import { attachTelegram } from './services/telegram/index.js';
+import { GEMINI_API_KEY } from './config/env.js';
 import { redactSensitiveData } from './utils/redact.js';
 
 // Importing ./config/env.js above has already loaded .env and validated the
@@ -52,6 +54,20 @@ wss.on('error', (err) => {
 applySecurity(app);
 
 app.use(express.json({ limit: '10mb' }));
+
+// Two-way Telegram integration (notifications + remote control + AI practice).
+// Wired before the rate limiter so the inbound webhook (which receives bursts
+// from Telegram's servers) is not throttled by the per-IP general limiter. When
+// no bot token is configured this only registers the link/status endpoints and
+// never starts a bot, so the server boots normally without Telegram.
+const serverStartedAt = Date.now();
+attachTelegram(app, {
+  getStatus: () => ({
+    ok: true,
+    geminiConfigured: Boolean(GEMINI_API_KEY),
+    uptimeSec: (Date.now() - serverStartedAt) / 1000,
+  }),
+});
 
 // Rate-limit every /api/* route. The WebSocket path is not under /api.
 app.use('/api', generalLimiter);

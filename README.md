@@ -149,6 +149,30 @@ The critical `verify_failed` event now alerts via
 `silent=False`; delivered to Telegram when `NOTIFY_TELEGRAM_*` env vars are set,
 otherwise logged).
 
+## Two-way Telegram bot (optional)
+
+The backend ships an optional two-way Telegram bot that adds: **notifications**
+(registration, errors, uploads, practice events), **remote control** of courses
+and content (list / add / edit / delete / upload from chat), and **AI-teacher
+practice** (pick a topic, chat by text, or send a voice message that is
+transcribed and answered with both text and a synthesized voice reply).
+
+It is **off by default**: with no `TELEGRAM_BOT_TOKEN` the bot stays dormant and
+the server runs normally. To enable it, create a bot via
+[@BotFather](https://t.me/BotFather) and set the `TELEGRAM_*` variables
+(documented in `backend/.env.example`). The bot supports long polling (default)
+or webhook mode (`TELEGRAM_WEBHOOK_URL` + `TELEGRAM_WEBHOOK_SECRET`).
+
+- Endpoints: `POST /api/telegram/webhook` (secret-validated, bypasses the API
+  rate limiter), `POST /api/telegram/link` (authenticated account linking),
+  `GET /api/telegram/status`.
+- Implementation lives in `backend/services/telegram/`; tests in
+  `backend/tests/test_telegram_service.js` and `test_telegram_commands.js`
+  (run with `cd backend && node --test 'tests/test_*.js'`).
+- **Full Persian user guide:** [`docs/telegram-user-guide.md`](docs/telegram-user-guide.md)
+  — setup, account linking, every command, the practice flow, and
+  troubleshooting.
+
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE)

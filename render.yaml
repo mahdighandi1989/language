@@ -15,5 +15,13 @@ services:
         sync: false
       - key: FIREBASE_PROJECT_ID
         sync: false
+      # Two-way Telegram bot (optional). Set the token in the dashboard to
+      # enable; leave unset to keep the bot dormant. See docs/telegram-user-guide.md
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_ADMIN_IDS
+        sync: false
       - key: NODE_ENV
         value: production
