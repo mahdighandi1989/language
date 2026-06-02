@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند و رفع خطاهای راه‌اندازی
 type: other
 priority: critical
-execution_priority: 1150
-status: pending
+execution_priority: 1450
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-02T09:40:09.325573+00:00'
+updated_at: '2026-06-02T19:42:55.671827+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2356,7 +2356,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: اضافه کردن وابستگی‌های گمشده به backend/package.json
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اضافه کردن وابستگی‌های multer, fluent-ffmpeg, ffmpeg-static, pdf-parse به بخش dependencies در فایل backend/package.json است. خارج از این مرحله: نصب وابستگی‌ها (npm install) در مرحله بعد انجام می‌شود. نکته حیاتی: نسخه‌های دقیق مشخص شده در نمونه قبل/بعد باید استفاده شوند.
 **Excerpt:**
 ```
@@ -2364,7 +2364,7 @@ _(مستقل)_
 ```
 
 ### Step 2: اجرای npm install در backend و بررسی عدم وجود خطا
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای دستور npm install در پوشه backend و اطمینان از اتمام آن بدون خطا است. خارج از این مرحله: اجرای سرور یا تست‌های دیگر. نکته حیاتی: این مرحله باید بعد از به‌روزرسانی package.json انجام شود.
 **Excerpt:**
 ```
@@ -2372,7 +2372,7 @@ _(مستقل)_
 ```
 
 ### Step 3: اجرای node backend/server و بررسی عدم وجود خطای MODULE_NOT_FOUND
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای دستور node backend/server.js و اطمینان از عدم بروز خطای MODULE_NOT_FOUND است. خارج از این مرحله: تست endpointها یا عملکرد کامل سرور. نکته حیاتی: این مرحله باید بعد از نصب وابستگی‌ها انجام شود.
 **Excerpt:**
 ```
@@ -2380,7 +2380,7 @@ _(مستقل)_
 ```
 
 ### Step 4: ایجاد پوشه‌های جدید برای جداسازی لایه‌ها در backend
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد پوشه‌های backend/controllers/, backend/services/, backend/routes/, backend/middleware/, backend/utils/ است. خارج از این مرحله: انتقال کد به این پوشه‌ها. نکته حیاتی: مسیر دقیق پوشه‌ها باید مطابق با ساختار نمونه بعد در پرامپت باشد.
 **Excerpt:**
 ```
@@ -2388,7 +2388,7 @@ _(مستقل)_
 ```
 
 ### Step 5: انتقال route handlers از server.js به فایل‌های جداگانه در routes/
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی تمام route handlers (app.get, app.post, app.put, app.delete, app.patch) در backend/server.js و انتقال آن‌ها به فایل‌های مجزا در پوشه backend/routes/ است. خارج از این مرحله: انتقال middleware یا توابع سرویس. نکته حیاتی: route handlers باید به صورت ماژولار و با استفاده از express.Router() پیاده‌سازی شوند.
 **Excerpt:**
 ```
@@ -2396,7 +2396,7 @@ _(مستقل)_
 ```
 
 ### Step 6: انتقال توابع سرویس (analyzeWithGemini, uploadToGeminiFileAPI) به فایل‌های services/
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی توابع سرویس مانند analyzeWithGemini و uploadToGeminiFileAPI در backend/server.js و انتقال آن‌ها به فایل‌های مجزا در پوشه backend/services/ است. خارج از این مرحله: انتقال route handlers یا توابع کمکی. نکته حیاتی: توابع سرویس باید به صورت ماژولار و با export مناسب پیاده‌سازی شوند.
 **Excerpt:**
 ```
@@ -2404,7 +2404,7 @@ _(مستقل)_
 ```
 
 ### Step 7: انتقال middleware (handleMulterError) به فایل middleware/
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی تابع middleware handleMulterError در backend/server.js و انتقال آن به فایل مجزا در پوشه backend/middleware/ است. خارج از این مرحله: انتقال route handlers یا توابع سرویس. نکته حیاتی: middleware باید به صورت ماژولار و با export مناسب پیاده‌سازی شود.
 **Excerpt:**
 ```
@@ -2412,7 +2412,7 @@ _(مستقل)_
 ```
 
 ### Step 8: انتقال توابع کمکی (splitIntoChunks) به فایل utils/
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی توابع کمکی مانند splitIntoChunks در backend/server.js و انتقال آن‌ها به فایل مجزا در پوشه backend/utils/ است. خارج از این مرحله: انتقال route handlers یا توابع سرویس. نکته حیاتی: توابع کمکی باید به صورت ماژولار و با export مناسب پیاده‌سازی شوند.
 **Excerpt:**
 ```
@@ -2420,7 +2420,7 @@ _(مستقل)_
 ```
 
 ### Step 9: تبدیل server.js به یک فایل راه‌انداز با کمتر از ۱۰۰ خط
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بازنویسی backend/server.js به گونه‌ای است که فقط شامل importها، تنظیمات global (مانند middlewareهای عمومی) و mount کردن routeها باشد. خارج از این مرحله: تغییر منطق business یا endpointها. نکته حیاتی: فایل نهایی باید کمتر از ۱۰۰ خط باشد.
 **Excerpt:**
 ```
@@ -2428,7 +2428,7 @@ _(مستقل)_
 ```
 
 ### Step 10: تأیید عملکرد برنامه پس از refactor با تست endpoint /api/upload
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای برنامه backend و ارسال یک درخواست POST به endpoint /api/upload برای اطمینان از کارکرد صحیح آن است. خارج از این مرحله: تست تمام endpointها. نکته حیاتی: پاسخ باید شامل فیلدهای fileId و message با status 200 باشد.
 **Excerpt:**
 ```
@@ -2436,7 +2436,7 @@ _(مستقل)_
 ```
 
 ### Step 11: بررسی و همگام‌سازی وابستگی‌های جانبی (مستندات، تست‌ها، config)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی و به‌روزرسانی مستندات (README, CHANGELOG)، تست‌های موجود، فایل‌های config (مانند render.yaml) و سایر artifactهایی است که ممکن است تحت تأثیر تغییرات ساختاری قرار گرفته باشند. خارج از این مرحله: نوشتن تست‌های جدید. نکته حیاتی: اگر هیچ وابستگی جانبی شناسایی نشد، باید صریحاً در commit message ذکر شود.
 **Excerpt:**
 ```
