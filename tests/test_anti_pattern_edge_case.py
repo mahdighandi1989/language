@@ -15,36 +15,48 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SERVER_JS = REPO_ROOT / "backend" / "server.js"
+BACKEND_DIR = REPO_ROOT / "backend"
+SERVER_JS = BACKEND_DIR / "server.js"
+SECURITY_JS = BACKEND_DIR / "middleware" / "security.js"
 
 
 def test_edge_case_scenario():
     """A non-CORS error is not left without a JSON response."""
-    source = SERVER_JS.read_text(encoding="utf-8")
+    # After the layered refactor the conditional CORS handler lives in
+    # middleware/security.js and the terminal catch-all stays in server.js.
+    security = SECURITY_JS.read_text(encoding="utf-8")
+    server = SERVER_JS.read_text(encoding="utf-8")
 
     # The conditional CORS handler still exists (we didn't regress it)...
-    assert "Not allowed by CORS" in source
+    assert "Not allowed by CORS" in security
 
     # ...but it is no longer the *only* error middleware: a terminal catch-all
-    # follows it, so the "message != CORS sentinel" branch can't fall through.
+    # in server.js follows it, so the "message != CORS sentinel" branch can't
+    # fall through. The CORS handler is itself an (err, req, res, next)
+    # middleware, and server.js registers another one as the terminal handler.
+    assert "(err, req, res, next)" in security, (
+        "CORS error middleware should remain an (err, req, res, next) handler"
+    )
     error_handlers = [
-        m.start() for m in re.finditer(r"\(err, req, res, next\)", source)
+        m.start() for m in re.finditer(r"\(err, req, res, next\)", server)
     ]
-    assert len(error_handlers) >= 2, (
-        "anti-pattern not resolved: no terminal handler after the conditional "
-        "CORS handler"
+    assert len(error_handlers) >= 1, (
+        "anti-pattern not resolved: no terminal handler in server.js"
     )
 
-    cors_pos = source.index("Not allowed by CORS")
+    # server.js installs the security middleware (which registers the CORS
+    # handler) before its terminal error handler, so forwarded errors are
+    # caught downstream.
+    security_pos = server.index("applySecurity")
     terminal_pos = error_handlers[-1]
-    assert terminal_pos > cors_pos, (
-        "terminal error handler must be registered after the CORS handler so "
-        "forwarded errors are caught"
+    assert terminal_pos > security_pos, (
+        "terminal error handler must be registered after the security/CORS "
+        "middleware so forwarded errors are caught"
     )
 
     # The terminal handler returns JSON for the general case — uniform shape
     # regardless of error type.
-    tail = source[terminal_pos:]
+    tail = server[terminal_pos:]
     assert re.search(r"res\.status\([^)]*\)\.json\(", tail), (
         "terminal handler should answer with JSON for any error type"
     )

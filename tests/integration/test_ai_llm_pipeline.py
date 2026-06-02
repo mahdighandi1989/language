@@ -17,7 +17,24 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_DIR = REPO_ROOT / "prompt"
-SERVER_JS = REPO_ROOT / "backend" / "server.js"
+BACKEND_DIR = REPO_ROOT / "backend"
+SERVER_JS = BACKEND_DIR / "server.js"
+
+
+def _backend_source() -> str:
+    """Combined backend source across the layered module structure.
+
+    The Gemini endpoints were extracted from ``server.js`` into routes and
+    controllers during the backend refactor, so pipeline assertions look at the
+    whole backend rather than a single file.
+    """
+    parts = []
+    for path in sorted(BACKEND_DIR.rglob("*.js")):
+        rel = path.relative_to(BACKEND_DIR).parts
+        if "node_modules" in rel or "tests" in rel:
+            continue
+        parts.append(path.read_text(encoding="utf-8"))
+    return "\n".join(parts)
 
 REQUIRED_FIELDS = (
     "purpose",
@@ -86,8 +103,8 @@ def test_pipeline_runs_successfully():
 
     # 3. The backend the pipeline targets still exposes its Gemini entry point
     #    and a terminal error handler, so the pipeline can actually run.
-    server = SERVER_JS.read_text(encoding="utf-8")
-    assert "/api/gemini/chat" in server, "Gemini chat endpoint missing"
-    assert server.count("(err, req, res, next)") >= 2, (
+    backend = _backend_source()
+    assert "/api/gemini/chat" in backend, "Gemini chat endpoint missing"
+    assert backend.count("(err, req, res, next)") >= 2, (
         "expected both the CORS and the terminal error handlers"
     )

@@ -15,11 +15,27 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SERVER_JS = REPO_ROOT / "backend" / "server.js"
+BACKEND_DIR = REPO_ROOT / "backend"
+SERVER_JS = BACKEND_DIR / "server.js"
 
 
 def _server_source() -> str:
-    return SERVER_JS.read_text(encoding="utf-8")
+    """Combined backend source.
+
+    The server was refactored from a monolithic ``server.js`` into a layered
+    structure (config / middleware / services / controllers / routes), so the
+    error-handling behavior now spans several files: the CORS translator lives
+    in ``middleware/security.js`` while the terminal handler stays in
+    ``server.js``. These tests assert on the backend as a whole rather than on
+    a single file.
+    """
+    parts = []
+    for path in sorted(BACKEND_DIR.rglob("*.js")):
+        rel = path.relative_to(BACKEND_DIR).parts
+        if "node_modules" in rel or "tests" in rel:
+            continue
+        parts.append(path.read_text(encoding="utf-8"))
+    return "\n".join(parts)
 
 
 def test_edge_case_error_handling():
