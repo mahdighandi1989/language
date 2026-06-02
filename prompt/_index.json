@@ -15,16 +15,6 @@
       "external_attempts": 2
     },
     {
-      "task_id": "task_2cd58167a90c",
-      "title": "بازسازی معماری بک‌اند",
-      "priority": "high",
-      "execution_priority": 2100,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_2cd58167a90c.md",
-      "external_attempts": 2
-    },
-    {
       "task_id": "task_9172abbf97f5",
       "title": "مستندسازی جامع پروژه و بهبود فرآیند راه‌اندازی",
       "priority": "high",
@@ -53,6 +43,16 @@
       "external_status": "pending",
       "path": "prompt/task-task_ce963d814d52.md",
       "external_attempts": 2
+    },
+    {
+      "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
+      "title": "پیاده‌سازی اتصال مجدد WebSocket با بک‌آف نمایی",
+      "priority": "high",
+      "execution_priority": 2150,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
+      "external_attempts": 3
     },
     {
       "task_id": "task_ef0945bccb18",
