@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند و رفع خطاهای راه‌اندازی
 type: other
 priority: critical
-execution_priority: 1250
-status: pending
+execution_priority: 1550
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-02T23:39:13.233554+00:00'
+updated_at: '2026-06-02T23:42:00.293985+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2364,7 +2364,7 @@ _(مستقل)_
 ```
 
 ### Step 2: اجرای npm install در backend و بررسی عدم وجود خطا
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اجرای دستور npm install در پوشه backend و اطمینان از اتمام آن بدون خطا است. خارج از این مرحله: اجرای سرور یا تست‌های دیگر. نکته حیاتی: این مرحله باید بعد از به‌روزرسانی package.json انجام شود.
 **Excerpt:**
 ```
@@ -2372,7 +2372,7 @@ _(مستقل)_
 ```
 
 ### Step 3: اجرای node backend/server و بررسی عدم وجود خطای MODULE_NOT_FOUND
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اجرای دستور node backend/server.js و اطمینان از عدم بروز خطای MODULE_NOT_FOUND است. خارج از این مرحله: تست endpointها یا عملکرد کامل سرور. نکته حیاتی: این مرحله باید بعد از نصب وابستگی‌ها انجام شود.
 **Excerpt:**
 ```
@@ -2412,7 +2412,7 @@ _(مستقل)_
 ```
 
 ### Step 8: انتقال توابع کمکی (splitIntoChunks) به فایل utils/
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل شناسایی توابع کمکی مانند splitIntoChunks در backend/server.js و انتقال آن‌ها به فایل مجزا در پوشه backend/utils/ است. خارج از این مرحله: انتقال route handlers یا توابع سرویس. نکته حیاتی: توابع کمکی باید به صورت ماژولار و با export مناسب پیاده‌سازی شوند.
 **Excerpt:**
 ```
