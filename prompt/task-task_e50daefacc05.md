@@ -5,12 +5,12 @@ type: other
 priority: critical
 execution_priority: 1250
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: pending
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-02T23:47:07.985165+00:00'
+updated_at: '2026-06-02T23:52:12.300952+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1681,7 +1681,7 @@ _(مستقل)_
 ```
 
 ### Step 2: حذف Inspector Bridge Script از frontend/src/App.jsx
-**Status:** `partial` (70%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل حذف کامل بلوک اسکریپت Inspector Bridge (WebSocket mode) از فایل frontend/src/App.jsx (خطوط 4-126) است. خارج از این مرحله: تغییر در index.html، ایجاد شرط محیط توسعه، یا تغییر در فایل‌های دیگر. نکته حیاتی: اسکریپت باید به طور کامل حذف شود، نه کامنت‌گذاری.
 **Excerpt:**
 ```
@@ -1705,7 +1705,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 5: ایجاد تست build موفقیت‌آمیز برای Vite/PostCSS/Tailwind
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ایجاد تست در فایل tests/test_build.py است که بررسی کند build با موفقیت انجام می‌شود (تابع test_build_succeeds). خارج از این مرحله: تست plugins، تست index.html، یا تغییر در فایل‌های کانفیگ. نکته حیاتی: تست باید timeout 120 ثانیه داشته باشد.
 **Excerpt:**
 ```
@@ -1713,7 +1713,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 6: ایجاد تست بارگذاری صحیح plugins برای Vite/PostCSS/Tailwind
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ایجاد تست در فایل tests/test_build.py است که بررسی کند plugins به درستی load می‌شوند (تابع test_plugins_loaded). خارج از این مرحله: تست build موفقیت‌آمیز، تست index.html، یا تغییر در فایل‌های کانفیگ. نکته حیاتی: تست باید timeout 60 ثانیه داشته باشد.
 **Excerpt:**
 ```
