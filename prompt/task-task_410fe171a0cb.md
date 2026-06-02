@@ -3,14 +3,14 @@ task_id: task_410fe171a0cb
 title: پیکربندی Inspector Bridge و بهبود مدیریت خطا
 type: other
 priority: critical
-execution_priority: 1200
-status: pending
+execution_priority: 1500
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:22:56.705850+00:00'
-updated_at: '2026-06-02T19:54:17.826707+00:00'
+updated_at: '2026-06-02T22:01:29.291930+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1773,7 +1773,7 @@ metric/log اضافه شد تا در production outcome rate قابل تشخیص
 ```
 
 ### Step 12: Update Inspector Bridge WebSocket URL to point to backend /ws/live
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on updating the Inspector Bridge WebSocket URL in frontend/src/App.jsx to point to the backend's /ws/live endpoint. The URL should use a configurable environment variable with a fallback to the local development URL (e.g., ws://localhost:3001/ws/live). This step does NOT modify backend files or add tests.
 **Excerpt:**
 ```
