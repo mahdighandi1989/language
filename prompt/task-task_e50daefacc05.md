@@ -3,14 +3,14 @@ task_id: task_e50daefacc05
 title: پاکسازی و افزایش امنیت بیلد فرانت‌اند
 type: other
 priority: critical
-execution_priority: 1100
-status: pending
+execution_priority: 1400
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-02T08:56:19.971189+00:00'
+updated_at: '2026-06-02T18:57:55.497872+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1673,7 +1673,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: حذف Inspector Bridge Script از frontend/index.html
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل حذف کامل بلوک اسکریپت Inspector Bridge از فایل frontend/index.html (خطوط 31-201) است. خارج از این مرحله: تغییر در frontend/src/App.jsx، ایجاد شرط محیط توسعه، یا تغییر در فایل‌های دیگر. نکته حیاتی: اسکریپت باید به طور کامل حذف شود، نه کامنت‌گذاری.
 **Excerpt:**
 ```
@@ -1681,7 +1681,7 @@ _(مستقل)_
 ```
 
 ### Step 2: حذف Inspector Bridge Script از frontend/src/App.jsx
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل حذف کامل بلوک اسکریپت Inspector Bridge (WebSocket mode) از فایل frontend/src/App.jsx (خطوط 4-126) است. خارج از این مرحله: تغییر در index.html، ایجاد شرط محیط توسعه، یا تغییر در فایل‌های دیگر. نکته حیاتی: اسکریپت باید به طور کامل حذف شود، نه کامنت‌گذاری.
 **Excerpt:**
 ```
@@ -1689,7 +1689,7 @@ _(مستقل)_
 ```
 
 ### Step 3: تأیید عدم وجود event listener رهگیری در production build
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی فایل‌های build نهایی (dist/index.html و dist/assets/*.js) برای اطمینان از عدم وجود event listenerهای رهگیری (کلیک/اسکرول/تایپ) است. خارج از این مرحله: تغییر در فایل‌های منبع، اجرای build، یا تست‌های دیگر. نکته حیاتی: این مرحله صرفاً یک مرحله تأیید است و نیازی به تغییر کد ندارد.
 **Excerpt:**
 ```
@@ -1697,7 +1697,7 @@ _(مستقل)_
 ```
 
 ### Step 4: اجرای build پروژه و تأیید موفقیت آن
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اجرای build پروژه فرانت‌اند (npm run build) و تأیید عدم وجود خطا است. خارج از این مرحله: تغییر در فایل‌های کد، اجرای تست‌های واحد، یا بررسی lint. نکته حیاتی: build باید بدون خطا انجام شود و خروجی dist تولید شود.
 **Excerpt:**
 ```
@@ -1705,7 +1705,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 5: ایجاد تست build موفقیت‌آمیز برای Vite/PostCSS/Tailwind
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ایجاد تست در فایل tests/test_build.py است که بررسی کند build با موفقیت انجام می‌شود (تابع test_build_succeeds). خارج از این مرحله: تست plugins، تست index.html، یا تغییر در فایل‌های کانفیگ. نکته حیاتی: تست باید timeout 120 ثانیه داشته باشد.
 **Excerpt:**
 ```
@@ -1713,7 +1713,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 6: ایجاد تست بارگذاری صحیح plugins برای Vite/PostCSS/Tailwind
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ایجاد تست در فایل tests/test_build.py است که بررسی کند plugins به درستی load می‌شوند (تابع test_plugins_loaded). خارج از این مرحله: تست build موفقیت‌آمیز، تست index.html، یا تغییر در فایل‌های کانفیگ. نکته حیاتی: تست باید timeout 60 ثانیه داشته باشد.
 **Excerpt:**
 ```
@@ -1721,7 +1721,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 7: بررسی وابستگی‌های upstream برای تسک 1 (حذف Inspector Bridge)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و مستندسازی وابستگی‌های upstream برای تسک حذف Inspector Bridge است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی downstream. نکته حیاتی: باید فایل‌ها، توابع، API endpoint‌ها، schema‌ها، env vars و config‌هایی که این تسک به آنها متکی است شناسایی شوند.
 — [merged] این مرحله شامل شناسایی و مستندسازی وابستگی‌های downstream برای تسک حذف Inspector Bridge است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی upstream. نکته حیاتی: باید با grep و reference search همه call sites، importها، subclassها و referenceهای مستقیم و غیرمستقیم پیدا شوند.
 **Excerpt:**
@@ -1730,7 +1730,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 8: بررسی وابستگی‌های cross-tier برای تسک 1 (حذف Inspector Bridge)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و مستندسازی وابستگی‌های cross-tier برای تسک حذف Inspector Bridge است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی upstream/downstream. نکته حیاتی: باید تأثیر تغییر frontend بر backend، database، workers، auth، CORS، CSP و سایر tierها بررسی شود.
 **Excerpt:**
 ```
@@ -1738,7 +1738,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 9: بررسی وابستگی‌های جانبی (artifacts) برای تسک 1 (حذف Inspector Bridge)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و مستندسازی وابستگی‌های جانبی (مستندات، تست‌ها، type definitions، infra config، monitoring، security، caches) برای تسک حذف Inspector Bridge است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی upstream/downstream/cross-tier. نکته حیاتی: همه artifact‌ها باید بررسی و به‌روز شوند.
 **Excerpt:**
 ```
@@ -1746,7 +1746,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 10: بررسی وابستگی‌های upstream برای تسک 2 (تست Vite/PostCSS/Tailwind)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و مستندسازی وابستگی‌های upstream برای تسک تست تنظیمات build است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی downstream. نکته حیاتی: باید فایل‌ها، توابع، API endpoint‌ها، schema‌ها، env vars و config‌هایی که این تسک به آنها متکی است شناسایی شوند.
 — [merged] این مرحله شامل شناسایی و مستندسازی وابستگی‌های downstream برای تسک تست تنظیمات build است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی upstream. نکته حیاتی: باید با grep و reference search همه call sites، importها، subclassها و referenceهای مستقیم و غیرمستقیم پیدا شوند.
 **Excerpt:**
