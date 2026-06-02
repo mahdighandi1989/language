@@ -3,14 +3,14 @@ task_id: task_78af588c4541
 title: 'بازسازی بک‌اند: بهینه‌سازی server.js و مدیریت وابستگی‌ها'
 type: other
 priority: high
-execution_priority: 2050
-status: pending
+execution_priority: 2350
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-02T09:47:02.934795+00:00'
+updated_at: '2026-06-02T19:46:27.015969+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1206,7 +1206,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: اضافه کردن وابستگی‌های گمشده به backend/package.json
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل افزودن سه وابستگی 'fluent-ffmpeg'، 'ffmpeg-static' و 'multer' به بخش dependencies فایل backend/package.json است. خارج از این مرحله: نصب وابستگی‌ها (npm install)، به‌روزرسانی package-lock.json، یا تغییرات در server.js. نکته حیاتی: فقط فایل package.json را ویرایش کنید، نه چیز دیگر.
 **Excerpt:**
 ```
@@ -1214,7 +1214,7 @@ Add 'fluent-ffmpeg' and 'ffmpeg-static' to backend/package.json dependencies. Al
 ```
 
 ### Step 2: اجرای npm install برای به‌روزرسانی package-lock.json
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای دستور npm install در دایرکتوری backend برای نصب وابستگی‌های جدید (fluent-ffmpeg، ffmpeg-static، multer) و به‌روزرسانی فایل package-lock.json است. خارج از این مرحله: تغییرات در کد منبع یا تست‌ها. نکته حیاتی: مطمئن شوید که npm install بدون خطا اجرا می‌شود.
 **Excerpt:**
 ```
@@ -1222,7 +1222,7 @@ Run npm install to update package-lock.json.
 ```
 
 ### Step 3: تأیید عدم وجود خطاهای module not found در startup بک‌اند
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای تست test_no_module_not_found_errors از فایل tests/test_backend_startup.py برای اطمینان از عدم وجود خطاهای module not found در زمان startup بک‌اند است. خارج از این مرحله: تست endpointهای صوتی یا تغییرات در کد. نکته حیاتی: تست باید با timeout 30 ثانیه اجرا شود.
 **Excerpt:**
 ```
@@ -1230,7 +1230,7 @@ Backend starts without module not found errors [verify_method=backend_test] [ver
 ```
 
 ### Step 4: تأیید عملکرد صحیح endpoint پردازش صوتی
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ارسال یک درخواست POST به endpoint /api/audio/process و بررسی پاسخ است. خارج از این مرحله: تست endpointهای دیگر یا تغییرات در کد. نکته حیاتی: پاسخ باید شامل فیلدهای status و result باشد و status کد 200 برگرداند.
 **Excerpt:**
 ```
@@ -1238,7 +1238,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 5: ایجاد دایرکتوری routes و فایل‌های مسیریاب جداگانه
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد دایرکتوری backend/routes و فایل‌های مسیریاب جداگانه برای chat، tts و fileAnalysis است. خارج از این مرحله: انتقال منطق از server.js به این فایل‌ها یا تغییرات در server.js. نکته حیاتی: فقط ساختار دایرکتوری و فایل‌های خالی ایجاد کنید.
 **Excerpt:**
 ```
@@ -1246,7 +1246,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 6: ایجاد دایرکتوری services و فایل‌های سرویس جداگانه
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد دایرکتوری backend/services و فایل‌های سرویس جداگانه برای gemini و upload است. خارج از این مرحله: انتقال منطق از server.js به این فایل‌ها یا تغییرات در server.js. نکته حیاتی: فقط ساختار دایرکتوری و فایل‌های خالی ایجاد کنید.
 **Excerpt:**
 ```
@@ -1254,7 +1254,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 7: انتقال routeهای chat از server.js به routes/chat.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و انتقال تمام routeهای مربوط به chat از فایل backend/server.js به فایل backend/routes/chat.js است. خارج از این مرحله: انتقال routeهای tts یا fileAnalysis. نکته حیاتی: اطمینان حاصل کنید که importها و exportها به درستی تنظیم شده‌اند.
 **Excerpt:**
 ```
@@ -1262,7 +1262,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 8: انتقال routeهای tts از server.js به routes/tts.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و انتقال تمام routeهای مربوط به tts از فایل backend/server.js به فایل backend/routes/tts.js است. خارج از این مرحله: انتقال routeهای chat یا fileAnalysis. نکته حیاتی: اطمینان حاصل کنید که importها و exportها به درستی تنظیم شده‌اند.
 **Excerpt:**
 ```
@@ -1270,7 +1270,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 9: انتقال routeهای fileAnalysis از server.js به routes/fileAnalysis.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و انتقال تمام routeهای مربوط به file analysis از فایل backend/server.js به فایل backend/routes/fileAnalysis.js است. خارج از این مرحله: انتقال routeهای chat یا tts. نکته حیاتی: اطمینان حاصل کنید که importها و exportها به درستی تنظیم شده‌اند.
 **Excerpt:**
 ```
@@ -1278,7 +1278,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 10: انتقال سرویس gemini از server.js به services/gemini.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و انتقال منطق مربوط به سرویس gemini از فایل backend/server.js به فایل backend/services/gemini.js است. خارج از این مرحله: انتقال سرویس upload یا routeها. نکته حیاتی: اطمینان حاصل کنید که importها و exportها به درستی تنظیم شده‌اند.
 **Excerpt:**
 ```
@@ -1286,7 +1286,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 11: انتقال سرویس upload از server.js به services/upload.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و انتقال منطق مربوط به سرویس upload از فایل backend/server.js به فایل backend/services/upload.js است. خارج از این مرحله: انتقال سرویس gemini یا routeها. نکته حیاتی: اطمینان حاصل کنید که importها و exportها به درستی تنظیم شده‌اند.
 **Excerpt:**
 ```
@@ -1294,7 +1294,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 12: به‌روزرسانی server.js برای import و استفاده از routeها و سرویس‌های جدید
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل به‌روزرسانی فایل backend/server.js برای import و استفاده از routeها و سرویس‌های جدید است. خارج از این مرحله: تغییرات در routeها یا سرویس‌های جدید. نکته حیاتی: اطمینان حاصل کنید که تمام importها و app.useها به درستی تنظیم شده‌اند و فایل server.js کمتر از 300 خط است.
 **Excerpt:**
 ```
@@ -1302,7 +1302,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 13: تأیید اجرای بدون خطای برنامه پس از refactoring
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای تست test_server_starts از فایل tests/test_server_startup.py برای اطمینان از اجرای بدون خطای برنامه پس از refactoring است. خارج از این مرحله: تست endpointهای خاص یا تغییرات در کد. نکته حیاتی: تست باید با timeout 30 ثانیه اجرا شود.
 **Excerpt:**
 ```
@@ -1310,7 +1310,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 14: تبدیل package.json ریشه به npm workspace
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل به‌روزرسانی فایل package.json ریشه برای تعریف backend و frontend به‌عنوان workspace است. خارج از این مرحله: حذف package-lock.json ریشه یا تغییرات در package.json زیرپروژه‌ها. نکته حیاتی: از ویژگی workspaces npm استفاده کنید.
 **Excerpt:**
 ```
@@ -1318,7 +1318,7 @@ package.json ریشه را به‌عنوان یک workspace تعریف کنید 
 ```
 
 ### Step 15: حذف package-lock.json ریشه و ایجاد یک lockfile واحد
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل حذف فایل package-lock.json ریشه و اجرای npm install در ریشه برای ایجاد یک lockfile واحد است. خارج از این مرحله: تغییرات در package.json ریشه یا زیرپروژه‌ها. نکته حیاتی: مطمئن شوید که npm install در ریشه بدون خطا اجرا می‌شود.
 **Excerpt:**
 ```
@@ -1326,7 +1326,7 @@ package-lock.json ریشه را حذف کنید و اجازه دهید npm works
 ```
 
 ### Step 16: تأیید عدم شکستن تست‌های موجود پس از تغییرات workspace
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای تمام تست‌های موجود (در دایرکتوری tests/) برای اطمینان از عدم شکستن آن‌ها پس از تغییرات workspace است. خارج از این مرحله: تغییرات در کد منبع. نکته حیاتی: تست‌ها باید با timeout 120 ثانیه اجرا شوند.
 **Excerpt:**
 ```
