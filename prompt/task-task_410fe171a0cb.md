@@ -3,14 +3,14 @@ task_id: task_410fe171a0cb
 title: پیکربندی Inspector Bridge و بهبود مدیریت خطا
 type: other
 priority: critical
-execution_priority: 1300
-status: pending
+execution_priority: 1600
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:22:56.705850+00:00'
-updated_at: '2026-06-02T23:14:28.280735+00:00'
+updated_at: '2026-06-02T23:19:37.256550+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1683,7 +1683,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: Replace hardcoded WebSocket URL with environment variable in App.jsx
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on modifying frontend/src/App.jsx to replace the hardcoded WebSocket URL with a configurable environment variable. The change must ensure the Inspector Bridge WebSocket URL is configurable via environment variable (VITE_INSPECTOR_WS_URL or similar). The guard clause that disables the feature must be updated to check for the new variable. This step does NOT include removing the Inspector Bridge entirely, modifying backend files, or adding tests.
 **Excerpt:**
 ```
@@ -1894,7 +1894,7 @@ No hardcoded third-party URLs remain in the codebase [verify_method=static] [ver
 ```
 
 ### Step 27: Verify Inspector Bridge works with valid WS_URL or is gracefully disabled
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on verifying that the Inspector Bridge either works with a valid WS_URL or is gracefully disabled. This is a verification step that should be performed after all changes are made. This step does NOT modify any code.
 **Excerpt:**
 ```
