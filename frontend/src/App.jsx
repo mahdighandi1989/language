@@ -17,6 +17,16 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, setLogLevel } from 'firebase/firestore';
 
+// --- Analytics ---
+// Client-side product analytics tracker. Records chat interactions and flushes
+// session summaries to the backend so the product KPIs / outcome_rate can be
+// measured (see src/analytics.js and backend/services/analyticsService.js).
+import AnalyticsTracker from './analytics.js';
+
+// Module-level singleton: one tracker for the app's chat activity. Analytics is
+// strictly best-effort and must never affect the chat UX.
+const chatAnalytics = new AnalyticsTracker();
+
 // ============================================
 // AI COMMAND VALIDATION
 // ============================================
@@ -880,6 +890,12 @@ const initialData = {
 // --- Gemini API Helpers ---
 // Calls backend API for Gemini chat (API key is secure on server)
 async function callGeminiAPI(payload, retries = 3, delay = 1000, signal = null) {
+  // Best-effort analytics: count this as a user turn and start the response
+  // timer. Only on the first attempt so retries don't inflate the counts.
+  if (retries === 3) {
+    try { chatAnalytics.trackUserMessage(); } catch { /* analytics must never break chat */ }
+  }
+
   const response = await fetch('/api/gemini/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -898,6 +914,14 @@ async function callGeminiAPI(payload, retries = 3, delay = 1000, signal = null) 
   }
 
   const result = await response.json();
+
+  // Record the assistant reply + response time, then flush the session summary
+  // to the backend. Fire-and-forget so it never delays the chat response.
+  try {
+    chatAnalytics.trackAssistantMessage();
+    chatAnalytics.flush();
+  } catch { /* analytics must never break chat */ }
+
   return result.text;
 }
 

@@ -123,6 +123,32 @@ reverse-engineering it.
   below 100%. This turns "is the code documented?" into an objective,
   regression-guarded check.
 
+## Product KPIs as a measurable outcome
+
+Beyond technical health (`error_rate`, `warn_count`, `info_count`), the app
+measures whether users actually succeed. The **outcome target** is stated in
+measurable Persian KPIs (full definitions and targets in
+[`docs/outcome_target.md`](docs/outcome_target.md)):
+
+- **نرخ موفقیت چت** (`chat_success_rate`) — هدف ≥ ۰٫۸۰
+- **میانگین زمان پاسخ** (`avg_response_time`) — هدف ≤ ۲۰۰۰ms
+- **نرخ تعامل کاربر** (`user_engagement_rate`) — هدف ≥ ۰٫۶۰
+- **نرخ تبدیل** (`conversion_rate`) — هدف ≥ ۰٫۲۵
+
+These blend into a single `outcome_rate`. The frontend tracker
+(`frontend/src/analytics.js`) posts session summaries to `POST /api/analytics`,
+where `backend/services/analyticsService.js` computes the KPIs; the Python
+verify/measurement layer (`backend/app/analytics.py`) mirrors the computation
+and logs each metric via the `analytics_log` logger so `outcome_rate` is
+observable in CI/production. The end-to-end test
+`tests/e2e/test_outcome_metrics.py::test_outcome_metrics_collected` feeds
+synthetic sessions and asserts every KPI is collected.
+
+The critical `verify_failed` event now alerts via
+`backend/app/notifications.py` (Persian message, `priority="high"`,
+`silent=False`; delivered to Telegram when `NOTIFY_TELEGRAM_*` env vars are set,
+otherwise logged).
+
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE)

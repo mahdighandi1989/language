@@ -58,4 +58,17 @@ export const analyzeFilesSchema = z
   })
   .passthrough();
 
-export default { chatSchema, ttsSchema, analyzeFilesSchema, VALID_VOICES };
+// POST /api/analytics — a session summary from the frontend tracker. All fields
+// are optional with safe defaults so analytics never blocks the UX; unknown
+// fields pass through.
+export const analyticsSchema = z
+  .object({
+    session_id: z.string().optional(),
+    user_messages: z.number().int().nonnegative().optional(),
+    assistant_messages: z.number().int().nonnegative().optional(),
+    response_times_ms: z.array(z.number().nonnegative()).optional(),
+    converted: z.boolean().optional(),
+  })
+  .passthrough();
+
+export default { chatSchema, ttsSchema, analyzeFilesSchema, analyticsSchema, VALID_VOICES };

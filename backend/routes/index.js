@@ -4,7 +4,7 @@ import { requireAuth, optionalAuth } from '../middleware/firebaseAuth.js';
 import { requireGeminiKey } from '../middleware/requireGeminiKey.js';
 import { analysisLimiter } from '../middleware/rateLimiter.js';
 import { upload, handleMulterError, MAX_FILES } from '../middleware/upload.js';
-import { chatSchema, ttsSchema, analyzeFilesSchema } from '../validators/schemas.js';
+import { chatSchema, ttsSchema, analyzeFilesSchema, analyticsSchema } from '../validators/schemas.js';
 import {
   chat,
   tts,
@@ -14,6 +14,7 @@ import {
   testGemini,
 } from '../controllers/geminiController.js';
 import { analyzeFiles } from '../controllers/analysisController.js';
+import { ingestAnalytics, getAnalytics } from '../controllers/analyticsController.js';
 
 // Aggregates every /api route. Mounted at the app root so the absolute paths
 // below match the original API contract exactly.
@@ -42,5 +43,10 @@ apiRouter.post(
   requireGeminiKey,
   analyzeFiles
 );
+
+// Product analytics: the frontend tracker posts session summaries here so the
+// backend can compute and expose the product KPIs / outcome_rate.
+apiRouter.post('/api/analytics', validate(analyticsSchema), optionalAuth, ingestAnalytics);
+apiRouter.get('/api/analytics', optionalAuth, getAnalytics);
 
 export default apiRouter;
