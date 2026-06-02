@@ -3,14 +3,14 @@ task_id: task_2cd58167a90c
 title: بازسازی معماری بک‌اند
 type: other
 priority: high
-execution_priority: 2250
-status: pending
+execution_priority: 2550
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-02T22:42:24.842440+00:00'
+updated_at: '2026-06-02T23:00:30.085810+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2450,7 +2450,7 @@ _(مستقل)_
 ```
 
 ### Step 7: حذف اسکریپت Inspector Bridge از frontend/index.html
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل حذف کامل تگ <script> مربوط به Inspector Bridge (خطوط 31-201) از فایل frontend/index.html است. خارج از این مرحله: تغییر در سایر بخش‌های index.html، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: اطمینان حاصل شود که هیچ وابستگی به متغیرهای سراسری مانند window.__inspectorBridgeLoaded در جای دیگری وجود ندارد.
 **Excerpt:**
 ```
@@ -2547,7 +2547,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 17: ایجاد پوشه‌های frontend بر اساس معماری کامپوننتی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد پوشه‌های frontend/src/components، frontend/src/hooks و frontend/src/utils است. خارج از این مرحله: انتقال فایل‌ها به این پوشه‌ها، تغییر در منطق برنامه، یا تغییر در backend. نکته حیاتی: فقط پوشه‌ها ایجاد می‌شوند و هیچ فایلی منتقل یا تغییر نمی‌کند.
 **Excerpt:**
 ```
@@ -2565,7 +2565,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 19: به‌روزرسانی import در frontend/src/main.jsx
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل تغییر مسیر import در frontend/src/main.jsx از './App' به './components/App' است. خارج از این مرحله: تغییر در سایر بخش‌های main.jsx، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: فقط مسیر import تغییر می‌کند و محتوای فایل تغییری نمی‌کند.
 **Excerpt:**
 ```
@@ -2610,7 +2610,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 24: اجرای تست‌های موجود برای تایید عدم رگرشن
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اجرای تمام تست‌های موجود (npm run test / pytest) برای اطمینان از عدم شکستن تست‌ها پس از تغییرات است. خارج از این مرحله: تغییر در کد، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: تمام تست‌ها باید با موفقیت عبور کنند.
 **Excerpt:**
 ```
@@ -2637,7 +2637,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 27: تغییر Inspector Bridge به استفاده از postMessage به جای WebSocket
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل تغییر Inspector Bridge در frontend/src/App.jsx (یا فایل مجزای آن) به استفاده از postMessage به جای WebSocket است. خارج از این مرحله: حذف WebSocket سرور از backend، تغییر در منطق برنامه، یا تغییر در فایل‌های دیگر. نکته حیاتی: Inspector Bridge باید فقط از postMessage استفاده کند و هیچ تلاشی برای اتصال WebSocket به آدرس خارجی صورت نگیرد.
 **Excerpt:**
 ```
@@ -2655,7 +2655,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 29: تایید عدم وجود خطای WebSocket در کنسول
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی و تایید این است که هیچ خطای WebSocket در کنسول مرورگر ظاهر نمی‌شود. خارج از این مرحله: تغییر در کد، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: با استفاده از ui_interaction، باید اطمینان حاصل شود که هیچ خطای WebSocket در کنسول ظاهر نمی‌شود.
 **Excerpt:**
 ```
