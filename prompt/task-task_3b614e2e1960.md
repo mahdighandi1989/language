@@ -3,14 +3,14 @@ task_id: task_3b614e2e1960
 title: اعتبارسنجی پاسخ AI و رفع anti-pattern
 type: other
 priority: high
-execution_priority: 2150
-status: pending
+execution_priority: 2450
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:23:50.486184+00:00'
-updated_at: '2026-06-02T22:26:00.137328+00:00'
+updated_at: '2026-06-02T22:48:17.346346+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -864,7 +864,7 @@ _(مستقل)_
 ```
 
 ### Step 3: نوشتن تست edge case برای invalid selector یا url در tests/test_edge_cases.py
-**Status:** `not_done` (0%)
+**Status:** `partial` (50%)
 **Scope:** این مرحله شامل نوشتن یک تست جدید در فایل tests/test_edge_cases.py با نام test_invalid_selector_or_url است. این تست باید رفتار برنامه را در مواجهه با selector یا URL نامعتبر بررسی کند. خارج از این مرحله، اصلاح کد در frontend/src/App.jsx است. نکته حیاتی: تست باید با timeout 60 ثانیه اجرا شود.
 **Excerpt:**
 ```
@@ -898,7 +898,7 @@ _(مستقل)_
 ```
 
 ### Step 7: اجرای تست‌های موجود و اطمینان از عدم شکست آن‌ها
-**Status:** `not_done` (0%)
+**Status:** `partial` (50%)
 **Scope:** این مرحله شامل اجرای تمام تست‌های موجود در پروژه (با دستورات npm run test یا pytest) و اطمینان از عدم شکست هیچ‌کدام از آن‌ها پس از تغییرات اعمال شده است. خارج از این مرحله، بررسی linter و type-check است. نکته حیاتی: این مرحله باید پس از اعمال تمام تغییرات کد و تست‌ها انجام شود.
 **Excerpt:**
 ```
