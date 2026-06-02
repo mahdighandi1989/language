@@ -3,14 +3,14 @@ task_id: 31236cc5-eb3f-4b4e-be02-ee2362ecc8c4
 title: پیاده‌سازی File Analysis API بدون محدودیت در backend/server.js
 type: security
 priority: high
-execution_priority: 2050
-status: pending
+execution_priority: 2350
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:44:27.355859+00:00'
-updated_at: '2026-06-02T17:50:52.399259+00:00'
+updated_at: '2026-06-02T21:44:34.586143+00:00'
 ---
 
 # پیاده‌سازی File Analysis API بدون محدودیت در backend/server.js
