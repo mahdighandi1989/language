@@ -3,14 +3,14 @@ task_id: task_3b614e2e1960
 title: اعتبارسنجی پاسخ AI و رفع anti-pattern
 type: other
 priority: high
-execution_priority: 2050
-status: pending
+execution_priority: 2350
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:23:50.486184+00:00'
-updated_at: '2026-06-02T10:04:22.103243+00:00'
+updated_at: '2026-06-02T19:53:22.768828+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -846,7 +846,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: بررسی اولیه و تشخیص ریشه anti-pattern در frontend/src/App.jsx
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی کد موجود در frontend/src/App.jsx برای یافتن الگوی نامناسب (anti-pattern) AI بدون validation است. تمرکز بر روی تابع handleCommand و دستورات 'click' و 'navigate' است. خارج از این مرحله، هرگونه اصلاح کد یا نوشتن تست است. نکته حیاتی: این مرحله صرفاً تشخیصی است و هیچ تغییری در کد ایجاد نمی‌کند.
 **Excerpt:**
 ```
@@ -855,7 +855,7 @@ _(مستقل)_
 ```
 
 ### Step 2: اصلاح کد یا افزودن کامنت توجیهی در frontend/src/App.jsx برای validation selector و url
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اصلاح کد در frontend/src/App.jsx برای افزودن validation به msg.selector و msg.url در تابع handleCommand است. یا در صورت وجود دلیل موجه برای عدم validation، یک کامنت توجیهی اضافه می‌شود. خارج از این مرحله، نوشتن تست edge case است. نکته حیاتی: باید از توابع isValidSelector و isValidUrl استفاده شود یا معادل آن.
 **Excerpt:**
 ```
@@ -864,7 +864,7 @@ _(مستقل)_
 ```
 
 ### Step 3: نوشتن تست edge case برای invalid selector یا url در tests/test_edge_cases.py
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک تست جدید در فایل tests/test_edge_cases.py با نام test_invalid_selector_or_url است. این تست باید رفتار برنامه را در مواجهه با selector یا URL نامعتبر بررسی کند. خارج از این مرحله، اصلاح کد در frontend/src/App.jsx است. نکته حیاتی: تست باید با timeout 60 ثانیه اجرا شود.
 **Excerpt:**
 ```
@@ -872,7 +872,7 @@ _(مستقل)_
 ```
 
 ### Step 4: بررسی اولیه و تشخیص ریشه anti-pattern در backend/server.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی کد موجود در backend/server.js برای یافتن الگوی نامناسب (anti-pattern) AI بدون validation است. تمرکز بر روی endpoint های /api/gemini/chat و /api/list-models است. خارج از این مرحله، هرگونه اصلاح کد یا نوشتن تست است. نکته حیاتی: این مرحله صرفاً تشخیصی است و هیچ تغییری در کد ایجاد نمی‌کند.
 **Excerpt:**
 ```
@@ -881,7 +881,7 @@ _(مستقل)_
 ```
 
 ### Step 5: اصلاح کد یا افزودن کامنت توجیهی در backend/server.js برای validation پاسخ API
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اصلاح کد در backend/server.js برای افزودن validation به پاسخ‌های API در endpoint های /api/gemini/chat و /api/list-models است. یا در صورت وجود دلیل موجه برای عدم validation، یک کامنت توجیهی اضافه می‌شود. خارج از این مرحله، نوشتن تست edge case است. نکته حیاتی: باید از کامنت‌های // validation, // sanitize, // TODO, // justification استفاده شود.
 **Excerpt:**
 ```
@@ -890,7 +890,7 @@ _(مستقل)_
 ```
 
 ### Step 6: نوشتن تست edge case برای پاسخ API در tests/test_gemini.py
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک تست جدید در فایل tests/test_gemini.py با نام test_edge_case است. این تست باید رفتار برنامه را در مواجهه با پاسخ‌های API نامعتبر یا غیرمنتظره بررسی کند. خارج از این مرحله، اصلاح کد در backend/server.js است. نکته حیاتی: تست باید با timeout 60 ثانیه اجرا شود.
 **Excerpt:**
 ```
@@ -898,7 +898,7 @@ _(مستقل)_
 ```
 
 ### Step 7: اجرای تست‌های موجود و اطمینان از عدم شکست آن‌ها
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای تمام تست‌های موجود در پروژه (با دستورات npm run test یا pytest) و اطمینان از عدم شکست هیچ‌کدام از آن‌ها پس از تغییرات اعمال شده است. خارج از این مرحله، بررسی linter و type-check است. نکته حیاتی: این مرحله باید پس از اعمال تمام تغییرات کد و تست‌ها انجام شود.
 **Excerpt:**
 ```
@@ -906,7 +906,7 @@ _(مستقل)_
 ```
 
 ### Step 8: اجرای linter و اطمینان از عبور بدون warning
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای linter پروژه (با دستور npm run lint) و اطمینان از عبور آن بدون هیچ warning است. خارج از این مرحله، اجرای type-check است. نکته حیاتی: این مرحله باید پس از اعمال تمام تغییرات کد انجام شود.
 **Excerpt:**
 ```
@@ -914,7 +914,7 @@ linter بدون warning عبور می‌کند (`npm run lint`)
 ```
 
 ### Step 9: اجرای type-check و اطمینان از موفقیت آن
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای type-check پروژه (با دستور tsc --noEmit یا mypy) و اطمینان از موفقیت آن است. خارج از این مرحله، اجرای linter است. نکته حیاتی: این مرحله باید پس از اعمال تمام تغییرات کد انجام شود.
 **Excerpt:**
 ```
@@ -922,7 +922,7 @@ type-check موفق است (`tsc --noEmit` / `mypy`)
 ```
 
 ### Step 10: ثبت commit یا PR نهایی با پیام واضح و checklist
-**Status:** `pending` (0%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ثبت یک commit یا ایجاد یک Pull Request جدید با پیام واضح است که تمام تغییرات اعمال شده را توضیح می‌دهد. همچنین یک checklist از تمام مراحل انجام شده در توضیحات PR گنجانده می‌شود. خارج از این مرحله، اعمال تغییرات کد است. نکته حیاتی: پیام commit باید شامل merged-from: a2b20416-5230-4547-a8ba-472b511942b0, b49e0870-ebbf-45da-8e46-2571fbaeae97 باشد.
 **Excerpt:**
 ```
