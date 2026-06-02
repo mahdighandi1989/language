@@ -1,22 +1,22 @@
 ---
 task_id: task_2c28ca0737f1
-title: بازسازی ساختار بک‌اند و رفع خطاهای راه‌اندازی
+title: بازسازی ساختار بک‌اند
 type: other
 priority: critical
-execution_priority: 1550
-status: awaiting_review
-external_status: done
+execution_priority: 1250
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-02T23:42:00.293985+00:00'
+updated_at: '2026-06-02T23:42:16.945684+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# بازسازی ساختار بک‌اند و رفع خطاهای راه‌اندازی
+# بازسازی ساختار بک‌اند
 
 ## Raw Idea
 
