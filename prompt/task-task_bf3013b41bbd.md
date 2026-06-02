@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2200
-status: pending
+execution_priority: 2500
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T22:33:57.869523+00:00'
+updated_at: '2026-06-02T22:55:45.951333+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -9180,12 +9180,12 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 - [x] **مرحله 1: انتخاب و نصب فریم‌ورک تست‌نویسی (pytest)** — این مرحله شامل انتخاب فریم‌ورک تست‌نویسی مناسب برای پروژه (pytest به دلیل سادگی و پشتیبانی از فیچرهای پیشرفته) و نصب آن به همراه پلاگین‌های ضروری (pytest-cov برای پوشش کد، pytest-mock برای mocking) می‌شود. همچنین ایجاد فایل پیکربندی pytest (pytest.ini یا pyproject.toml) برای تنظیم مسیرها و گزینه‌های
 - [x] **مرحله 2: ایجاد ساختار دایرکتوری تست‌ها و فایل conftest.py** — ایجاد دایرکتوری `tests/` در ریشه پروژه با زیرشاخه‌های منطبق بر ساختار ماژول‌های اصلی (مثلاً tests/unit/, tests/integration/). ایجاد فایل `tests/conftest.py` برای تعریف fixtureهای سراسری (مثلاً دیتابیس تست، کلاینت HTTP mock). خارج از این مرحله: نوشتن تست‌های خاص یا fixtureهای ماژولار.
 - [ ] **مرحله 3: نوشتن تست‌های واحد برای ماژول مدیریت واژگان (Vocabulary)** — نوشتن تست‌های واحد برای توابع اصلی ماژول vocabulary (مثلاً add_word, get_word, delete_word, search_words). تست‌ها باید با استفاده از mock دیتابیس (بدون وابستگی به دیتابیس واقعی) نوشته شوند. پوشش حداقل 80% از خطوط کد ماژول vocabulary. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا API end
-- [ ] **مرحله 4: نوشتن تست‌های واحد برای ماژول مدیریت جلسات مطالعه (Study Sessions)** — نوشتن تست‌های واحد برای توابع ماژول study_sessions (مثلاً create_session, add_word_to_session, get_session_progress, complete_session). تست‌ها باید logic مربوط به زمان‌بندی مرور (spaced repetition) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 4: نوشتن تست‌های واحد برای ماژول مدیریت جلسات مطالعه (Study Sessions)** — نوشتن تست‌های واحد برای توابع ماژول study_sessions (مثلاً create_session, add_word_to_session, get_session_progress, complete_session). تست‌ها باید logic مربوط به زمان‌بندی مرور (spaced repetition) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [x] **مرحله 5: نوشتن تست‌های واحد برای ماژول احراز هویت (Authentication)** — نوشتن تست‌های واحد برای توابع احراز هویت (register, login, logout, token validation). تست‌ها باید سناریوهای موفق و ناموفق (رمز عبور اشتباه، توکن منقضی، کاربر تکراری) را پوشش دهند. خارج از این مرحله: تست‌های integration با دیتابیس یا API endpoints.
-- [ ] **مرحله 6: نوشتن تست‌های واحد برای ماژول API (Endpoints اصلی)** — نوشتن تست‌های واحد برای API endpoints اصلی با استفاده از TestClient فریم‌ورک وب (FastAPI TestClient یا Flask test client). تست‌ها باید status codes، response body، و validation خطاها را بررسی کنند. پوشش حداقل 70% از endpoints. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا سرویس‌های خارج
-- [ ] **مرحله 7: نوشتن تست‌های integration برای دیتابیس (Database Layer)** — نوشتن تست‌های integration که با دیتابیس واقعی (SQLite در حافظه یا PostgreSQL تستی) کار می‌کنند. تست‌ها باید CRUD operations، روابط بین جداول (مثلاً کاربر-واژه، جلسه-واژه)، و transaction rollback را بررسی کنند. خارج از این مرحله: تست‌های performance یا stress testing.
+- [x] **مرحله 6: نوشتن تست‌های واحد برای ماژول API (Endpoints اصلی)** — نوشتن تست‌های واحد برای API endpoints اصلی با استفاده از TestClient فریم‌ورک وب (FastAPI TestClient یا Flask test client). تست‌ها باید status codes، response body، و validation خطاها را بررسی کنند. پوشش حداقل 70% از endpoints. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا سرویس‌های خارج
+- [x] **مرحله 7: نوشتن تست‌های integration برای دیتابیس (Database Layer)** — نوشتن تست‌های integration که با دیتابیس واقعی (SQLite در حافظه یا PostgreSQL تستی) کار می‌کنند. تست‌ها باید CRUD operations، روابط بین جداول (مثلاً کاربر-واژه، جلسه-واژه)، و transaction rollback را بررسی کنند. خارج از این مرحله: تست‌های performance یا stress testing.
 - [ ] **مرحله 8: نوشتن تست‌های integration برای API با دیتابیس واقعی** — نوشتن تست‌های integration که API endpoints را با دیتابیس واقعی (در حافظه) تست می‌کنند. این تست‌ها flow کامل کاربر (ثبت‌نام → ورود → افزودن واژه → ایجاد جلسه مطالعه → تکمیل جلسه) را پوشش می‌دهند. خارج از این مرحله: تست‌های UI یا سرویس‌های خارجی.
-- [ ] **مرحله 9: نوشتن تست‌های واحد برای ماژول آمار و گزارش‌گیری (Statistics)** — نوشتن تست‌های واحد برای توابع ماژول statistics (مثلاً get_user_stats, get_learning_progress, get_weak_words). تست‌ها باید محاسبات آماری (میانگین، درصد پیشرفت، تعداد کلمات یادگرفته‌شده) را بررسی کنند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 9: نوشتن تست‌های واحد برای ماژول آمار و گزارش‌گیری (Statistics)** — نوشتن تست‌های واحد برای توابع ماژول statistics (مثلاً get_user_stats, get_learning_progress, get_weak_words). تست‌ها باید محاسبات آماری (میانگین، درصد پیشرفت، تعداد کلمات یادگرفته‌شده) را بررسی کنند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 10: نوشتن تست‌های واحد برای ماژول مدیریت فلش‌کارت‌ها (Flashcards)** — نوشتن تست‌های واحد برای توابع ماژول flashcards (مثلاً create_flashcard, review_flashcard, get_due_cards, update_card_rating). تست‌ها باید logic الگوریتم SM-2 (spaced repetition) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 11: نوشتن تست‌های واحد برای ماژول مدیریت کاربران (User Management)** — نوشتن تست‌های واحد برای توابع ماژول user (مثلاً update_profile, change_password, delete_account, get_user_settings). تست‌ها باید validation داده‌ها و مجوزهای دسترسی را بررسی کنند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 12: نوشتن تست‌های واحد برای ماژول ابزارهای کمکی (Utilities)** — نوشتن تست‌های واحد برای توابع کمکی (مثلاً text_processing, date_helpers, validators, formatters). تست‌ها باید edge cases (ورودی‌های خالی، کاراکترهای خاص، مقادیر مرزی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
@@ -17640,7 +17640,7 @@ _(مستقل)_
 ```
 
 ### Step 4: راه‌اندازی زیرساخت تست pytest برای بک‌اند
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل سه تغییر است: (1) افزودن اسکریپت test به package.json بک‌اند، (2) ایجاد فایل pytest.ini در مسیر backend/، (3) ایجاد فایل conftest.py در مسیر backend/tests/. این بخش صرفاً به زیرساخت تست مربوط می‌شود و شامل نوشتن خود تست‌ها نیست.
 **Excerpt:**
 ```
@@ -17736,7 +17736,7 @@ def app():
 ```
 
 ### Step 6: ایجاد ساختار دایرکتوری تست‌ها و فایل conftest.py
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد دایرکتوری tests/ در ریشه پروژه با زیرشاخه‌های tests/unit/ و tests/integration/ است. همچنین فایل backend/tests/conftest.py برای تعریف fixtureهای سراسری (مانند دیتابیس تست و کلاینت HTTP mock) ایجاد می‌شود. خارج از این مرحله: نوشتن تست‌های خاص، fixtureهای ماژولار، یا پیکربندی pytest.ini.
 **Excerpt:**
 ```
@@ -17747,7 +17747,7 @@ def app():
 ```
 
 ### Step 7: ایجاد ساختار دایرکتوری تست‌ها و فایل conftest.py برای پروژه آموزش لهجه لبنانی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد دایرکتوری `tests/` در ریشه پروژه با زیرشاخه‌های `tests/unit/` و `tests/integration/` و ایجاد فایل `backend/tests/conftest.py` برای تعریف fixtureهای سراسری (مانند دیتابیس تست، کلاینت HTTP mock) است. خارج از این مرحله: نوشتن تست‌های خاص یا fixtureهای ماژولار. همچنین شامل نصب dependencies تست (jest, supertest, nock) در backend و frontend نیست.
 **Excerpt:**
 ```
@@ -17771,7 +17771,7 @@ def app():
 ```
 
 ### Step 9: ایجاد ساختار دایرکتوری tests و فایل conftest.py با فیxtureهای اولیه
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد دایرکتوری tests/ با زیرشاخه‌های unit/ و integration/، فایل‌های __init__.py خالی، و فایل backend/tests/conftest.py با سه فیxture خالی (app, client, mock_gemini_api) است. فایل‌های backend/tests/__init__.py و backend/tests/__init__.py نیز ایجاد می‌شوند. این مرحله فقط ساختار و فیxtureهای اولیه را ایجاد می‌کند و پیاده‌سازی واقعی فیxtureها در مراحل بعدی انجام خواهد شد.
 **Excerpt:**
 ```
@@ -20122,7 +20122,7 @@ export async function create_subscription(userId, planId) {
 ```
 
 ### Step 67: پیاده‌سازی و تست سرویس نوتیفیکیشن (Notification Service) با رویکرد رفتار-محور
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل `backend/services/notificationService.js` با چهار تابع (`sendNotification`, `getUserNotifications`, `markAsRead`, `scheduleReminder`) و فایل تست `backend/tests/notificationService.test.js` با حداقل ۴ تست است. تمام سرویس‌های خارجی (ایمیل، push) باید mock شوند. هیچ درخواست واقعی به سرویس‌های خارجی ارسال نمی‌شود. تست‌ها باید با `npx jest backend/tests/notificationService.test.js` پاس شوند. نکته حیاتی: رفتار قابل مشاهده تعریف می‌شود، نه نام فایل/کلاس. لیست فایل‌های موجود در پروژه شامل `backend/services/emailService.js` و `backend/tests/emailService.test.js` است که می‌توان از آن‌ها برای mock استفاده کرد.
 **Excerpt:**
 ```
@@ -20907,7 +20907,7 @@ describe('InMemoryCache', () => {
 ```
 
 ### Step 91: نوشتن تست‌های واحد برای ماژول مدیریت فایل (File Management)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع اصلی ماژول مدیریت فایل (مانند upload_file, download_file, delete_file, get_file_metadata) است. تست‌ها باید validation نوع فایل، محدودیت حجم، و virus scanning mock را پوشش دهند. خارج از این مرحله: تست‌های integration با سرویس‌های ذخیره‌سازی ابری. نکته حیاتی: ماژول caching در کد فعلی وجود ندارد و باید از صفر ساخته شود، اما این مرحله صرفاً به تست‌های واحد مدیریت فایل می‌پردازد و به caching مربوط نیست.
 **Excerpt:**
 ```
@@ -22008,7 +22008,7 @@ describe('get_translation_history', () => {
 ```
 
 ### Step 113: نوشتن تست‌های واحد برای ماژول مدیریت صدا (Audio Service)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع ماژول audio (مانند generate_audio, get_audio_metadata, convert_audio_format, get_audio_duration) است. تست‌ها باید با mock کردن کتابخانه‌های پردازش صدا (ffmpeg, gTTS) نوشته شوند. خارج از این مرحله: تست‌های integration با سرویس‌های واقعی. نکته حیاتی: ایجاد ماژول translationService.js وابستگی‌های جدیدی به backend اضافه می‌کند که ممکن است با وابستگی‌های موجود تداخل داشته باشند. همچنین اضافه کردن endpoint جدید /api/translate به backend/server.js ممکن است با middlewareهای موجود تداخل ایجاد کند. تست‌های mock شده ممکن است رفتار واقعی APIها را به طور کامل شبیه‌سازی نکنند.
 **Excerpt:**
 ```
@@ -22019,7 +22019,7 @@ describe('get_translation_history', () => {
 ```
 
 ### Step 114: نوشتن تست‌های واحد برای ماژول مدیریت صدا (Audio Service) با mock کردن ffmpeg و gTTS
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل نوشتن تست‌های واحد برای توابع ماژول جدید audioService.js است. توابع هدف عبارتند از: generate_audio, get_audio_metadata, convert_audio_format, get_audio_duration. تست‌ها باید با mock کردن کتابخانه‌های پردازش صدا (ffmpeg, gTTS) نوشته شوند. تست‌های integration با سرویس‌های واقعی خارج از این مرحله هستند. این بخش همچنین شامل استخراج توابع موجود در backend/server.js (getVideoDuration, extractAudioFromVideo, منطق endpoint /api/gemini/tts) به یک ماژول مجزا (backend/services/audioService.js) است.
 **Excerpt:**
 ```
@@ -22135,7 +22135,7 @@ describe('getAudioDuration', () => {
 ```
 
 ### Step 117: نوشتن تست‌های واحد برای ماژول مدیریت تصویر (Image Service)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع ماژول image (مانند upload_image, resize_image, generate_thumbnail, get_image_url) است. تست‌ها باید validation ابعاد، فرمت، و حجم تصویر را پوشش دهند. خارج از این مرحله: تست‌های integration با سرویس‌های ذخیره‌سازی ابری. همچنین، این مرحله شامل تغییر در توابع موجود backend/server.js (مانند getVideoDuration و extractAudioFromVideo) نمی‌شود و فقط بر ماژول image تمرکز دارد.
 — [merged] این مرحله شامل نوشتن تست‌های واحد برای توابع upload_image, resize_image, generate_thumbnail, get_image_url و validation ابعاد/فرمت/حجم در ماژول جدید backend/services/imageService.js است. تست‌ها باید با استفاده از vitest یا jest نوشته شوند و وابستگی‌های خارجی (مانند سرویس‌های ذخیره‌سازی ابری) را mock کنند. این مرحله شامل ایجاد خود ماژول imageService.js نیست (فقط تست‌ها).
 **Excerpt:**
@@ -22257,7 +22257,7 @@ export async function generate_thumbnail(inputPath, outputPath, size = 150) {
 ```
 
 ### Step 120: اجرای دستورات اعتبارسنجی برای تست و بررسی سرویس تصویر
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل اجرای سه دستور مشخص برای اعتبارسنجی است: ۱) اجرای تست واحد مربوط به imageService، ۲) بررسی exportهای سرویس imageService، ۳) تست endpoint API تحلیل فایل. این بخش صرفاً اجرای این دستورات است و شامل توسعه یا تغییر کد نمی‌شود.
 **Excerpt:**
 ```
