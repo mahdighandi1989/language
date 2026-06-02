@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "deps:check": "npm ci --ignore-scripts",
+    "audit": "npm audit --omit=dev --audit-level=critical"
   },
   "dependencies": {
     "firebase": "^10.7.0",

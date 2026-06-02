@@ -9,7 +9,9 @@
     "dev": "node --watch server.js",
     "test": "python -m pytest",
     "test:cov": "python -m pytest --cov=. --cov-report=term-missing",
-    "test:node": "node --test 'tests/test_*.js'"
+    "test:node": "node --test 'tests/test_*.js'",
+    "deps:check": "npm ci --ignore-scripts",
+    "audit": "npm audit --omit=dev --audit-level=critical"
   },
   "dependencies": {
     "cors": "^2.8.5",
