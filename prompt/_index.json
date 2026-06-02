@@ -2,8 +2,18 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 1,
+  "total": 2,
   "tasks": [
+    {
+      "task_id": "task_2c28ca0737f1",
+      "title": "بازسازی ساختار بک‌اند و رفع خطاهای راه‌اندازی",
+      "priority": "critical",
+      "execution_priority": 1150,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_2c28ca0737f1.md",
+      "external_attempts": 3
+    },
     {
       "task_id": "task_f55414420332",
       "title": "استانداردسازی و رفع ابهام پرامپت‌های AI/LLM",
