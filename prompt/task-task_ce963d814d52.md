@@ -1,22 +1,22 @@
 ---
 task_id: task_ce963d814d52
-title: پیاده‌سازی سیستم پایش عملکرد و سنجش KPI
+title: پیاده‌سازی نوتیفیکیشن 'verify_failed' و بهبود معیارهای خروجی
 type: other
 priority: high
-execution_priority: 2000
+execution_priority: 2050
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:27:46.879724+00:00'
-updated_at: '2026-06-01T19:27:46.879729+00:00'
+updated_at: '2026-06-02T10:11:58.279708+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# پیاده‌سازی سیستم پایش عملکرد و سنجش KPI
+# پیاده‌سازی نوتیفیکیشن 'verify_failed' و بهبود معیارهای خروجی
 
 ## Raw Idea
 
