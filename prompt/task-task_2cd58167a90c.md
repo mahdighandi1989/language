@@ -3,14 +3,14 @@ task_id: task_2cd58167a90c
 title: بازسازی معماری بک‌اند
 type: other
 priority: high
-execution_priority: 2150
-status: pending
+execution_priority: 2450
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-02T20:54:12.574056+00:00'
+updated_at: '2026-06-02T21:18:35.082362+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1757,7 +1757,7 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 این تسک به مراحل کوچک‌تر تقسیم شده. **در هر verify خودکار، وضعیت هر مرحله به‌صورت `[ ]` (انجام نشده)، `[~]` (ناقص)، یا `[x]` (انجام شده) به‌روز می‌شود.**
 وقتی تمام مراحل `[x]` شدند، تسک به‌طور خودکار به «انجام شده» منتقل می‌شود.
 
-- [ ] **مرحله 1: ایجاد ساختار پوشه‌های backend بر اساس معماری لایه‌ای (controllers, models, services)** — این مرحله شامل ایجاد پوشه‌های اصلی backend شامل controllers، models، services و انتقال فایل‌های موجود به پوشه‌های مناسب است. فایل‌های مربوط به مسیرها (routes) باید به پوشه controllers، مدل‌های داده به پوشه models، و منطق کسب‌وکار به پوشه services منتقل شوند. این مرحله شامل تغییر محتوای فایل‌ها یا با
+- [x] **مرحله 1: ایجاد ساختار پوشه‌های backend بر اساس معماری لایه‌ای (controllers, models, services)** — این مرحله شامل ایجاد پوشه‌های اصلی backend شامل controllers، models، services و انتقال فایل‌های موجود به پوشه‌های مناسب است. فایل‌های مربوط به مسیرها (routes) باید به پوشه controllers، مدل‌های داده به پوشه models، و منطق کسب‌وکار به پوشه services منتقل شوند. این مرحله شامل تغییر محتوای فایل‌ها یا با
 - [x] **مرحله 2: ایجاد ساختار پوشه‌های frontend بر اساس معماری کامپوننتی (components, hooks, utils)** — این مرحله شامل ایجاد پوشه‌های اصلی frontend شامل components، hooks، utils و انتقال فایل‌های موجود به پوشه‌های مناسب است. کامپوننت‌های React به پوشه components، هوک‌های سفارشی به پوشه hooks، و توابع کمکی به پوشه utils منتقل می‌شوند. این مرحله شامل تغییر محتوای فایل‌ها یا بازنویسی کد نیست، فقط سازماند
 
 ---
@@ -2393,7 +2393,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: استخراج Inspector Bridge Script از App.jsx به فایل مجزا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل استخراج بلوک کد Inspector Bridge Script (خطوط 1-126) از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/components/InspectorBridge.jsx است. خارج از این مرحله: تغییر در منطق اسکریپت، حذف اسکریپت، یا تغییر در فایل‌های دیگر. نکته حیاتی: اسکریپت باید دقیقاً با همان منطق و وابستگی‌ها به فایل جدید منتقل شود و import آن در App.jsx اضافه گردد.
 **Excerpt:**
 ```
@@ -2475,7 +2475,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 9: ایجاد پوشه‌های backend بر اساس معماری لایه‌ای
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد پوشه‌های backend/controllers/، backend/models/، backend/services/، backend/routes/، backend/middleware/، backend/utils/ و backend/config/ است. خارج از این مرحله: انتقال فایل‌ها به این پوشه‌ها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: فقط پوشه‌ها ایجاد می‌شوند و هیچ فایلی منتقل یا تغییر نمی‌کند.
 **Excerpt:**
 ```
@@ -2511,7 +2511,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 13: انتقال ثابت‌ها و پرامپت‌های سیستمی از backend/server.js به فایل‌های models/config
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال ثابت‌ها و پرامپت‌های سیستمی (مانند LEBANESE_CORRECTION_PROMPT، ANALYSIS_SYSTEM_PROMPT) از backend/server.js به فایل‌های backend/models/ یا backend/config/ است. خارج از این مرحله: انتقال سایر بخش‌ها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: ثابت‌ها باید به فایل‌های مجزا مانند prompts.js در backend/models/ یا config.js در backend/config/ منتقل شوند.
 **Excerpt:**
 ```
@@ -2556,7 +2556,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 18: انتقال فایل App.jsx به frontend/src/App.jsx
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال فایل frontend/src/App.jsx به frontend/src/App.jsx است. خارج از این مرحله: تغییر در محتوای فایل، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: محتوای فایل تغییری نمی‌کند و فقط مسیر آن تغییر می‌کند.
 **Excerpt:**
 ```
