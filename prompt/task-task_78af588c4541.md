@@ -3,14 +3,14 @@ task_id: task_78af588c4541
 title: تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند
 type: other
 priority: high
-execution_priority: 2300
-status: pending
+execution_priority: 2600
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-02T23:21:37.901947+00:00'
+updated_at: '2026-06-02T23:26:55.242945+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1294,7 +1294,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 12: به‌روزرسانی server.js برای import و استفاده از routeها و سرویس‌های جدید
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل به‌روزرسانی فایل backend/server.js برای import و استفاده از routeها و سرویس‌های جدید است. خارج از این مرحله: تغییرات در routeها یا سرویس‌های جدید. نکته حیاتی: اطمینان حاصل کنید که تمام importها و app.useها به درستی تنظیم شده‌اند و فایل server.js کمتر از 300 خط است.
 **Excerpt:**
 ```
