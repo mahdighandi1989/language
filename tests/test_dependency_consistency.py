@@ -37,6 +37,18 @@ def _load_monitoring():
     return module
 
 
+def _load_notifications():
+    """Load backend/app/notifications.py directly from its path."""
+    spec = importlib.util.spec_from_file_location(
+        "app_notifications", REPO_ROOT / "backend" / "app" / "notifications.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules["app_notifications"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 monitoring = _load_monitoring()
 
 
@@ -102,6 +114,43 @@ def test_every_resolved_package_has_integrity():
         "these locked packages are resolved but have no integrity hash:\n  "
         + "\n  ".join(sorted(offenders))
     )
+
+
+def test_inconsistency_triggers_verify_failed_notification(tmp_path):
+    """At the point of occurrence — a failed consistency invariant must fire the
+    critical ``verify_failed`` notification (loud, high priority, Persian)."""
+    notifications = _load_notifications()
+    notifications.SENT_NOTIFICATIONS.clear()
+    notifications._LAST_SENT.clear()
+
+    # A repo with a malformed lock file => guaranteed inconsistency.
+    (tmp_path / "package-lock.json").write_text("{ not valid json", encoding="utf-8")
+
+    metrics = monitoring.check_dependency_consistency(tmp_path)
+    assert metrics["dependency_inconsistency"] > 0
+
+    # A verify_failed notification was produced at the failure point.
+    verify_notes = [
+        n for n in notifications.SENT_NOTIFICATIONS if n.event == "verify_failed"
+    ]
+    assert verify_notes, "expected a verify_failed notification on inconsistency"
+    note = verify_notes[-1]
+    assert note.priority == "high"
+    assert note.silent is False
+    assert "راستی‌آزمایی" in note.message
+
+
+def test_consistent_repo_emits_no_verify_failed(tmp_path):
+    """When the outcome is met (no failures) no verify_failed alert is fired."""
+    notifications = _load_notifications()
+    notifications.SENT_NOTIFICATIONS.clear()
+    notifications._LAST_SENT.clear()
+
+    metrics = monitoring.check_dependency_consistency(REPO_ROOT)
+    assert metrics["dependency_inconsistency"] == 0
+    assert not [
+        n for n in notifications.SENT_NOTIFICATIONS if n.event == "verify_failed"
+    ]
 
 
 @pytest.mark.parametrize("workspace", ["backend", "frontend"])

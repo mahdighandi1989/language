@@ -45,6 +45,14 @@ outcome_rate = consistent_checks / total_checks
   `dependency_inconsistency` و `outcome_rate` را محاسبه و از طریق logger با
   نام `monitoring_log` خط‌به‌خط `metric_name=... value=...` منتشر می‌کند تا در
   لاگ‌های production قابل grep باشد.
+- **هشدار بحرانی (`verify_failed`):** اگر هر یک از invariantهای سازگاری رد
+  شود (`dependency_inconsistency > 0`)، `check_dependency_consistency` در همان
+  نقطهٔ وقوع رویداد بحرانی `verify_failed` را از طریق
+  `backend/app/notifications.py` فعال می‌کند — با `priority="high"`،
+  `silent=False` و یک پیام فارسی معنادار. اگر `NOTIFY_TELEGRAM_BOT_TOKEN` و
+  `NOTIFY_TELEGRAM_CHAT_ID` تنظیم باشند پیام در تلگرام تحویل می‌شود؛ در غیر این
+  صورت به‌صورت لاگ سطح‌خطا منتشر می‌شود تا رویداد مشاهده‌پذیر بماند. این رفتار
+  با `notify_on_failure=False` قابل غیرفعال‌سازی است.
 - **فرانت‌اند:** `frontend/src/utils/logger.js` همان کلیدهای متریک
   (`outcome_rate`, `dependency_inconsistency`) را در کنسول مرورگر به‌صورت
   ساختاریافته لاگ می‌کند تا مشاهده‌پذیری دوطرفه باشد.

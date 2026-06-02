@@ -18,10 +18,12 @@ downstream: the end-to-end test
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
+import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 # Dedicated logger so dependency-monitoring lines are greppable/parseable in
 # production the same way analytics_log lines are (metric_name=<name> value=<v>).
@@ -45,7 +47,41 @@ def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def check_dependency_consistency(repo_root: Path | None = None) -> Dict[str, Any]:
+def _get_verify_failed_notifier() -> Optional[Callable[..., Any]]:
+    """Resolve ``notify_verify_failed`` from the sibling notifications module.
+
+    This module is imported both as ``backend.app.monitoring`` (package context)
+    and loaded directly from its file path in tests (no package context), so we
+    try the package import first and fall back to loading the sibling file by
+    path. Returns ``None`` if the notifier cannot be resolved — alerting must
+    never break the consistency check itself.
+    """
+    try:  # package context (normal app import).
+        from .notifications import notify_verify_failed  # type: ignore
+
+        return notify_verify_failed
+    except Exception:
+        pass
+    try:  # file-loaded context (tests load monitoring.py by path).
+        notifications_path = Path(__file__).resolve().parent / "notifications.py"
+        spec = importlib.util.spec_from_file_location(
+            "app_notifications", notifications_path
+        )
+        if spec and spec.loader:
+            module = sys.modules.get("app_notifications")
+            if module is None:
+                module = importlib.util.module_from_spec(spec)
+                sys.modules["app_notifications"] = module
+                spec.loader.exec_module(module)
+            return getattr(module, "notify_verify_failed", None)
+    except Exception:  # pragma: no cover - defensive: never crash the check.
+        monitoring_log.exception("Could not load verify_failed notifier")
+    return None
+
+
+def check_dependency_consistency(
+    repo_root: Path | None = None, *, notify_on_failure: bool = True
+) -> Dict[str, Any]:
     """Evaluate the dependency-consistency invariants and return a metrics dict.
 
     The invariants (each contributes equally to ``outcome_rate``):
@@ -126,7 +162,30 @@ def check_dependency_consistency(repo_root: Path | None = None) -> Dict[str, Any
         "total_checks": total,
     }
     log_metrics(metrics)
+
+    # Point of occurrence: a failed consistency invariant IS a verification
+    # failure. Fire the critical ``verify_failed`` notification here so an
+    # operator is alerted loudly instead of finding it days later in the logs.
+    if failures and notify_on_failure:
+        _notify_verify_failed(failures, outcome_rate)
+
     return metrics
+
+
+def _notify_verify_failed(failures: List[str], outcome_rate: float) -> None:
+    """Emit the critical ``verify_failed`` notification for failed invariants."""
+    notify_verify_failed = _get_verify_failed_notifier()
+    if notify_verify_failed is None:
+        return
+    reason = (
+        "راستی‌آزمایی سازگاری وابستگی‌ها رد شد — "
+        f"معیارهای ناموفق: {'، '.join(failures)} "
+        f"(نرخ موفقیت: {round(outcome_rate * 100)}٪)"
+    )
+    try:
+        notify_verify_failed(task="dependency_consistency", reason=reason)
+    except Exception:  # pragma: no cover - alerting must never crash the check.
+        monitoring_log.exception("Failed to emit verify_failed notification")
 
 
 def log_metrics(metrics: Dict[str, Any]) -> None:
