@@ -19,7 +19,7 @@ recommendations. Deep per-commit detail lives in the companion doc above.
 | Suspicious script in production | A client-side tracker streamed every click/scroll/input/focus + page URL to the parent frame via `postMessage(…, '*')`. | **Already removed** (`acf9983`) |
 | Debug code in production | Inline `console.log` calls in `frontend/index.html`. | **Already removed** (0 remaining) |
 | Credential leak | `GEMINI_API_KEY` prefix previously echoed in API responses (`keyPrefix`). | **Already removed** (no matches in `backend/`) |
-| Conventional-commits compliance | 82/100 recent commits compliant; 18 non-compliant (incl. all Inspector Bridge commits). | Reported |
+| Conventional-commits compliance | 89/100 recent commits compliant; 11 non-compliant (incl. all Inspector Bridge commits). | Reported |
 
 **Bottom line:** the security/privacy risk that motivated this audit is
 **closed in the current tree**. The remaining issue is process hygiene

@@ -87,8 +87,11 @@ git log --format='%s' -100 \
 | Metric | Count |
 |--------|-------|
 | Total commits scanned | 100 |
-| Conventional-compliant | 82 |
-| **Non-compliant** | **18** |
+| Conventional-compliant | 89 |
+| **Non-compliant** | **11** |
+
+(Counts are over the trailing 100 commits at audit time and drift as new
+commits land; re-run the scan command below for current figures.)
 
 The duplicated `🌉 Add Inspector Bridge Script …` commits are the archetype of
 the violation: an emoji prefix instead of a `type:` prefix, no scope, and a
