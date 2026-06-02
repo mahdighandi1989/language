@@ -3,14 +3,14 @@ task_id: task_3b614e2e1960
 title: اعتبارسنجی پاسخ AI و رفع anti-pattern
 type: other
 priority: high
-execution_priority: 2400
-status: awaiting_review
-external_status: done
+execution_priority: 2100
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:23:50.486184+00:00'
-updated_at: '2026-06-02T22:19:42.117701+00:00'
+updated_at: '2026-06-02T22:19:51.604320+00:00'
 tags:
 - consolidated
 - post_verify_merge
