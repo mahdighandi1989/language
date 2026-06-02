@@ -35,16 +35,6 @@
       "external_attempts": 1
     },
     {
-      "task_id": "task_bf3013b41bbd",
-      "title": "راه‌اندازی زیرساخت تست Pytest بک‌اند",
-      "priority": "high",
-      "execution_priority": 2050,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_bf3013b41bbd.md",
-      "external_attempts": 1
-    },
-    {
       "task_id": "task_ce963d814d52",
       "title": "پیاده‌سازی نوتیفیکیشن 'verify_failed' و بهبود معیارهای خروجی",
       "priority": "high",
@@ -73,6 +63,16 @@
       "external_status": "pending",
       "path": "prompt/task-task_ef0945bccb18.md",
       "external_attempts": 3
+    },
+    {
+      "task_id": "a0dab50d-cbd0-42ef-bcc7-a23f8c846e5f",
+      "title": "افزودن تست‌های اعتبارسنجی render.yaml",
+      "priority": "low",
+      "execution_priority": 4050,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-a0dab50d-cbd0-42ef-bcc7-a23f8c846e5f.md",
+      "external_attempts": 1
     }
   ]
 }
