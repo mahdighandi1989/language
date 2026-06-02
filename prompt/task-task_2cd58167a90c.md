@@ -1,22 +1,22 @@
 ---
 task_id: task_2cd58167a90c
-title: بازسازی معماری بک‌اند
+title: یکپارچه‌سازی معماری فرانت‌اند
 type: other
 priority: high
-execution_priority: 2550
-status: awaiting_review
-external_status: done
+execution_priority: 2250
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-02T23:00:30.085810+00:00'
+updated_at: '2026-06-02T23:00:50.176173+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# بازسازی معماری بک‌اند
+# یکپارچه‌سازی معماری فرانت‌اند
 
 ## Raw Idea
 
