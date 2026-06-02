@@ -11,7 +11,9 @@
 - **هدف قابل اندازه‌گیری:** کاهش خطاهای ناشی از ناسازگاری وابستگی‌ها به
   **صفر**. هر اجرای CI/CD با `npm ci` نصب می‌شود (که اگر `package.json` و
   `package-lock.json` از هم فاصله بگیرند، شکست می‌خورد) و `npm audit` به‌صورت
-  منظم تعداد آسیب‌پذیری‌های **critical** رسیدگی‌نشده را صفر نگه می‌دارد.
+  منظم اجرا می‌شود تا آسیب‌پذیری‌ها **شناسایی و گزارش** شوند (گزارش‌محور و
+  non-blocking، چون رفع برخی advisoryهای transitive/dev نیازمند ارتقای
+  breaking است).
 
 ## معیارهای سازگاری (invariants)
 
@@ -32,9 +34,13 @@ outcome_rate = consistent_checks / total_checks
 
 ## نحوهٔ اندازه‌گیری و مشاهده در production
 
-- **CI/CD:** فایل `.github/workflows/ci.yml` روی هر push و pull request (و
+- **CI/CD:** workflow آمادهٔ نصب در `docs/ci.workflow.example.yml` قرار دارد؛
+  آن را به `.github/workflows/ci.yml` کپی کنید تا روی هر push و pull request (و
   زمان‌بندی هفتگی) مراحل `npm ci` (dependency check) و `npm audit`
-  (vulnerability scan) را اجرا می‌کند.
+  (vulnerability scan) اجرا شوند. (به‌صورت example نگه‌داری می‌شود چون توکن
+  اتوماسیون ریپو مجوز `workflows` ندارد.) بدون GitHub Actions نیز همان بررسی‌ها
+  مستقیماً با npm scripts اجرا می‌شوند: `npm run audit` و `npm run deps:check`
+  (در ریشه، و `audit`/`deps:check` در هر workspace).
 - **بک‌اند (Python — لایهٔ سنجش):** `backend/app/monitoring.py` متریک
   `dependency_inconsistency` و `outcome_rate` را محاسبه و از طریق logger با
   نام `monitoring_log` خط‌به‌خط `metric_name=... value=...` منتشر می‌کند تا در

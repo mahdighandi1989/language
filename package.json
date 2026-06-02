@@ -11,7 +11,10 @@
     "install:all": "npm install",
     "dev": "npm run dev --workspace backend",
     "build": "npm run build --workspace frontend",
-    "start": "npm start --workspace backend"
+    "start": "npm start --workspace backend",
+    "audit": "npm audit",
+    "audit:ci": "npm audit --omit=dev --audit-level=critical || true",
+    "deps:check": "npm ci && python -m pytest tests/test_dependency_consistency.py"
   },
   "keywords": ["lebanese", "arabic", "language-learning", "gemini", "ai"],
   "license": "MIT"
