@@ -3,14 +3,14 @@ task_id: task_2cd58167a90c
 title: بازسازی معماری بک‌اند
 type: other
 priority: high
-execution_priority: 2200
-status: pending
+execution_priority: 2500
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-02T21:27:51.049244+00:00'
+updated_at: '2026-06-02T22:31:04.890692+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2484,7 +2484,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 10: انتقال مسیرهای HTTP از backend/server.js به فایل‌های routes
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال تمام تعاریف مسیرهای HTTP (مانند app.post('/api/gemini/chat', ...)، app.post('/api/analyze-files', ...)، app.get('/api/health', ...)) از backend/server.js به فایل‌های جداگانه در backend/routes/ است. خارج از این مرحله: انتقال منطق کنترلرها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: مسیرها باید به فایل‌های مجزا مانند geminiRoutes.js، fileRoutes.js و healthRoutes.js منتقل شوند.
 **Excerpt:**
 ```
@@ -2493,7 +2493,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 11: انتقال منطق کنترلرها از backend/server.js به فایل‌های controllers
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال منطق کنترلرها (callbackهای مسیرها) از backend/server.js به فایل‌های backend/controllers/ است. خارج از این مرحله: انتقال مسیرها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: کنترلرها باید به فایل‌های مجزا مانند geminiController.js و fileController.js منتقل شوند و به صورت module.exports صادر شوند.
 **Excerpt:**
 ```
@@ -2502,7 +2502,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 12: انتقال منطق تجاری و سرویس‌ها از backend/server.js به فایل‌های services
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال منطق تجاری و تعامل با APIهای خارجی (مانند توابع analyzeWithGemini، uploadToGeminiFileAPI) از backend/server.js به فایل‌های backend/services/ است. خارج از این مرحله: انتقال کنترلرها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: سرویس‌ها باید به فایل‌های مجزا مانند geminiService.js و fileService.js منتقل شوند.
 **Excerpt:**
 ```
@@ -2520,7 +2520,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 14: انتقال میان‌افزارها از backend/server.js به فایل‌های middleware
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال میان‌افزارها (مانند handleMulterError) از backend/server.js به فایل‌های backend/middleware/ است. خارج از این مرحله: انتقال سایر بخش‌ها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: میان‌افزارها باید به فایل‌های مجزا مانند uploadMiddleware.js در backend/middleware/ منتقل شوند.
 **Excerpt:**
 ```
@@ -2529,7 +2529,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 15: انتقال توابع کمکی از backend/server.js به فایل‌های utils
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل انتقال توابع کمکی (مانند splitIntoChunks) از backend/server.js به فایل‌های backend/utils/ است. خارج از این مرحله: انتقال سایر بخش‌ها، تغییر در منطق برنامه، یا تغییر در frontend. نکته حیاتی: توابع کمکی باید به فایل‌های مجزا مانند helpers.js در backend/utils/ منتقل شوند.
 **Excerpt:**
 ```
@@ -2538,7 +2538,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 16: بازسازی backend/server.js به عنوان entry point سبک
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بازسازی فایل backend/server.js به عنوان یک entry point است که فقط شامل importها، تنظیمات middlewareهای global، و استفاده از routeها باشد. خارج از این مرحله: تغییر در منطق برنامه، تغییر در frontend، یا ایجاد قابلیت جدید. نکته حیاتی: طول فایل باید به طور قابل توجهی کاهش یابد و فقط شامل importها، تنظیمات middlewareهای global، و استفاده از routeها باشد.
 **Excerpt:**
 ```
