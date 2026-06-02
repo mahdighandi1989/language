@@ -15,16 +15,6 @@
       "external_attempts": 5
     },
     {
-      "task_id": "task_f55414420332",
-      "title": "استانداردسازی و رفع ابهام پرامپت‌های AI/LLM",
-      "priority": "critical",
-      "execution_priority": 1250,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_f55414420332.md",
-      "external_attempts": 5
-    },
-    {
       "task_id": "task_0193aa4e943f",
       "title": "امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری",
       "priority": "critical",
@@ -143,6 +133,16 @@
       "external_status": "pending",
       "path": "prompt/task-task_78af588c4541.md",
       "external_attempts": 6
+    },
+    {
+      "task_id": "task_bf3013b41bbd",
+      "title": "راه‌اندازی زیرساخت تست Pytest بک‌اند",
+      "priority": "high",
+      "execution_priority": 2400,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_bf3013b41bbd.md",
+      "external_attempts": 8
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
