@@ -3,14 +3,14 @@ task_id: task_0193aa4e943f
 title: 'امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری'
 type: other
 priority: critical
-execution_priority: 1300
-status: pending
+execution_priority: 1600
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:17:50.430047+00:00'
-updated_at: '2026-06-02T22:52:23.751940+00:00'
+updated_at: '2026-06-02T23:10:16.362828+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -6229,7 +6229,7 @@ validation باید در سطح middleware انجام شود و قبل از رس
 ```
 
 ### Step 48: پیاده‌سازی اعتبارسنجی ورودی با Zod برای APIهای backend
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل‌های backend/validators/schemas.js و backend/middleware/validate.js، نصب کتابخانه Zod، و اعمال middleware validate روی سه endpoint مشخص (chat، tts، analyze-files) در backend/server.js است. همچنین اضافه کردن validation برای query parameters در GET endpoints (api/list-models و api/test-gemini) جزو این بخش است. خارج از scope: تغییر در frontend، تست‌های Python، یا هر فایل دیگری غیر از موارد ذکر شده.
 **Excerpt:**
 ```
@@ -6295,7 +6295,7 @@ app.post('/api/gemini/tts', validate(ttsSchema), async (req, res) => {
 ```
 
 ### Step 50: اعتبارسنجی ماژول zod و middleware validate.js با دو endpoint تستی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل نصب کتابخانه zod در backend، بارگذاری ماژول middleware/validate.js و اجرای دو درخواست curl برای تست اعتبارسنجی است. endpoint اول (tts) با body خالی باید خطای اعتبارسنجی بدهد و endpoint دوم (chat) با داده نامعتبر باید خطای 400 برگرداند. این بخش فقط دستورات تست را مشخص می‌کند و شامل پیاده‌سازی خود middleware نیست.
 **Excerpt:**
 ```
