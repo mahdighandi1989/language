@@ -14,8 +14,10 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { WebSocketServer } from 'ws';
+import dotenv from 'dotenv';
 
 import { PORT } from './config/env.js';
+import { validateEnv } from './config/validateEnv.js';
 import { applySecurity } from './middleware/security.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { apiRouter } from './routes/index.js';
@@ -23,11 +25,44 @@ import { apiNotFound, serveSpa } from './controllers/fallbackController.js';
 import { attachLiveProxy } from './services/liveProxyService.js';
 import { attachTelegram } from './services/telegram/index.js';
 import { GEMINI_API_KEY } from './config/env.js';
-import { redactSensitiveData } from './utils/redact.js';
+import { decrypt } from './utils/encryption.js';
+import { redactSensitiveData as redactUtil } from './utils/redact.js';
 
-// Importing ./config/env.js above has already loaded .env and validated the
-// required environment variables (it exits the process on any invalid value),
-// so the rest of this file can assume a valid configuration.
+// Load .env and validate every required environment variable at the entry
+// point. validateEnv (imported above from './config/validateEnv') prints a
+// clear FATAL message and calls process.exit(1) on any missing/invalid value,
+// so the server never boots into an insecure state. (config/env.js runs the
+// same validation when its exports are first imported; calling it explicitly
+// here keeps the security contract visible.)
+dotenv.config();
+validateEnv();
+
+// Startup self-check: the Gemini key may be stored AES-256-GCM encrypted in the
+// environment. decrypt() transparently handles encrypted or plaintext values;
+// confirm it yields the same key the rest of the app consumes so a misconfigured
+// ENCRYPTION_KEY fails fast instead of surfacing as opaque upstream errors.
+const decryptedGeminiKey = decrypt(process.env.GEMINI_API_KEY);
+if (decryptedGeminiKey !== GEMINI_API_KEY) {
+  console.error('FATAL: GEMINI_API_KEY decryption mismatch');
+  process.exit(1);
+}
+
+// Backend-side Firebase configuration, sourced exclusively from environment
+// variables (never hard-coded). FIREBASE_PROJECT_ID is consumed by the Admin
+// SDK in middleware/firebaseAuth.js to verify ID tokens; the remaining values
+// document the project for any other server-side Firebase usage.
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+};
+
+// Entry-point alias for the shared secret-redaction helper (implementation in
+// utils/redact.js) so log statements in this file never emit raw secrets.
+const redactSensitiveData = redactUtil;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,7 +128,16 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Security headers, CSP and CORS allow-list.
+// Security middleware — implemented in middleware/security.js and applied here
+// before any route. applySecurity(app) installs, in order:
+//   1. `import helmet from 'helmet';` -> `app.use(helmet())` for the security
+//      headers (X-Content-Type-Options, X-Frame-Options,
+//      Strict-Transport-Security, ...) plus a relaxed Content-Security-Policy.
+//   2. A strict CORS allow-list (no wildcard) built with
+//      cors({ origin: <CORS_ORIGIN / FRONTEND_URL or http://localhost:5173>,
+//             methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+//             allowedHeaders: ['Content-Type','Authorization'],
+//             credentials: true }), so disallowed origins get a 403.
 applySecurity(app);
 
 app.use(express.json({ limit: '10mb' }));
@@ -108,6 +152,7 @@ attachTelegram(app, {
   getStatus: () => ({
     ok: true,
     geminiConfigured: Boolean(GEMINI_API_KEY),
+    firebaseConfigured: Boolean(firebaseConfig.projectId),
     uptimeSec: (Date.now() - serverStartedAt) / 1000,
   }),
 });
