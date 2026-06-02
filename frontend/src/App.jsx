@@ -5,16 +5,19 @@ if (typeof window !== 'undefined' && !window.__inspectorBridgeLoaded) {
   window.__inspectorBridgeLoaded = true;
 
   const isInIframe = window !== window.parent;
-  const WS_URL = 'wss://ai-creator-backend-q677.onrender.com/api/render/ws/bridge/gh_mahdighandi1989_language';
+  // Inspector Bridge WebSocket URL — configurable via VITE_WS_URL.
+  // اگر تنظیم نشده باشد، اتصال WebSocket به‌صورت graceful غیرفعال می‌شود و
+  // فقط فالبک postMessage برای Inspector والد فعال می‌ماند.
+  const WS_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_WS_URL) || '';
   let ws = null;
   let wsReady = false;
   let messageQueue = [];
 
-  console.log('🌉 Inspector Bridge: Active (WebSocket mode)');
+  console.log(WS_URL ? '🌉 Inspector Bridge: Active (WebSocket mode)' : '🌉 Inspector Bridge: WebSocket disabled (no VITE_WS_URL), postMessage fallback only');
 
   // اتصال WebSocket
   const connectWS = () => {
-    if (!WS_URL || WS_URL === 'wss://ai-creator-backend-q677.onrender.com/api/render/ws/bridge/gh_mahdighandi1989_language') return;
+    if (!WS_URL) return;
     try {
       ws = new WebSocket(WS_URL);
       ws.onopen = () => { ws.send(JSON.stringify({ type: 'register', role: 'bridge' })); };
