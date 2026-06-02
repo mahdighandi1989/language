@@ -13,9 +13,9 @@ function fail(message) {
 }
 
 export function validateEnv(env = process.env) {
-  const rawGeminiKey = env.GEMINI_API_KEY;
+  const encryptedKey = env.GEMINI_API_KEY;
 
-  if (!rawGeminiKey || !String(rawGeminiKey).trim()) {
+  if (!encryptedKey || !String(encryptedKey).trim()) {
     fail('FATAL: متغیر محیطی GEMINI_API_KEY معتبر نیست');
     return undefined;
   }
@@ -25,7 +25,7 @@ export function validateEnv(env = process.env) {
   // is invalid.
   let geminiKey;
   try {
-    geminiKey = decrypt(rawGeminiKey);
+    geminiKey = decrypt(encryptedKey);
   } catch {
     fail('FATAL: متغیر محیطی GEMINI_API_KEY معتبر نیست');
     return undefined;
