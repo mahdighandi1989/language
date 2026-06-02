@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 6,
+  "total": 5,
   "tasks": [
     {
       "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
@@ -12,16 +12,6 @@
       "status": "awaiting_review",
       "external_status": "pending",
       "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
-      "external_attempts": 0
-    },
-    {
-      "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
-      "title": "Address Over/Under-Engineering Anti-pattern",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-e4229cce-5083-4ed9-b7d7-4275cf77ec8e.md",
       "external_attempts": 0
     },
     {
