@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 14,
+  "total": 13,
   "tasks": [
-    {
-      "task_id": "1470edf2-a90f-43ec-b54a-255674ed6c86",
-      "title": "Resolve Threshold-Outcome mismatch anti-pattern",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
-      "external_attempts": 0
-    },
     {
       "task_id": "task_068445d6ae13",
       "title": "حل ناسازگاری معماری پایپ‌لاین AI/LLM",
