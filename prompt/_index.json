@@ -135,14 +135,14 @@
       "external_attempts": 5
     },
     {
-      "task_id": "task_bf3013b41bbd",
-      "title": "راه‌اندازی زیرساخت تست Pytest بک‌اند",
+      "task_id": "task_78af588c4541",
+      "title": "تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند",
       "priority": "high",
-      "execution_priority": 2250,
+      "execution_priority": 2300,
       "status": "pending",
       "external_status": "pending",
-      "path": "prompt/task-task_bf3013b41bbd.md",
-      "external_attempts": 5
+      "path": "prompt/task-task_78af588c4541.md",
+      "external_attempts": 6
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
