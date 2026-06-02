@@ -3,14 +3,14 @@ task_id: task_78af588c4541
 title: تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند
 type: other
 priority: high
-execution_priority: 2550
-status: awaiting_review
-external_status: done
+execution_priority: 2250
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-02T23:14:17.918389+00:00'
+updated_at: '2026-06-02T23:14:25.795293+00:00'
 tags:
 - consolidated
 - post_verify_merge
