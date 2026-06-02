@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2300
-status: pending
+execution_priority: 2600
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T23:33:04.495177+00:00'
+updated_at: '2026-06-02T23:38:58.799623+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -20570,7 +20570,7 @@ describe('validate_api_key', () => {
 ```
 
 ### Step 83: نوشتن تست‌های واحد برای ماژول مدیریت خطاها و لاگینگ (Error Handling & Logging)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع ماژول error_handling است: log_error, get_error_logs, send_error_report, format_error_response. تست‌ها باید سناریوهای مختلف خطا (validation error, database error, external service error) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI. نکته حیاتی: ماژول error_handling یک ماژول جدید است و هیچ فایل موجودی در پروژه با آن ارتباط ندارد، بنابراین ریسک شکستن کد موجود حداقل است.
 — [merged] این مرحله شامل ایجاد یک ماژول متمرکز برای مدیریت خطاها و لاگینگ (backend/services/errorHandling.js) و نوشتن تست‌های واحد برای توابع آن (logError, getErrorLogs, sendErrorReport, formatErrorResponse) با استفاده از Jest و Supertest است. تست‌ها باید سناریوهای مختلف خطا (validation error, database error, external service error) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI، و همچنین refactor کردن backend/server.js برای استفاده از ماژول جدید (این کار در مرحله بعدی انجام می‌شود).
 **Excerpt:**
@@ -20597,7 +20597,7 @@ _(مستقل)_
 ```
 
 ### Step 84: ایجاد ماژول مدیریت خطا و یکپارچه‌سازی آن در سرور
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل جدید `backend/services/errorHandling.js` با توابع `logError`, `getErrorLogs`, `sendErrorReport`, و `formatErrorResponse` است. همچنین شامل به‌روزرسانی تمام `try/catch` blocks در `backend/server.js` برای استفاده از این توابع جدید به جای `console.error` و پاسخ‌های مستقیم می‌باشد. ایجاد فایل تست `backend/tests/errorHandling.test.js` با پوشش ۴ سناریوی خطا (validation, database, external service, unknown) نیز در این scope قرار دارد. نکته حیاتی: هیچ `console.error` جدیدی نباید به `server.js` اضافه شود و همه تست‌ها باید با `npx jest backend/tests/errorHandling.test.js` پاس شوند.
 **Excerpt:**
 ```
@@ -20617,7 +20617,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 85: بهبود مدیریت خطا در endpoint /api/gemini/chat و middleware handleMulterError
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل دو تغییر مشخص در backend/server.js است: (1) جایگزینی catch ساده در endpoint /api/gemini/chat با logError و formatErrorResponse، (2) جایگزینی مدیریت خطای دستی در middleware handleMulterError با logError و formatErrorResponse. خارج از scope: سایر endpointها، سایر middlewareها، پیاده‌سازی توابع logError و formatErrorResponse (فرض می‌شود وجود دارند).
 **Excerpt:**
 ```
@@ -20673,7 +20673,7 @@ const handleMulterError = (err, req, res, next) => {
 ```
 
 ### Step 86: اجرای تست‌های اعتبارسنجی خطاهای بک‌اند
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل اجرای دو دستور تست است: (1) اجرای تست واحد روی فایل errorHandling.test.js با پوشش کد، و (2) اجرای یک درخواست POST به endpoint /api/gemini/chat با بدنه خالی برای تست رفتار خطا. این بخش فقط اجرای این دو دستور را پوشش می‌دهد و شامل تحلیل نتایج یا رفع خطاها نیست.
 **Excerpt:**
 ```
