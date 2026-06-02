@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 12,
+  "total": 13,
   "tasks": [
     {
       "task_id": "task_2c28ca0737f1",
@@ -53,6 +53,16 @@
       "external_status": "pending",
       "path": "prompt/task-31236cc5-eb3f-4b4e-be02-ee2362ecc8c4.md",
       "external_attempts": 1
+    },
+    {
+      "task_id": "e4229cce-5083-4ed9-b7d7-4275cf77ec8e",
+      "title": "Replace legacy Inspector Bridge tracking with metric sink",
+      "priority": "high",
+      "execution_priority": 2100,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-e4229cce-5083-4ed9-b7d7-4275cf77ec8e.md",
+      "external_attempts": 2
     },
     {
       "task_id": "task_068445d6ae13",
