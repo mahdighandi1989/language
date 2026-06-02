@@ -3,14 +3,14 @@ task_id: task_78af588c4541
 title: تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند
 type: other
 priority: high
-execution_priority: 2150
-status: pending
+execution_priority: 2450
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-02T22:20:02.373936+00:00'
+updated_at: '2026-06-02T22:22:48.961672+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1222,7 +1222,7 @@ Run npm install to update package-lock.json.
 ```
 
 ### Step 3: تأیید عدم وجود خطاهای module not found در startup بک‌اند
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای تست test_no_module_not_found_errors از فایل tests/test_backend_startup.py برای اطمینان از عدم وجود خطاهای module not found در زمان startup بک‌اند است. خارج از این مرحله: تست endpointهای صوتی یا تغییرات در کد. نکته حیاتی: تست باید با timeout 30 ثانیه اجرا شود.
 **Excerpt:**
 ```
@@ -1230,7 +1230,7 @@ Backend starts without module not found errors [verify_method=backend_test] [ver
 ```
 
 ### Step 4: تأیید عملکرد صحیح endpoint پردازش صوتی
-**Status:** `partial` (50%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل ارسال یک درخواست POST به endpoint /api/audio/process و بررسی پاسخ است. خارج از این مرحله: تست endpointهای دیگر یا تغییرات در کد. نکته حیاتی: پاسخ باید شامل فیلدهای status و result باشد و status کد 200 برگرداند.
 **Excerpt:**
 ```
@@ -1302,7 +1302,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 13: تأیید اجرای بدون خطای برنامه پس از refactoring
-**Status:** `done` (100%)
+**Status:** `partial` (70%)
 **Scope:** این مرحله شامل اجرای تست test_server_starts از فایل tests/test_server_startup.py برای اطمینان از اجرای بدون خطای برنامه پس از refactoring است. خارج از این مرحله: تست endpointهای خاص یا تغییرات در کد. نکته حیاتی: تست باید با timeout 30 ثانیه اجرا شود.
 **Excerpt:**
 ```
