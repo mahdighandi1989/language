@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 11,
+  "total": 12,
   "tasks": [
     {
       "task_id": "task_2c28ca0737f1",
@@ -82,6 +82,16 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
+      "external_attempts": 3
+    },
+    {
+      "task_id": "task_9172abbf97f5",
+      "title": "مستندسازی جامع پروژه و بهبود فرآیند راه‌اندازی",
+      "priority": "high",
+      "execution_priority": 2150,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_9172abbf97f5.md",
       "external_attempts": 3
     },
     {
