@@ -9,6 +9,12 @@ external_status: pending
 verification_status: done
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
+pipeline: ai_llm
+purpose: Wire CI/CD and quality gates (lint, build, CodeQL, dependabot) around the ai_llm backend so AI/LLM changes ship safely.
+responsibility: Own the GitHub Actions workflows and quality-gate configuration that validate every change to the Gemini-backed services.
+expected_inputs: Pushed commits and pull requests that touch the backend or frontend sources.
+expected_outputs: Pass/fail CI signal, security-scan results, and automated dependency-update pull requests.
+interacts_with: backend/server.js, the frontend build, .github/workflows, and the other ai_llm pipeline prompts.
 created_at: '2026-05-09T07:29:40.376193+00:00'
 updated_at: '2026-06-02T17:37:25.626766+00:00'
 archived: true
