@@ -3,14 +3,14 @@ task_id: task_78af588c4541
 title: تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند
 type: other
 priority: high
-execution_priority: 2200
-status: pending
+execution_priority: 2500
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-02T22:29:55.615001+00:00'
+updated_at: '2026-06-02T22:51:37.535020+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1302,7 +1302,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 13: تأیید اجرای بدون خطای برنامه پس از refactoring
-**Status:** `partial` (70%)
+**Status:** `partial` (50%)
 **Scope:** این مرحله شامل اجرای تست test_server_starts از فایل tests/test_server_startup.py برای اطمینان از اجرای بدون خطای برنامه پس از refactoring است. خارج از این مرحله: تست endpointهای خاص یا تغییرات در کد. نکته حیاتی: تست باید با timeout 30 ثانیه اجرا شود.
 **Excerpt:**
 ```
