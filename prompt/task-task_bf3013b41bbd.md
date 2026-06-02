@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2250
-status: pending
+execution_priority: 2550
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T23:07:06.508222+00:00'
+updated_at: '2026-06-02T23:23:43.909142+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -9179,7 +9179,7 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 
 - [x] **مرحله 1: انتخاب و نصب فریم‌ورک تست‌نویسی (pytest)** — این مرحله شامل انتخاب فریم‌ورک تست‌نویسی مناسب برای پروژه (pytest به دلیل سادگی و پشتیبانی از فیچرهای پیشرفته) و نصب آن به همراه پلاگین‌های ضروری (pytest-cov برای پوشش کد، pytest-mock برای mocking) می‌شود. همچنین ایجاد فایل پیکربندی pytest (pytest.ini یا pyproject.toml) برای تنظیم مسیرها و گزینه‌های
 - [x] **مرحله 2: ایجاد ساختار دایرکتوری تست‌ها و فایل conftest.py** — ایجاد دایرکتوری `tests/` در ریشه پروژه با زیرشاخه‌های منطبق بر ساختار ماژول‌های اصلی (مثلاً tests/unit/, tests/integration/). ایجاد فایل `tests/conftest.py` برای تعریف fixtureهای سراسری (مثلاً دیتابیس تست، کلاینت HTTP mock). خارج از این مرحله: نوشتن تست‌های خاص یا fixtureهای ماژولار.
-- [ ] **مرحله 3: نوشتن تست‌های واحد برای ماژول مدیریت واژگان (Vocabulary)** — نوشتن تست‌های واحد برای توابع اصلی ماژول vocabulary (مثلاً add_word, get_word, delete_word, search_words). تست‌ها باید با استفاده از mock دیتابیس (بدون وابستگی به دیتابیس واقعی) نوشته شوند. پوشش حداقل 80% از خطوط کد ماژول vocabulary. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا API end
+- [x] **مرحله 3: نوشتن تست‌های واحد برای ماژول مدیریت واژگان (Vocabulary)** — نوشتن تست‌های واحد برای توابع اصلی ماژول vocabulary (مثلاً add_word, get_word, delete_word, search_words). تست‌ها باید با استفاده از mock دیتابیس (بدون وابستگی به دیتابیس واقعی) نوشته شوند. پوشش حداقل 80% از خطوط کد ماژول vocabulary. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا API end
 - [x] **مرحله 4: نوشتن تست‌های واحد برای ماژول مدیریت جلسات مطالعه (Study Sessions)** — نوشتن تست‌های واحد برای توابع ماژول study_sessions (مثلاً create_session, add_word_to_session, get_session_progress, complete_session). تست‌ها باید logic مربوط به زمان‌بندی مرور (spaced repetition) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [x] **مرحله 5: نوشتن تست‌های واحد برای ماژول احراز هویت (Authentication)** — نوشتن تست‌های واحد برای توابع احراز هویت (register, login, logout, token validation). تست‌ها باید سناریوهای موفق و ناموفق (رمز عبور اشتباه، توکن منقضی، کاربر تکراری) را پوشش دهند. خارج از این مرحله: تست‌های integration با دیتابیس یا API endpoints.
 - [x] **مرحله 6: نوشتن تست‌های واحد برای ماژول API (Endpoints اصلی)** — نوشتن تست‌های واحد برای API endpoints اصلی با استفاده از TestClient فریم‌ورک وب (FastAPI TestClient یا Flask test client). تست‌ها باید status codes، response body، و validation خطاها را بررسی کنند. پوشش حداقل 70% از endpoints. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا سرویس‌های خارج
@@ -17625,7 +17625,7 @@ _(مستقل)_
 ```
 
 ### Step 3: راه‌اندازی زیرساخت تست pytest در backend
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل ایجاد فایل‌های پیکربندی pytest (requirements.txt, pytest.ini)، دایرکتوری tests/ با __init__.py و conftest.py، به‌روزرسانی package.json برای اجرای pytest، و به‌روزرسانی .gitignore برای نادیده گرفتن فایل‌های pytest است. خارج از scope: نوشتن تست‌های واقعی، اجرای linter یا type-check، و تغییر ساختار پروژه به غیر از موارد ذکر شده.
 **Excerpt:**
 ```
