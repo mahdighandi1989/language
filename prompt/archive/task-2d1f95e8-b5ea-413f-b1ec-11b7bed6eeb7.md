@@ -10,7 +10,7 @@ verification_status: done
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-09T07:29:40.376193+00:00'
-updated_at: '2026-06-01T18:29:05.254782+00:00'
+updated_at: '2026-06-02T17:37:25.626766+00:00'
 archived: true
 archived_at: '2026-06-01T18:28:55.541723+00:00'
 target_files:
@@ -25,12 +25,6 @@ target_files:
 - .github/workflows/codeql-analysis.yml
 - .github/dependabot.yml
 - frontend/vite.config.js
-pipeline: ai_llm
-purpose: تعریف و راه‌اندازی خط‌لوله CI/CD و Quality Gates پروژه (lint، build، تست، تحلیل امنیتی).
-responsibility: تضمین این‌که هر تغییر کد پیش از merge از gateهای کیفیت و امنیت عبور کند.
-expected_inputs: تغییرات کد در frontend/backend و رویدادهای push/PR در GitHub Actions.
-expected_outputs: workflowهای ci.yml و codeql-analysis.yml و پیکربندی dependabot برای اجرای خودکار بررسی‌ها.
-interacts_with: خط‌لوله ai_llm — همراه با تسک‌های تست بک‌اند، error handling و معماری اجرا می‌شود.
 ---
 
 # پیاده‌سازی CI/CD و Quality Gates
