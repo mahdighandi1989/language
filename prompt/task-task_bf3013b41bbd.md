@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2150
-status: pending
+execution_priority: 2450
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T21:01:49.196650+00:00'
+updated_at: '2026-06-02T22:27:00.817971+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -22268,7 +22268,7 @@ export async function generate_thumbnail(inputPath, outputPath, size = 150) {
 ```
 
 ### Step 121: مدیریت ریسک‌های استخراج Image Service از backend/server.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش به تحلیل ریسک‌های مرتبط با ایجاد ماژول جدید Image Service می‌پردازد. شامل ریسک شکستن endpoint `POST /api/analyze-files` (خط 698) به دلیل استخراج ناقص توابع multer و منطق پردازش فایل، و ریسک تغییر مسیر نادرست تابع `extractKeyFrames` (خط 531) است. همچنین ریسک نصب کتابخانه sharp در محیط‌های خاص مانند Docker را پوشش می‌دهد. خارج از scope: پیاده‌سازی واقعی ماژول Image Service یا تغییر کد.
 **Excerpt:**
 ```
