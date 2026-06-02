@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 14,
+  "total": 15,
   "tasks": [
     {
       "task_id": "task_2c28ca0737f1",
@@ -113,6 +113,16 @@
       "external_status": "pending",
       "path": "prompt/task-task_9172abbf97f5.md",
       "external_attempts": 3
+    },
+    {
+      "task_id": "task_2cd58167a90c",
+      "title": "یکپارچه‌سازی معماری فرانت‌اند",
+      "priority": "high",
+      "execution_priority": 2250,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_2cd58167a90c.md",
+      "external_attempts": 5
     },
     {
       "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
