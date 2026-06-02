@@ -3,14 +3,14 @@ task_id: task_2cd58167a90c
 title: بازسازی معماری بک‌اند و فرانت‌اند
 type: other
 priority: high
-execution_priority: 2100
-status: pending
+execution_priority: 2400
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-02T10:51:13.881575+00:00'
+updated_at: '2026-06-02T20:08:23.567007+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1757,8 +1757,8 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 این تسک به مراحل کوچک‌تر تقسیم شده. **در هر verify خودکار، وضعیت هر مرحله به‌صورت `[ ]` (انجام نشده)، `[~]` (ناقص)، یا `[x]` (انجام شده) به‌روز می‌شود.**
 وقتی تمام مراحل `[x]` شدند، تسک به‌طور خودکار به «انجام شده» منتقل می‌شود.
 
-- [x] **مرحله 1: ایجاد ساختار پوشه‌های backend بر اساس معماری لایه‌ای (controllers, models, services)** — این مرحله شامل ایجاد پوشه‌های اصلی backend شامل controllers، models، services و انتقال فایل‌های موجود به پوشه‌های مناسب است. فایل‌های مربوط به مسیرها (routes) باید به پوشه controllers، مدل‌های داده به پوشه models، و منطق کسب‌وکار به پوشه services منتقل شوند. این مرحله شامل تغییر محتوای فایل‌ها یا با
-- [ ] **مرحله 2: ایجاد ساختار پوشه‌های frontend بر اساس معماری کامپوننتی (components, hooks, utils)** — این مرحله شامل ایجاد پوشه‌های اصلی frontend شامل components، hooks، utils و انتقال فایل‌های موجود به پوشه‌های مناسب است. کامپوننت‌های React به پوشه components، هوک‌های سفارشی به پوشه hooks، و توابع کمکی به پوشه utils منتقل می‌شوند. این مرحله شامل تغییر محتوای فایل‌ها یا بازنویسی کد نیست، فقط سازماند
+- [ ] **مرحله 1: ایجاد ساختار پوشه‌های backend بر اساس معماری لایه‌ای (controllers, models, services)** — این مرحله شامل ایجاد پوشه‌های اصلی backend شامل controllers، models، services و انتقال فایل‌های موجود به پوشه‌های مناسب است. فایل‌های مربوط به مسیرها (routes) باید به پوشه controllers، مدل‌های داده به پوشه models، و منطق کسب‌وکار به پوشه services منتقل شوند. این مرحله شامل تغییر محتوای فایل‌ها یا با
+- [x] **مرحله 2: ایجاد ساختار پوشه‌های frontend بر اساس معماری کامپوننتی (components, hooks, utils)** — این مرحله شامل ایجاد پوشه‌های اصلی frontend شامل components، hooks، utils و انتقال فایل‌های موجود به پوشه‌های مناسب است. کامپوننت‌های React به پوشه components، هوک‌های سفارشی به پوشه hooks، و توابع کمکی به پوشه utils منتقل می‌شوند. این مرحله شامل تغییر محتوای فایل‌ها یا بازنویسی کد نیست، فقط سازماند
 
 ---
 
@@ -2402,7 +2402,7 @@ _(مستقل)_
 ```
 
 ### Step 2: استخراج Firebase initialization از App.jsx به فایل مجزا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل استخراج بلوک Firebase initialization (خطوط 136-139) از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/hooks/useFirebase.js است. خارج از این مرحله: تغییر در منطق Firebase، تغییر در سایر contextها، یا تغییر در فایل‌های دیگر. نکته حیاتی: تابع useFirebase باید به عنوان یک hook سفارشی React پیاده‌سازی شود و در App.jsx استفاده گردد.
 **Excerpt:**
 ```
@@ -2411,7 +2411,7 @@ _(مستقل)_
 ```
 
 ### Step 3: استخراج ExecutionFlowContext از App.jsx به فایل مجزا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل استخراج بلوک ExecutionFlowContext (خطوط 141-349) از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/contexts/ExecutionFlowContext.jsx است. خارج از این مرحله: تغییر در منطق context، تغییر در سایر contextها، یا تغییر در فایل‌های دیگر. نکته حیاتی: context باید با تمام provider logic و state management خود به فایل جدید منتقل شود و در App.jsx import گردد.
 **Excerpt:**
 ```
@@ -2420,7 +2420,7 @@ _(مستقل)_
 ```
 
 ### Step 4: استخراج LiveChatContext از App.jsx به فایل مجزا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل استخراج بلوک LiveChatContext (خطوط 352+) از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/contexts/LiveChatContext.jsx است. خارج از این مرحله: تغییر در منطق context، تغییر در سایر contextها، یا تغییر در فایل‌های دیگر. نکته حیاتی: context باید با تمام provider logic و state management خود به فایل جدید منتقل شود و در App.jsx import گردد.
 **Excerpt:**
 ```
@@ -2429,7 +2429,7 @@ _(مستقل)_
 ```
 
 ### Step 5: استخراج کامپوننت Chat از App.jsx به فایل مجزا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل استخراج کامپوننت Chat از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/components/Chat.jsx است. خارج از این مرحله: تغییر در منطق کامپوننت، تغییر در سایر کامپوننت‌ها، یا تغییر در فایل‌های دیگر. نکته حیاتی: کامپوننت باید با تمام props و state management خود به فایل جدید منتقل شود و در App.jsx import گردد.
 — [merged] این مرحله شامل استخراج کامپوننت Quiz از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/components/Quiz.jsx است. خارج از این مرحله: تغییر در منطق کامپوننت، تغییر در سایر کامپوننت‌ها، یا تغییر در فایل‌های دیگر. نکته حیاتی: کامپوننت باید با تمام props و state management خود به فایل جدید منتقل شود و در App.jsx import گردد.
 — [merged] این مرحله شامل استخراج کامپوننت FileAnalysis از frontend/src/App.jsx و انتقال آن به یک فایل مجزا در frontend/src/components/FileAnalysis.jsx است. خارج از این مرحله: تغییر در منطق کامپوننت، تغییر در سایر کامپوننت‌ها، یا تغییر در فایل‌های دیگر. نکته حیاتی: کامپوننت باید با تمام props و state management خود به فایل جدید منتقل شود و در App.jsx import گردد.
@@ -2441,7 +2441,7 @@ _(مستقل)_
 ```
 
 ### Step 6: بازسازی App.jsx با importهای جدید و ساختار تمیز
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بازسازی فایل frontend/src/App.jsx به عنوان یک orchestrator است که فقط providers را ترکیب می‌کند و کامپوننت‌های اصلی را import می‌کند. خارج از این مرحله: تغییر در منطق برنامه، تغییر در فایل‌های دیگر، یا ایجاد قابلیت جدید. نکته حیاتی: App.jsx باید حداکثر 100 خط باشد و فقط شامل importها، providerها و رندر کامپوننت‌های اصلی باشد.
 **Excerpt:**
 ```
@@ -2464,7 +2464,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 8: حذف بلوک Inspector Bridge از frontend/src/App.jsx
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل حذف کامل بلوک کد Inspector Bridge (خطوط 1-126) از فایل frontend/src/App.jsx است. خارج از این مرحله: تغییر در سایر بخش‌های App.jsx، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: اطمینان حاصل شود که هیچ وابستگی به متغیرهای سراسری مانند window.__inspectorBridgeLoaded در جای دیگری وجود ندارد.
 **Excerpt:**
 ```
@@ -2583,7 +2583,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 21: اجرای npm run dev در ریشه پروژه برای تایید سرویس‌دهی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اجرای دستور npm run dev در ریشه پروژه برای اطمینان از اجرای backend و سرویس‌دهی frontend بدون خطا است. خارج از این مرحله: تغییر در کد، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: dev server باید بدون خطا اجرا شود و frontend به درستی سرو شود.
 **Excerpt:**
 ```
@@ -2646,7 +2646,7 @@ _(file:line — symbol — snippet)_
 ```
 
 ### Step 28: تایید باقی ماندن WebSocket سرور برای Live Voice
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی و تایید این است که WebSocket سرور در backend/server.js برای قابلیت Live Voice یا قابلیت دیگر باقی مانده است. خارج از این مرحله: تغییر در کد، تغییر در فایل‌های دیگر، یا تغییر در منطق برنامه. نکته حیاتی: WebSocket سرور باید با مسیر '/ws/live' باقی بماند.
 **Excerpt:**
 ```
