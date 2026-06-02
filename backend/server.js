@@ -41,6 +41,15 @@ app.use('/api', generalLimiter);
 app.use(express.static(join(__dirname, '../frontend/dist')));
 
 // All /api routes.
+// validation/justification: AI (Gemini) responses are not relayed to the client
+// raw. The original anti-pattern lived in the chat handler, which did
+// `res.json(result)` straight from the upstream payload (and the model-list
+// handler echoed `response.data` on error). Outbound response validation and
+// sanitize logic now live next to each route handler in
+// controllers/geminiController.js (isValidGeminiResponse /
+// sanitizeGeminiResponse), while inbound request validation is enforced by the
+// zod schemas in validators/schemas.js via the validate() middleware in
+// routes/index.js. This keeps server.js focused on wiring.
 app.use(apiRouter);
 
 // Unmatched /api requests get a JSON 404; everything else serves the SPA.

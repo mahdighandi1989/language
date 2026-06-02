@@ -1,6 +1,42 @@
 import { GEMINI_API_KEY } from '../config/env.js';
 import { redactSensitiveData } from '../utils/redact.js';
 
+// validation: structural guard for Gemini generateContent responses. The
+// upstream API is trusted to be well-formed, but the anti-pattern we are
+// fixing is returning `result` straight to the client with no structural
+// check. A genuine response always carries a non-empty `candidates` array;
+// anything else (error envelope, unexpected shape, hostile payload) must not
+// be forwarded verbatim.
+function isValidGeminiResponse(result) {
+  return (
+    result !== null &&
+    typeof result === 'object' &&
+    Array.isArray(result.candidates) &&
+    result.candidates.length > 0
+  );
+}
+
+// sanitize: strip a Gemini generateContent response down to the fields the
+// client actually consumes (text + audio inline data) so we never relay
+// unexpected or sensitive top-level fields from the upstream payload.
+function sanitizeGeminiResponse(result) {
+  const candidates = (result.candidates || []).map((candidate) => ({
+    content: {
+      role: candidate?.content?.role,
+      parts: (candidate?.content?.parts || []).map((part) => {
+        if (part?.inlineData || part?.inline_data) {
+          return { inlineData: part.inlineData || part.inline_data };
+        }
+        if (part?.text !== undefined) {
+          return { text: part.text };
+        }
+        return null;
+      }).filter((p) => p !== null),
+    },
+  }));
+  return { candidates };
+}
+
 // POST /api/gemini/chat — proxy a chat request to Gemini, optionally returning
 // the full response (with audio) or just the generated text.
 export async function chat(req, res) {
@@ -43,9 +79,17 @@ export async function chat(req, res) {
 
     const result = await response.json();
 
+    // validation: reject malformed/unexpected upstream payloads instead of
+    // forwarding them blindly to the client.
+    if (!isValidGeminiResponse(result)) {
+      console.error('Gemini API returned an unexpected response shape');
+      return res.status(502).json({ error: 'Invalid response from AI service' });
+    }
+
     // Return full result for audio requests, just text otherwise
     if (includeAudio) {
-      res.json(result);
+      // sanitize the validated result so only known fields reach the client.
+      res.json(sanitizeGeminiResponse(result));
     } else {
       const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) {
