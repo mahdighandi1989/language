@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 7,
+  "total": 6,
   "tasks": [
     {
       "task_id": "task_068445d6ae13",
@@ -12,16 +12,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-task_068445d6ae13.md",
-      "external_attempts": 1
-    },
-    {
-      "task_id": "task_ce963d814d52",
-      "title": "پیاده‌سازی نوتیفیکیشن 'verify_failed' و بهبود معیارهای خروجی",
-      "priority": "high",
-      "execution_priority": 2050,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_ce963d814d52.md",
       "external_attempts": 1
     },
     {
