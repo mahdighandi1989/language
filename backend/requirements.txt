@@ -1,0 +1,6 @@
+# Python test tooling for the backend.
+# The backend runtime is Node/Express; these packages power the pytest suite
+# that boots the real server and exercises it (see tests/ and backend/tests/).
+pytest>=8.0
+pytest-cov>=5.0
+pytest-mock>=3.14
