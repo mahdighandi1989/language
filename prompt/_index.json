@@ -5,6 +5,16 @@
   "total": 7,
   "tasks": [
     {
+      "task_id": "task_0193aa4e943f",
+      "title": "امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری",
+      "priority": "critical",
+      "execution_priority": 1200,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_0193aa4e943f.md",
+      "external_attempts": 4
+    },
+    {
       "task_id": "31236cc5-eb3f-4b4e-be02-ee2362ecc8c4",
       "title": "پیاده‌سازی File Analysis API با اعتبارسنجی فایل",
       "priority": "high",
@@ -13,16 +23,6 @@
       "external_status": "pending",
       "path": "prompt/task-31236cc5-eb3f-4b4e-be02-ee2362ecc8c4.md",
       "external_attempts": 1
-    },
-    {
-      "task_id": "1470edf2-a90f-43ec-b54a-255674ed6c86",
-      "title": "Resolve Threshold-Outcome mismatch anti-pattern",
-      "priority": "high",
-      "execution_priority": 2100,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
-      "external_attempts": 2
     },
     {
       "task_id": "task_068445d6ae13",
