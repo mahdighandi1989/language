@@ -3,14 +3,14 @@ task_id: task_3b614e2e1960
 title: اعتبارسنجی پاسخ AI و رفع anti-pattern
 type: other
 priority: high
-execution_priority: 2100
-status: pending
+execution_priority: 2400
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:23:50.486184+00:00'
-updated_at: '2026-06-02T20:25:38.888055+00:00'
+updated_at: '2026-06-02T22:19:42.117701+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -881,7 +881,7 @@ _(مستقل)_
 ```
 
 ### Step 5: اصلاح کد یا افزودن کامنت توجیهی در backend/server.js برای validation پاسخ API
-**Status:** `done` (100%)
+**Status:** `partial` (50%)
 **Scope:** این مرحله شامل اصلاح کد در backend/server.js برای افزودن validation به پاسخ‌های API در endpoint های /api/gemini/chat و /api/list-models است. یا در صورت وجود دلیل موجه برای عدم validation، یک کامنت توجیهی اضافه می‌شود. خارج از این مرحله، نوشتن تست edge case است. نکته حیاتی: باید از کامنت‌های // validation, // sanitize, // TODO, // justification استفاده شود.
 **Excerpt:**
 ```
