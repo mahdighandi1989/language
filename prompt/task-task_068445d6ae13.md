@@ -3,14 +3,14 @@ task_id: task_068445d6ae13
 title: حل ناسازگاری معماری پایپ‌لاین AI/LLM
 type: other
 priority: high
-execution_priority: 2100
-status: pending
+execution_priority: 2400
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:30:57.201755+00:00'
-updated_at: '2026-06-02T20:41:11.594209+00:00'
+updated_at: '2026-06-02T20:44:07.052741+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2337,7 +2337,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 6: اجرای گام ۴ از Task 1: نوشتن Integration Test
-**Status:** `partial` (70%)
+**Status:** `partial` (50%)
 **Scope:** این مرحله شامل اجرای گام ۴ از مراحل اجرایی پیشنهادی Task 1 است: 'integration test برای این pipeline بنویس تا regression جلوگیری شود.' این شامل نوشتن یک تست یکپارچه‌سازی در فایل tests/integration/test_ai_llm_pipeline.py است که pipeline `ai_llm` را با فرض ground truth جدید اجرا کرده و عبور می‌کند. خارج از این مرحله: align کردن کد (گام ۳) یا تست‌های واحد.
 — [merged] این مرحله شامل اجرای گام ۴ از مراحل اجرایی پیشنهادی Task 2 است: 'integration test برای این pipeline بنویس تا regression جلوگیری شود.' این شامل نوشتن یک تست یکپارچه‌سازی در فایل tests/backend/ai_llm/test_pipeline_integration.py است که pipeline `ai_llm` را با ارکستراسیون جدید اجرا کرده و عبور می‌کند. خارج از این مرحله: align کردن کد (گام ۳) یا تست‌های واحد.
 **Excerpt:**
