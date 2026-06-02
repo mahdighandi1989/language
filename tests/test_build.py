@@ -34,6 +34,25 @@ def test_build_succeeds():
     assert js_bundles, "build did not emit any JS bundle (React plugin?)"
 
 
+@pytest.mark.skipif(not npm_available(), reason="npm is not installed")
+def test_frontend_build():
+    """`npm run build` produces the dist artifacts after the components/ move.
+
+    Equivalent to ``test_build_succeeds`` but kept as a stable, explicitly named
+    entry point for the frontend-restructure acceptance check: the build must
+    still emit ``dist/index.html`` and at least one JS bundle once App.jsx lives
+    under ``src/components/`` and ``main.jsx`` imports it from there.
+    """
+    result = run_build(timeout=120)
+    assert result.returncode == 0, (
+        f"`npm run build` failed (exit {result.returncode}).\n"
+        f"STDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+    )
+    assert (DIST_DIR / "index.html").is_file(), "build did not produce dist/index.html"
+    js_bundles = list((DIST_DIR / "assets").glob("*.js"))
+    assert js_bundles, "build did not emit any JS bundle"
+
+
 # A small ESM probe that loads the actual config files and asserts that the
 # expected plugins are registered. Running it through Node resolves the configs
 # exactly the way Vite would, so a missing or renamed plugin fails the test.
