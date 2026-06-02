@@ -25,6 +25,8 @@ npm-debug.log*
 __pycache__/
 *.pyc
 .pytest_cache/
+.coverage
+htmlcov/
 
 # Telegram bot local JSON data store (runtime persistence, not source)
 backend/data/
