@@ -3,14 +3,14 @@ task_id: task_410fe171a0cb
 title: پیکربندی Inspector Bridge و بهبود مدیریت خطا
 type: other
 priority: critical
-execution_priority: 1400
-status: awaiting_review
-external_status: done
+execution_priority: 1100
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:22:56.705850+00:00'
-updated_at: '2026-06-02T18:54:39.337399+00:00'
+updated_at: '2026-06-02T18:54:46.372339+00:00'
 tags:
 - consolidated
 - post_verify_merge
