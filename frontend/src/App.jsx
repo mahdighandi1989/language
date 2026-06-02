@@ -25,6 +25,18 @@
 // executed. The guard implementations live in
 // `./components/InspectorBridge.jsx` and are re-exported here so the historical
 // `src/App.jsx` import path can reach the same validated command handlers.
+//
+// Inspector Bridge transport: Inspector Bridge no longer opens any external
+// WebSocket. It receives AI commands purely over the browser's own
+// `window.postMessage` channel — `startPostMessageBridge` installs the listener
+// and routes each tagged envelope through `handleCommand`. It is re-exported
+// here so the historical `src/App.jsx` import path can reach the postMessage
+// bridge as well.
 export { default } from './components/App.jsx';
 export { resolveLiveWsUrl, LIVE_WS_PATH } from './utils/wsUrl.js';
-export { isValidSelector, isValidUrl, handleCommand } from './components/InspectorBridge.jsx';
+export {
+  isValidSelector,
+  isValidUrl,
+  handleCommand,
+  startPostMessageBridge,
+} from './components/InspectorBridge.jsx';

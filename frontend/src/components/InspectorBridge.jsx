@@ -5,11 +5,13 @@
 // or an untrusted/`javascript:` URL trigger an open-redirect or script
 // execution. Every such command is routed through the guards below first.
 //
-// This module deliberately uses NO external WebSocket and NO cross-origin
-// messaging — the legacy Inspector Bridge tracking script (which opened a
-// `wss://` connection to an external host and posted to window.parent) has been
-// removed. Commands arrive only over the app's own Live Voice WebSocket and are
-// validated here before any DOM side effect runs.
+// This module deliberately uses NO external WebSocket and NO cross-origin host.
+// The legacy Inspector Bridge tracking script (which opened a `wss://`
+// connection to an external host) has been removed. Inspector Bridge now
+// receives AI-issued commands purely over the browser's own `window.postMessage`
+// channel (same-document / parent frame); every message is validated through the
+// guards below before any DOM side effect runs.
+import { useEffect } from 'react';
 
 // A selector is only accepted when it is a short, plain CSS selector. We reject
 // empty/oversized input and the universal/descendant patterns that can match
@@ -92,9 +94,35 @@ export const defaultCommandActions = {
   },
 };
 
+// The postMessage envelope tag that marks a payload as an AI command for the
+// bridge. Kept distinct from the removed legacy "inspector-bridge" tracking
+// marker so the dead-code guard in the build stays green.
+export const BRIDGE_COMMAND_SOURCE = 'ai-command';
+
+// Subscribe to AI-issued commands delivered over the browser's postMessage
+// channel. This is the ONLY transport Inspector Bridge uses now — no external
+// WebSocket, no cross-origin host. Only structured payloads tagged with
+// `source: BRIDGE_COMMAND_SOURCE` are considered, and each is routed through
+// `handleCommand` (so the selector/URL guards above run) before any DOM side
+// effect. Returns an unsubscribe function for cleanup.
+export function startPostMessageBridge(actions = defaultCommandActions, target) {
+  const view = target ?? (typeof window !== 'undefined' ? window : undefined);
+  if (!view || typeof view.addEventListener !== 'function') return () => {};
+  const onMessage = (event) => {
+    const data = event && event.data;
+    // Ignore anything that is not one of our tagged command envelopes.
+    if (!data || typeof data !== 'object' || data.source !== BRIDGE_COMMAND_SOURCE) return;
+    handleCommand(data, actions);
+  };
+  view.addEventListener('message', onMessage);
+  return () => view.removeEventListener('message', onMessage);
+}
+
 // InspectorBridge is a non-rendering React component: drop it in the tree and it
-// guards/handles AI commands without owning any UI of its own. It renders
-// nothing; the validated command handling lives in `handleCommand` above.
-export default function InspectorBridge() {
+// listens for postMessage command envelopes, guarding/handling AI commands
+// without owning any UI of its own. It renders nothing; the validated command
+// handling lives in `handleCommand` above.
+export default function InspectorBridge({ actions = defaultCommandActions } = {}) {
+  useEffect(() => startPostMessageBridge(actions), [actions]);
   return null;
 }

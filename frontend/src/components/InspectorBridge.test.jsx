@@ -9,6 +9,8 @@ import {
   isValidUrl,
   handleCommand,
   defaultCommandActions,
+  startPostMessageBridge,
+  BRIDGE_COMMAND_SOURCE,
 } from './InspectorBridge.jsx';
 
 describe('isValidSelector', () => {
@@ -104,5 +106,77 @@ describe('handleCommand', () => {
     expect(clickSpy).toHaveBeenCalled();
 
     document.body.removeChild(el);
+  });
+});
+
+describe('startPostMessageBridge', () => {
+  // A minimal stand-in for a window: records listeners and lets us fire a
+  // synthetic "message" event without touching the real jsdom window.
+  function makeTarget() {
+    const listeners = {};
+    return {
+      addEventListener: (type, fn) => {
+        (listeners[type] ||= []).push(fn);
+      },
+      removeEventListener: (type, fn) => {
+        listeners[type] = (listeners[type] || []).filter((f) => f !== fn);
+      },
+      emit: (type, event) => (listeners[type] || []).forEach((f) => f(event)),
+      count: (type) => (listeners[type] || []).length,
+    };
+  }
+
+  it('routes a tagged postMessage envelope through handleCommand', () => {
+    const target = makeTarget();
+    const click = vi.fn();
+    startPostMessageBridge({ click }, target);
+
+    target.emit('message', {
+      data: { source: BRIDGE_COMMAND_SOURCE, command: 'click', selector: '.go' },
+    });
+    expect(click).toHaveBeenCalledWith('.go');
+  });
+
+  it('ignores messages that are not tagged for the bridge', () => {
+    const target = makeTarget();
+    const click = vi.fn();
+    const navigate = vi.fn();
+    startPostMessageBridge({ click, navigate }, target);
+
+    target.emit('message', { data: { command: 'click', selector: '.go' } });
+    target.emit('message', { data: 'not-an-object' });
+    target.emit('message', { data: null });
+    expect(click).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('still validates commands received over postMessage', () => {
+    const target = makeTarget();
+    const navigate = vi.fn();
+    startPostMessageBridge({ navigate }, target);
+
+    // A javascript: URL must be rejected even when it arrives via postMessage.
+    target.emit('message', {
+      data: { source: BRIDGE_COMMAND_SOURCE, command: 'navigate', url: 'javascript:1' },
+    });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('unsubscribes the listener when the returned cleanup runs', () => {
+    const target = makeTarget();
+    const click = vi.fn();
+    const stop = startPostMessageBridge({ click }, target);
+    expect(target.count('message')).toBe(1);
+
+    stop();
+    expect(target.count('message')).toBe(0);
+    target.emit('message', {
+      data: { source: BRIDGE_COMMAND_SOURCE, command: 'click', selector: '.go' },
+    });
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op for a target without addEventListener', () => {
+    expect(() => startPostMessageBridge({}, {})()).not.toThrow();
   });
 });
