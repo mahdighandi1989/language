@@ -5,12 +5,12 @@ type: docs
 priority: low
 execution_priority: 4050
 status: pending
-external_status: done
+external_status: pending
 verification_status: needs_clarification
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.294582+00:00'
-updated_at: '2026-06-02T20:17:19.916547+00:00'
+updated_at: '2026-06-02T20:17:27.123940+00:00'
 target_files:
 - render.yaml
 ---
