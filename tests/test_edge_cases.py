@@ -7,8 +7,9 @@ up the main thread, and an untrusted ``javascript:`` URL can trigger script
 execution or an open redirect.
 
 The fix adds ``isValidSelector`` / ``isValidUrl`` guards and routes every
-AI-issued command through ``handleCommand`` in ``frontend/src/App.jsx`` so an
-invalid selector or URL is rejected instead of executed.
+AI-issued command through ``handleCommand``. After the frontend was split into
+modules these guards live in ``frontend/src/components/InspectorBridge.jsx`` so
+an invalid selector or URL is rejected instead of executed.
 
 These assertions read the frontend source (the project's test convention -- see
 ``test_anti_pattern_edge_case.py``) and confirm the guards exist and are wired
@@ -25,11 +26,12 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-APP_JSX = REPO_ROOT / "frontend" / "src" / "App.jsx"
+# The AI-command guards were extracted from src/App.jsx into a dedicated module.
+GUARD_SOURCE = REPO_ROOT / "frontend" / "src" / "components" / "InspectorBridge.jsx"
 
 
 def _app_source() -> str:
-    return APP_JSX.read_text(encoding="utf-8")
+    return GUARD_SOURCE.read_text(encoding="utf-8")
 
 
 def test_invalid_selector_or_url():
