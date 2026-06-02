@@ -13,12 +13,26 @@ pipeline stays coherent and regressions are caught:
 """
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_DIR = REPO_ROOT / "prompt"
 BACKEND_DIR = REPO_ROOT / "backend"
 SERVER_JS = BACKEND_DIR / "server.js"
+PIPELINE_PY = BACKEND_DIR / "app" / "ai_llm" / "pipeline.py"
+
+
+def _load_pipeline():
+    """Load the ground-truth pipeline module straight from its file path.
+
+    Importing by path avoids needing ``backend`` to be an importable package and
+    matches this suite's read-source-by-path convention.
+    """
+    spec = importlib.util.spec_from_file_location("ai_llm_pipeline", PIPELINE_PY)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _backend_source() -> str:
@@ -108,3 +122,55 @@ def test_pipeline_runs_successfully():
     assert backend.count("(err, req, res, next)") >= 2, (
         "expected both the CORS and the terminal error handlers"
     )
+
+
+def test_consistency_check_passes():
+    """The model/parser inconsistency is resolved: the Python ground-truth
+    contract agrees with the running Node backend.
+
+    This pins down the coherence-audit answer — the two previously-inconsistent
+    sides (the structured-spec expectation and the free-form Gemini
+    implementation) now describe the *same* pipeline, with the implementation
+    chosen as ground truth.
+    """
+    pipeline = _load_pipeline()
+    backend = _backend_source()
+    gt = pipeline.GROUND_TRUTH
+
+    # 1. Models declared as ground truth are the ones the backend actually calls.
+    assert gt["models"]["default"] in backend, "default model drifted from backend"
+    assert gt["models"]["tts"] in backend, "TTS model drifted from backend"
+    for model in pipeline.SUPPORTED_MODELS:
+        assert model.startswith("gemini-"), f"unexpected model id: {model}"
+
+    # 2. The validation guard named as ground truth exists in the backend.
+    assert gt["validation"]["guard"] in backend, "validation guard missing in backend"
+    assert gt["validation"]["sanitizer"] in backend, "sanitizer missing in backend"
+    assert gt["validation"]["on_invalid_status"] == 502
+
+    # 3. The output parser contract matches the JS extraction path and the
+    #    backend exposes that exact extraction.
+    assert gt["output_parser"]["structured"] is False
+    assert "candidates?.[0]?.content?.parts?.[0]?.text" in backend
+
+    # 4. The Python validation/parse behaves exactly like the JS guard: a
+    #    non-empty candidates array is valid; a malformed payload is rejected.
+    valid = {"candidates": [{"content": {"parts": [{"text": "مرحبا"}]}}]}
+    assert pipeline.is_valid_response(valid) is True
+    assert pipeline.extract_text(valid) == "مرحبا"
+    assert pipeline.parse_validated_output(valid) == "مرحبا"
+
+    for bad in (None, {}, {"candidates": []}, {"error": "boom"}, "not-an-object"):
+        assert pipeline.is_valid_response(bad) is False
+        try:
+            pipeline.parse_validated_output(bad)
+            raised = False
+        except pipeline.InvalidResponseError:
+            raised = True
+        assert raised, f"expected InvalidResponseError for {bad!r}"
+
+    # 5. Hallucination guards are documented and align with the prompt-level
+    #    ground truth (Lebanese correction ruleset lives in prompts.js).
+    assert "lebanese_correction_ruleset" in pipeline.HALLUCINATION_GUARDS
+    prompts_js = (BACKEND_DIR / "services" / "prompts.js").read_text(encoding="utf-8")
+    assert "LEBANESE_CORRECTION_PROMPT" in prompts_js

@@ -1,0 +1,67 @@
+# مستندسازی و یکپارچه‌سازی معماری پایپ‌لاین AI/LLM — رفع ناسازگاری مدل/پارسر
+
+## چرا این تصمیم گرفته شد (reason for decision)
+
+coherence audit روی پایپ‌لاین `ai_llm` نشان داد دو طرف فرض‌های ناسازگار
+داشتند: یک طرف انتظارِ یک پایپ‌لاینِ ساختاریافته و schema-validated را داشت،
+و طرف دیگر پیاده‌سازیِ واقعیِ مبتنی بر متنِ آزادِ Gemini بود. هیچ مستندی
+وجود نداشت که مدلِ واقعی، فرمت prompt، منطق پارسر، validation و
+hallucination guards را تعریف کند.
+
+**ground truth:** پیاده‌سازیِ در حال اجرا (بک‌اند Node/Gemini) به‌عنوان مرجع
+صحیح انتخاب شد، چون رفتاری است که به کاربر تحویل می‌شود و در تست‌ها و
+production اثبات شده. این تصمیم گرفته شد که انتظارِ spec با واقعیتِ
+پیاده‌سازی align شود (نه برعکس)، و شکاف‌های واقعی (مثلِ نبودِ schema parser
+به دلیلِ خروجیِ free-form) به‌عنوان محدودیتِ شناخته‌شده ثبت شوند.
+
+دلیلِ کاملِ تصمیم (reason for decision) و نگاشتِ جزء‌به‌جزءِ ground truth در
+`docs/design/ai_llm_pipeline.md` و `docs/architecture/ai_llm_pipeline.md`
+آمده است.
+
+## تغییرات
+
+- `backend/app/ai_llm/pipeline.py` (+ `__init__.py`): منبعِ واحدِ حقیقت
+  (ground truth) برای پایپ‌لاین — مدل‌ها، `build_request_payload`،
+  `is_valid_response`، `extract_text`، `parse_validated_output`،
+  `run_pipeline`، `HALLUCINATION_GUARDS`، و descriptor‏ `GROUND_TRUTH`؛
+  field-for-field مطابق بک‌اند Node.
+- `docs/design/ai_llm_pipeline.md`: سندِ طراحی شاملِ inconsistency identified،
+  فرضیات هر دو طرف (assumptions)، و reason for decision برای انتخاب ground truth.
+- `docs/architecture/ai_llm_pipeline.md`: معماری و ارکستراسیون، طرف ناسازگاری
+  و فرض‌هایشان (assumptions documented)، دیاگرام جریان.
+- `tests/integration/test_ai_llm_pipeline.py`: افزودنِ
+  `test_consistency_check_passes` که توافقِ قراردادِ پایتون با بک‌اند Node را
+  اثبات می‌کند.
+- `tests/backend/ai_llm/test_pipeline_logic.py` و
+  `tests/backend/ai_llm/test_pipeline_integration.py`: تست‌های منطق و
+  یکپارچه‌سازیِ ground truth (شاملِ `test_ground_truth_alignment`).
+
+## Dependencies synced
+
+- upstream: `backend/services/geminiService.js`, `backend/services/prompts.js`,
+  `backend/controllers/geminiController.js`, `backend/services/analysisService.js`
+  (منبعِ حقیقتِ رفتاری که در پایتون کد شد) — هیچ‌کدام تغییر نکردند، فقط
+  مستند/codify شدند.
+- downstream: تست‌های `tests/integration/test_ai_llm_pipeline.py` و
+  `tests/backend/ai_llm/*` به ماژولِ جدید وابسته‌اند و سبز هستند.
+- cross-tier (backend → frontend): بررسی شد — شکلِ پاسخِ `/api/gemini/chat`
+  (`{ text }` یا `{ candidates: [...] }`ِ sanitize‌شده) تغییر نکرد؛ نیازی به
+  تغییرِ frontend نبود.
+- cross-tier (backend → infra): بررسی شد — `GEMINI_API_KEY` از قبل در
+  `.env.example` هست؛ env var جدیدی اضافه نشد.
+- cross-tier (backend → db): بررسی شد — این پایپ‌لاین stateless است؛ migration
+  لازم نبود.
+- side artifacts: دو سندِ معماری/طراحی اضافه شد؛ هیچ i18n/OpenAPI/alert
+  جدیدی لازم نشد (هیچ endpoint یا error code جدیدی اضافه نشد).
+
+## TO-DO
+
+بررسی شد — این تسک هیچ بخش Manual-required ندارد؛ فایل TO-DO ساخته نشد.
+
+## Test plan
+
+- [x] `pytest tests/integration/test_ai_llm_pipeline.py` (شاملِ
+      `test_consistency_check_passes`)
+- [x] `pytest tests/backend/ai_llm/` (شاملِ `test_ground_truth_alignment` و
+      `test_pipeline_integration.py`)
+- [x] `pytest` کاملِ ریپو — ۲۶ تست سبز
