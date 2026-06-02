@@ -5,6 +5,16 @@
   "total": 7,
   "tasks": [
     {
+      "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
+      "title": "پیاده‌سازی مدیریت خطا برای WebSocket و پیام‌ها",
+      "priority": "high",
+      "execution_priority": 2050,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
+      "external_attempts": 1
+    },
+    {
       "task_id": "task_068445d6ae13",
       "title": "حل ناسازگاری معماری پایپ‌لاین AI/LLM",
       "priority": "high",
@@ -22,16 +32,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-task_3b614e2e1960.md",
-      "external_attempts": 1
-    },
-    {
-      "task_id": "task_78af588c4541",
-      "title": "تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند",
-      "priority": "high",
-      "execution_priority": 2050,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_78af588c4541.md",
       "external_attempts": 1
     },
     {
