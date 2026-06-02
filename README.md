@@ -95,6 +95,36 @@ hand**; change `package.json` and let npm regenerate the lock file. Because it
 is large and machine-generated, JSON syntax forbids comments inside it, so its
 purpose is documented here rather than in the file itself.
 
+## Dependency consistency as a measurable outcome
+
+Committing `package-lock.json` for both workspaces (`backend` and `frontend`) is
+only useful if the lock file actually stays consistent with the `package.json`
+manifests and is verified on every change. The **outcome target** of this
+project's dependency-management effort is therefore stated in measurable terms
+rather than as "keep dependencies tidy":
+
+- **Outcome target (measurable):** reduce dependency-inconsistency errors to
+  **zero** — every CI/CD run installs from the committed lock file with
+  `npm ci` (which fails if `package.json` and `package-lock.json` have drifted),
+  and a scheduled `npm audit` keeps the count of unaddressed **critical**
+  advisories in the shipped (production) dependency tree at zero (dev-only
+  tooling is reported but not a release gate).
+- **Effectiveness metric (`outcome_rate`):** dependency consistency =
+  `consistent_checks / total_checks` over the dependency-consistency invariants
+  (lock file is valid JSON, every registry-resolved package carries an
+  `integrity` hash, and each workspace `package.json` is represented in the lock
+  file). The end-to-end test
+  `tests/test_dependency_consistency.py::test_e2e_outcome` computes this rate,
+  logs it (e.g. `outcome_rate (dependency consistency): 1.00`) so the metric is
+  observable in CI/production test logs, and fails if it drops below 100%. The
+  same `dependency_inconsistency` signal is emitted at runtime by
+  `backend/app/monitoring.py` and `frontend/src/utils/logger.js` so a regression
+  is greppable in production logs, not just in CI.
+- **Where it runs:** the `.github/workflows/ci.yml` pipeline performs the
+  `npm ci` dependency check and the `npm audit` vulnerability scan on every push
+  and pull request (and on a weekly schedule), turning "are our dependencies
+  consistent and safe?" into an objective, regression-guarded check.
+
 ## Testing
 
 The Python test suite (pytest) exercises the Node backend and the build:

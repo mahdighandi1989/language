@@ -272,7 +272,7 @@ Only add feedback for actual Arabic practice attempts, not for questions or Pers
 };
 
 // Helper function to get a prompt (checks customPrompts first, falls back to defaultPrompts)
-function getPrompt(customPrompts, key) {
+export function getPrompt(customPrompts, key) {
   return customPrompts?.[key] || defaultPrompts[key] || '';
 }
 
@@ -3692,7 +3692,7 @@ ${lesson.archivedNotes}`;
     );
 }
 
-function MarkdownRenderer({ text }) {
+export function MarkdownRenderer({ text }) {
     const sections = text.split('---');
     return (
         <div className="prose max-w-none prose-p:my-2 prose-headings:my-3 prose-ul:my-2">
