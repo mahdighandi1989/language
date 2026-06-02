@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 15,
+  "total": 14,
   "tasks": [
     {
       "task_id": "1470edf2-a90f-43ec-b54a-255674ed6c86",
@@ -12,16 +12,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
-      "external_attempts": 0
-    },
-    {
-      "task_id": "31236cc5-eb3f-4b4e-be02-ee2362ecc8c4",
-      "title": "پیاده‌سازی File Analysis API بدون محدودیت در backend/server.js",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-31236cc5-eb3f-4b4e-be02-ee2362ecc8c4.md",
       "external_attempts": 0
     },
     {
