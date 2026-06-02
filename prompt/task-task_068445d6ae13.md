@@ -3,14 +3,14 @@ task_id: task_068445d6ae13
 title: حل ناسازگاری معماری پایپ‌لاین AI/LLM
 type: other
 priority: high
-execution_priority: 2350
-status: awaiting_review
-external_status: done
+execution_priority: 2050
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:30:57.201755+00:00'
-updated_at: '2026-06-02T20:03:41.114337+00:00'
+updated_at: '2026-06-02T20:03:49.348294+00:00'
 tags:
 - consolidated
 - post_verify_merge
