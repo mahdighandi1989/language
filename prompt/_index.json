@@ -25,16 +25,6 @@
       "external_attempts": 4
     },
     {
-      "task_id": "task_0193aa4e943f",
-      "title": "امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری",
-      "priority": "critical",
-      "execution_priority": 1250,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_0193aa4e943f.md",
-      "external_attempts": 5
-    },
-    {
       "task_id": "task_f55414420332",
       "title": "استانداردسازی و رفع ابهام پرامپت‌های AI/LLM",
       "priority": "critical",
@@ -102,6 +92,16 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
+      "external_attempts": 3
+    },
+    {
+      "task_id": "task_3b614e2e1960",
+      "title": "اعتبارسنجی پاسخ AI و رفع anti-pattern",
+      "priority": "high",
+      "execution_priority": 2150,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_3b614e2e1960.md",
       "external_attempts": 3
     },
     {
