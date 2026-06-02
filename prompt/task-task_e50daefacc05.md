@@ -3,14 +3,14 @@ task_id: task_e50daefacc05
 title: حذف Inspector Bridge از بیلد فرانت‌اند
 type: other
 priority: critical
-execution_priority: 1200
+execution_priority: 1250
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-02T21:55:45.210147+00:00'
+updated_at: '2026-06-02T23:44:53.277593+00:00'
 tags:
 - consolidated
 - post_verify_merge
