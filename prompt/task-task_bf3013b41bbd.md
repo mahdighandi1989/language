@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2450
-status: awaiting_review
-external_status: done
+execution_priority: 2150
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T22:27:00.817971+00:00'
+updated_at: '2026-06-02T22:27:09.513070+00:00'
 tags:
 - consolidated
 - post_verify_merge
