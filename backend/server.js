@@ -1,3 +1,14 @@
+/**
+ * Purpose: HTTP + WebSocket entry point for the Lebanese-dialect backend. It
+ * wires Express security middleware, rate limiting, the /api router and the
+ * Gemini Live API WebSocket proxy, and serves the built frontend SPA.
+ *
+ * Upstream (inputs): environment variables validated by ./config/env.js
+ * (GEMINI_API_KEY, PORT, CORS_ORIGIN, FIREBASE_*); the compiled frontend in
+ * ../frontend/dist; the Google Gemini API (REST + Live API).
+ * Downstream (outputs): serves the SPA and the JSON /api/* endpoints consumed
+ * by frontend/src/App.jsx, plus the /ws/live socket for real-time voice.
+ */
 import express from 'express';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';

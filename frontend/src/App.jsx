@@ -1,4 +1,13 @@
-
+// Purpose: root React component for the Lebanese-dialect learning app. It owns
+// the top-level UI (lessons, chat, live voice call, settings) and the client
+// state, wiring Firebase auth/Firestore (with a localStorage fallback) to the
+// AI features exposed by the backend.
+//
+// Upstream (what this file depends on): VITE_* env vars via
+// src/firebaseConfig.js, mounted by src/main.jsx, and the backend REST/WebSocket
+// API (/api/* and /ws/live, proxied by Vite in dev — see vite.config.js).
+// Downstream (what depends on this file): src/main.jsx renders <App/>; this is
+// the SPA entry component served from frontend/index.html.
 import React, { useState, useEffect, useRef, useMemo, createContext, useContext, useCallback } from 'react';
 import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle, Square } from 'lucide-react';
 

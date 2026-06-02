@@ -1,4 +1,13 @@
 <!DOCTYPE html>
+<!--
+  Purpose: HTML entry document (Vite app shell) for the Lebanese-dialect
+  learning SPA. It defines the RTL Persian page chrome, injects the Firebase
+  config from VITE_* env vars at build time, and mounts the React app.
+
+  Upstream (inputs): VITE_* environment variables via /src/firebaseConfig.js.
+  Downstream (outputs): loads /src/main.jsx, which renders <App/> from
+  src/App.jsx into #root. Vite transforms this file into frontend/dist/index.html.
+-->
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="UTF-8" />
