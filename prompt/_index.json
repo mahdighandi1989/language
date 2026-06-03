@@ -2,8 +2,18 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 9,
+  "total": 12,
   "tasks": [
+    {
+      "task_id": "task_2c28ca0737f1",
+      "title": "بازسازی ساختار بک‌اند",
+      "priority": "critical",
+      "execution_priority": 1500,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_2c28ca0737f1.md",
+      "external_attempts": 42
+    },
     {
       "task_id": "task_35786c187ea9",
       "title": "پیاده‌سازی API تحلیل فایل و رفع مشکلات پایداری وابستگی‌های بک‌اند",
@@ -25,6 +35,16 @@
       "external_attempts": 0
     },
     {
+      "task_id": "task_068445d6ae13",
+      "title": "حل ناسازگاری معماری پایپ‌لاین AI/LLM",
+      "priority": "high",
+      "execution_priority": 2150,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_068445d6ae13.md",
+      "external_attempts": 3
+    },
+    {
       "task_id": "task_3b614e2e1960",
       "title": "اعتبارسنجی پاسخ AI و رفع anti-pattern",
       "priority": "high",
@@ -42,6 +62,16 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-task_9172abbf97f5.md",
+      "external_attempts": 3
+    },
+    {
+      "task_id": "task_ce963d814d52",
+      "title": "پیاده‌سازی نوتیفیکیشن 'verify_failed' و اندازه‌گیری هدف",
+      "priority": "high",
+      "execution_priority": 2150,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_ce963d814d52.md",
       "external_attempts": 3
     },
     {
