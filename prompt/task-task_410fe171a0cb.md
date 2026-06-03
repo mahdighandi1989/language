@@ -3,14 +3,14 @@ task_id: task_410fe171a0cb
 title: پیکربندی Inspector Bridge و پیاده‌سازی ردیابی خطا
 type: other
 priority: critical
-execution_priority: 1400
-status: pending
+execution_priority: 1700
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:22:56.705850+00:00'
-updated_at: '2026-06-03T00:59:07.362362+00:00'
+updated_at: '2026-06-03T01:03:47.963186+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1707,7 +1707,7 @@ backend/.env.example (سطر 1) — Should document the expected environment var
 ```
 
 ### Step 4: Rewrite outcome target as measurable for error coverage
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on rewriting the outcome target for error coverage in Inspector Bridge to be measurable (e.g., '100% of runtime errors are tracked and reported to parent iframe'). The target should be documented in README.md or docs/. This step does NOT modify any code or add tests.
 **Excerpt:**
 ```
@@ -1755,7 +1755,7 @@ metric/log اضافه شد تا در production outcome rate قابل تشخیص
 ```
 
 ### Step 10: Update parent iframe to receive and process error events
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on updating the parent iframe (the page that embeds the Inspector Bridge) to receive and process error events sent via postMessage. The parent iframe should handle error events and potentially display or log them. This step does NOT modify the frontend application code or add tests.
 **Excerpt:**
 ```
@@ -1837,7 +1837,7 @@ linter بدون warning عبور می‌کند [verify_method=static] [verify_pl
 ```
 
 ### Step 20: Ensure type-check passes successfully
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on ensuring type-check passes successfully after all changes. Run the type checker (e.g., tsc --noEmit for TypeScript or mypy for Python) and fix any type errors. This step does NOT modify application logic or add tests.
 **Excerpt:**
 ```
