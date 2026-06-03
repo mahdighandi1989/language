@@ -43,7 +43,9 @@ validateEnv();
 // ENCRYPTION_KEY fails fast instead of surfacing as opaque upstream errors.
 const decryptedGeminiKey = decrypt(process.env.GEMINI_API_KEY);
 if (decryptedGeminiKey !== GEMINI_API_KEY) {
-  console.error('FATAL: GEMINI_API_KEY decryption mismatch');
+  // Note: this log line never includes the secret value itself — only a generic
+  // mismatch notice — so no key material is leaked to stdout/stderr.
+  console.error('FATAL: Gemini API key decryption mismatch — check ENCRYPTION_KEY');
   process.exit(1);
 }
 
