@@ -16,6 +16,8 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { WebSocketServer } from 'ws';
+import helmet from 'helmet';
+import cors from 'cors';
 
 import { PORT, GEMINI_API_KEY } from './config/env.js';
 import { runStartupChecks, firebaseConfig } from './config/bootstrap.js';
@@ -47,8 +49,44 @@ const wss = new WebSocketServer({ server, path: '/ws/live' });
 // services/liveWsObserver.js). Separate from the message proxy below.
 attachLiveWsObserver(wss);
 
-// Security middleware (helmet headers + strict CORS allow-list) before any
-// route; implementation in middleware/security.js.
+// Security middleware. helmet() and the strict CORS allow-list are wired here,
+// at the entry point, so the security contract is visible in server.js; the
+// relaxed Content-Security-Policy and the CORS-rejection -> 403 translator live
+// in middleware/security.js (applySecurity, called below).
+//
+// 1. helmet() MUST be the first middleware after the app is created and before
+//    CORS, so every response carries the security headers (X-Content-Type-Options:
+//    nosniff, X-Frame-Options: SAMEORIGIN, Strict-Transport-Security, ...).
+app.use(helmet());
+
+// 2. Strict CORS allow-list (no wildcard). Production origins come from
+//    CORS_ORIGIN / FRONTEND_URL (comma-separated); the Vite dev server origin
+//    (http://localhost:5173) is always permitted. Disallowed origins are
+//    rejected and translated to a 403 by the handler in middleware/security.js.
+const DEV_ORIGIN = 'http://localhost:5173';
+const allowedOrigins = Array.from(
+  new Set(
+    `${process.env.CORS_ORIGIN || ''},${process.env.FRONTEND_URL || ''},${DEV_ORIGIN}`
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean)
+  )
+);
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow same-origin / non-browser requests (no Origin header).
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+
+// CSP override + CORS-rejection -> 403 JSON translator (middleware/security.js).
 applySecurity(app);
 
 app.use(express.json({ limit: '10mb' }));

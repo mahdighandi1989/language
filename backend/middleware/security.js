@@ -1,15 +1,15 @@
-import helmet from 'helmet';
-import cors from 'cors';
-
-// Applies the baseline security middleware to the app: security HTTP headers
-// (helmet), a relaxed Content-Security-Policy that still lets the SPA reach the
-// Gemini and Firebase APIs, and a strict CORS allow-list. Must run before the
-// route handlers.
+// Security middleware helpers. The baseline protections — helmet() (security
+// HTTP headers) and the strict, no-wildcard CORS allow-list — are wired at the
+// entry point in server.js so the security contract is visible there. This
+// module supplies the two pieces that stay decoupled from that wiring:
+//   1. A relaxed Content-Security-Policy that still lets the SPA reach the
+//      Gemini and Firebase APIs while keeping helmet's other protections.
+//   2. The CORS-rejection -> 403 JSON translator that turns the
+//      'Not allowed by CORS' error (thrown by the cors() origin callback in
+//      server.js) into a uniform JSON response.
+// applySecurity(app) must run after app.use(cors(...)) so the translator sits
+// downstream of the CORS middleware.
 export function applySecurity(app) {
-  // Security HTTP headers (X-Content-Type-Options, X-Frame-Options,
-  // Strict-Transport-Security, etc.). Must be the first middleware.
-  app.use(helmet());
-
   // Relax the Content-Security-Policy so the SPA can still reach the Gemini and
   // Firebase APIs while keeping the rest of helmet's protections.
   app.use((req, res, next) => {
@@ -26,33 +26,6 @@ export function applySecurity(app) {
     );
     next();
   });
-
-  // CORS: allow only explicitly configured origins (no wildcard). Production
-  // origins come from CORS_ORIGIN / FRONTEND_URL (comma-separated); the Vite dev
-  // server origin is always permitted.
-  const DEV_ORIGIN = 'http://localhost:5173';
-  const allowedOrigins = Array.from(
-    new Set(
-      `${process.env.CORS_ORIGIN || ''},${process.env.FRONTEND_URL || ''},${DEV_ORIGIN}`
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-    )
-  );
-
-  const corsOptions = {
-    origin: (origin, callback) => {
-      // Allow same-origin / non-browser requests (no Origin header).
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 204,
-  };
-  app.use(cors(corsOptions));
 
   // Translate CORS rejections into a 403 JSON response.
   app.use((err, req, res, next) => {

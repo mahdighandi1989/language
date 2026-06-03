@@ -87,6 +87,16 @@ npm run build
 - Deployment defaults live in `render.yaml`; secrets there are marked
   `sync: false` and must be set in the hosting dashboard.
 
+## Security
+
+Environment validation (fail-fast on invalid `GEMINI_API_KEY`/`PORT`),
+AES-256-GCM encryption of the API key via `ENCRYPTION_KEY`, secret redaction in
+logs/responses, security headers (`helmet`), a strict no-wildcard CORS
+allow-list, rate limiting, and zod input validation are described in
+[`docs/security.md`](docs/security.md). That document also covers the one manual
+step: restricting the Firebase web API key to your allowed domain in the
+Firebase Console.
+
 ## Lock files
 
 `package-lock.json` (committed at the repository root) pins the exact resolved
