@@ -3,14 +3,14 @@ task_id: task_0193aa4e943f
 title: 'امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری'
 type: other
 priority: critical
-execution_priority: 1500
-status: pending
+execution_priority: 1800
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:17:50.430047+00:00'
-updated_at: '2026-06-03T09:16:05.536040+00:00'
+updated_at: '2026-06-03T09:21:15.546954+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -6196,7 +6196,7 @@ app.use('/api/analyze-files', analysisLimiter);
 ```
 
 ### Step 46: پیاده‌سازی input validation middleware برای تمام ورودی‌های کاربر
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نصب کتابخانه validation (express-validator) و ایجاد middleware اختصاصی برای اعتبارسنجی body، query parameters و URL parameters در تمام routeهای Express است. قوانین validation برای هر endpoint باید در فایل backend/validators/schemas.js تعریف شود. middleware باید قبل از handler اصلی اجرا شود. خارج از این مرحله: helmet، CORS، rate limiting، WebSocket، health check endpoint. نکته حیاتی: validation باید در سطح middleware انجام شود و خطاهای 400 با پیام مناسب برگرداند.
 **Excerpt:**
 ```
@@ -6490,7 +6490,7 @@ const requireGeminiKey = (req, res, next) => {
 ```
 
 ### Step 61: ریسک‌ها و موارد احتیاط پیش از merge: اجرای تست‌های موجود برای جلوگیری از رگرشن
-**Status:** `done` (100%)
+**Status:** `partial` (80%)
 **Scope:** این بخش صرفاً یک هشدار/یادآوری است و شامل هیچ کار اجرایی جدیدی نمی‌شود. محتوای آن صرفاً بیانگر نیاز به اجرای تست‌های موجود (که در جای دیگر تعریف شده‌اند) پیش از ادغام (merge) تغییرات است. هیچ مرحله‌ای برای انجام دادن وجود ندارد و این بخش به‌عنوان یک نکته احتیاطی (cautionary note) در نظر گرفته شده است.
 **Excerpt:**
 ```
