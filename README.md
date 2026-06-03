@@ -205,6 +205,19 @@ result (`{ "status": "ok", "result": { "processed": true, "outputFormat":
 `backend/controllers/audioController.js` + `backend/services/audioService.js`;
 covered by `tests/test_audio_processing.py`.
 
+## File upload
+
+`POST /api/upload` is a credential-free, generic file-intake endpoint. With a
+multipart `file` field it stores the upload to the shared temp directory and
+returns a stable handle — `{ "fileId": "<unique-name>", "message": "...",
+"filename": ..., "mimeType": ..., "sizeBytes": ... }`. With no body it still
+answers 200 with a freshly generated `fileId` and a readiness `message`, so it
+doubles as a dependency-only health signal that needs no Gemini key.
+Implementation: `backend/controllers/uploadController.js` (wired in
+`backend/routes/index.js`, reusing the `multer` disk storage from
+`backend/middleware/upload.js`); covered by
+`tests/test_refactor.py::test_upload_endpoint_returns_file_handle`.
+
 ## Two-way Telegram bot (optional)
 
 The backend ships an optional two-way Telegram bot that adds: **notifications**

@@ -16,6 +16,7 @@ import {
 import { analyzeFiles } from '../controllers/analysisController.js';
 import { ingestAnalytics, getAnalytics } from '../controllers/analyticsController.js';
 import { processAudio } from '../controllers/audioController.js';
+import { uploadFile } from '../controllers/uploadController.js';
 
 // Aggregates every /api route. Mounted at the app root so the absolute paths
 // below match the original API contract exactly.
@@ -43,6 +44,18 @@ apiRouter.post(
   optionalAuth,
   requireGeminiKey,
   analyzeFiles
+);
+
+// Generic file intake: credential-free upload endpoint. Accepts a single
+// multipart `file`, stores it via the shared multer disk storage and returns a
+// stable { fileId, message } handle. With no file it still answers 200 with a
+// generated handle, so it doubles as a dependency-only readiness signal.
+apiRouter.post(
+  '/api/upload',
+  upload.single('file'),
+  handleMulterError,
+  optionalAuth,
+  uploadFile
 );
 
 // Audio processing: credential-free ffmpeg-backed endpoint. With no body it

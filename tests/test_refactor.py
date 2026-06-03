@@ -2,17 +2,21 @@
 
 ``backend/server.js`` was split from a single ~1400-line file into
 config/middleware/routes/controllers/services/models/utils modules. These
-tests confirm two things the static grep checks cannot:
+tests confirm three things the static grep checks cannot:
 
 * ``test_endpoints_work`` boots the real server and issues an HTTP request to
   ``/api/health`` so we know the reassembled route → controller → service wiring
   actually serves requests (i.e. "every previous endpoint still works").
+* ``test_upload_endpoint_returns_file_handle`` boots the server and POSTs to
+  ``/api/upload`` (no credential, no body), asserting the credential-free intake
+  endpoint answers 200 with the stable ``{ fileId, message }`` contract.
 * ``test_layered_structure`` asserts the entry point is now a slim wiring file
   and that the expected layer directories exist and are populated.
 """
 from __future__ import annotations
 
 import http.client
+import json
 import os
 import shutil
 import socket
@@ -41,6 +45,33 @@ def _free_port() -> int:
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def _start_server(port: int) -> subprocess.Popen:
+    """Boot backend/server.js on ``port`` with a valid dummy configuration."""
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "GEMINI_API_KEY": DUMMY_GEMINI_KEY,
+        "PORT": str(port),
+        "NODE_ENV": "test",
+    }
+    return subprocess.Popen(
+        ["node", "server.js"],
+        cwd=BACKEND_DIR,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+
+def _stop_server(proc: subprocess.Popen) -> None:
+    proc.terminate()
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=10)
 
 
 @pytest.mark.skipif(not _node_available(), reason="node is not installed")
@@ -90,12 +121,50 @@ def test_endpoints_work():
             f"/api/health returned an unexpected body: {body!r}"
         )
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=10)
+        _stop_server(proc)
+
+
+@pytest.mark.skipif(not _node_available(), reason="node is not installed")
+def test_upload_endpoint_returns_file_handle():
+    """POST /api/upload answers 200 with the { fileId, message } contract.
+
+    The credential-free intake endpoint must respond even with no body (no
+    multipart file, no Gemini key), returning a JSON object that carries both a
+    ``fileId`` handle and a human-readable ``message`` — the api_response
+    acceptance criterion for the layered backend.
+    """
+    port = _free_port()
+    proc = _start_server(port)
+    try:
+        status = None
+        body = ""
+        last_err = None
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                break
+            try:
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
+                conn.request("POST", "/api/upload")
+                resp = conn.getresponse()
+                status = resp.status
+                body = resp.read().decode("utf-8", "replace")
+                conn.close()
+                break
+            except (ConnectionRefusedError, OSError) as exc:
+                last_err = exc
+                time.sleep(0.4)
+
+        assert status == 200, (
+            "POST /api/upload did not return 200 "
+            f"(status={status}, last connection error={last_err}, "
+            f"process exited={proc.poll()})."
+        )
+        payload = json.loads(body)
+        assert payload.get("fileId"), f"/api/upload response missing fileId: {body!r}"
+        assert payload.get("message"), f"/api/upload response missing message: {body!r}"
+    finally:
+        _stop_server(proc)
 
 
 def test_layered_structure():
