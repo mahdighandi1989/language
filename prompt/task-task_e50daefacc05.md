@@ -10,7 +10,7 @@ verification_status: applied_externally_pending_verify
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-03T06:07:07.348779+00:00'
+updated_at: '2026-06-03T07:07:08.830455+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1730,7 +1730,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 8: بررسی وابستگی‌های cross-tier برای تسک 1 (حذف Inspector Bridge)
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل شناسایی و مستندسازی وابستگی‌های cross-tier برای تسک حذف Inspector Bridge است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی upstream/downstream. نکته حیاتی: باید تأثیر تغییر frontend بر backend، database، workers، auth، CORS، CSP و سایر tierها بررسی شود.
 **Excerpt:**
 ```

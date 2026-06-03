@@ -43,16 +43,17 @@ hard-code نمی‌شود و فقط از `process.env.ENCRYPTION_KEY` خواند
 
 - **هدرهای امنیتی:** پشتهٔ امنیتی پایه مستقیماً در `backend/server.js` به
   عنوان نخستین middlewareها (قبل از body parser و routeها) wire شده تا کل
-  posture امنیتی در همان entry point قابل ممیزی باشد؛ همین پشته به‌صورت
-  تابع قابل‌استفادهٔ مجدد `applySecurity(app)` در
-  `backend/middleware/security.js` نیز نگهداری می‌شود (آینهٔ همان wiring،
-  برای استفادهٔ مجدد/تست). در هر دو، `helmet()` نخستین middleware است و
-  هدرهایی مانند `X-Content-Type-Options: nosniff`،
-  `X-Frame-Options: SAMEORIGIN` و `Strict-Transport-Security` را تنظیم
-  می‌کند. یک `Content-Security-Policy` نرم‌شده اجازه‌ی اتصال SPA به APIهای
-  Gemini و Firebase را می‌دهد. مترجم خطای CORS→`403` پیش از
-  `mountFallbacks()` (terminal error handler) ثبت می‌شود تا خطاهای
-  forward شده همیشه downstream گرفته شوند.
+  posture امنیتی در همان entry point قابل ممیزی باشد: `helmet()` نخستین
+  middleware است و سپس فهرست مجاز سخت‌گیرانهٔ CORS. دو نگرانیِ
+  error-handling-shaped باقیمانده — یک `Content-Security-Policy` نرم‌شده و
+  مترجم خطای CORS→`403` — در تابع `applySecurity(app)` در
+  `backend/middleware/security.js` نگهداری می‌شوند و بلافاصله پس از لایهٔ
+  CORS در `server.js` ثبت می‌گردند. `helmet()` هدرهایی مانند
+  `X-Content-Type-Options: nosniff`، `X-Frame-Options: SAMEORIGIN` و
+  `Strict-Transport-Security` را تنظیم می‌کند؛ `Content-Security-Policy`
+  نرم‌شده اجازه‌ی اتصال SPA به APIهای Gemini و Firebase را می‌دهد. مترجم
+  خطای CORS→`403` پیش از `mountFallbacks()` (terminal error handler) ثبت
+  می‌شود تا خطاهای forward شده همیشه downstream گرفته شوند.
 - **CORS:** فهرست مجاز سخت‌گیرانه (بدون wildcard). originهای تولیدی از
   `CORS_ORIGIN`/`FRONTEND_URL` خوانده می‌شوند و `http://localhost:5173`
   برای توسعه همیشه مجاز است. متدهای مجاز

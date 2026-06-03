@@ -1,18 +1,16 @@
-// Security middleware helpers. The full baseline protection contract lives here
-// so it is documented in one place and server.js stays pure composition:
-//   1. helmet() — security HTTP headers (X-Content-Type-Options: nosniff,
-//      X-Frame-Options: SAMEORIGIN, Strict-Transport-Security, ...). Must be the
-//      first middleware so every response carries the headers.
-//   2. A strict, no-wildcard CORS allow-list. Production origins come from
-//      CORS_ORIGIN / FRONTEND_URL (comma-separated); the Vite dev server origin
-//      (http://localhost:5173) is always permitted. Same-origin / non-browser
-//      requests (no Origin header) are allowed; any other origin is rejected.
+// Security middleware helpers. server.js wires the first two layers of the
+// baseline protection stack directly (helmet() headers + the strict no-wildcard
+// CORS allow-list), so this module owns the two remaining, error-handling-shaped
+// concerns and keeps them documented in one place:
 //   3. A relaxed Content-Security-Policy that still lets the SPA reach the
 //      Gemini and Firebase APIs while keeping helmet's other protections.
 //   4. The CORS-rejection -> 403 JSON translator that turns the
-//      'Not allowed by CORS' error into a uniform JSON response.
-import helmet from 'helmet';
-import cors from 'cors';
+//      'Not allowed by CORS' error (thrown by the CORS layer in server.js) into
+//      a uniform JSON response.
+//
+// buildAllowedOrigins() is exported as the shared, single source of truth for
+// the CORS allow-list logic (CORS_ORIGIN / FRONTEND_URL + the always-permitted
+// Vite dev origin) so it can be reused/tested independently of server.js.
 
 const DEV_ORIGIN = 'http://localhost:5173';
 
@@ -30,42 +28,11 @@ export function buildAllowedOrigins() {
   );
 }
 
-// applySecurity(app) wires the complete baseline security stack. helmet() and
-// cors() are added first; the CSP override and the CORS-rejection -> 403
-// translator are added after cors() so the translator sits downstream of it.
+// applySecurity(app) completes the baseline security stack started in server.js
+// (helmet() + the strict no-wildcard CORS allow-list). It is registered right
+// after the CORS layer so its 403 translator sits downstream of it and catches
+// the 'Not allowed by CORS' error.
 export function applySecurity(app) {
-  // 1. helmet() first, before CORS, so every response carries security headers.
-  app.use(helmet());
-
-  // 2. Strict CORS allow-list (no wildcard). Disallowed origins are rejected and
-  //    translated to a 403 by the handler below. Same-origin requests (the
-  //    Origin host equals the request's own Host) are always permitted so the
-  //    deployed SPA can load its own Vite-emitted crossorigin <script>/<link>
-  //    assets and call its own /api on any host (e.g. *.onrender.com) without
-  //    that host having to appear in CORS_ORIGIN.
-  const allowedOrigins = buildAllowedOrigins();
-  const isOriginAllowed = (origin, host) => {
-    if (!origin) return true; // same-origin GET / non-browser / server-to-server
-    if (allowedOrigins.includes(origin)) return true;
-    try {
-      return Boolean(host) && new URL(origin).host === host;
-    } catch {
-      return false; // malformed Origin header
-    }
-  };
-  app.use(
-    cors((req, callback) => {
-      const allowed = isOriginAllowed(req.headers.origin, req.headers.host);
-      callback(allowed ? null : new Error('Not allowed by CORS'), {
-        origin: allowed,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
-        credentials: true,
-        optionsSuccessStatus: 204,
-      });
-    })
-  );
-
   // 3. Relax the Content-Security-Policy so the SPA can still reach the Gemini
   //    and Firebase APIs while keeping the rest of helmet's protections.
   app.use((req, res, next) => {
