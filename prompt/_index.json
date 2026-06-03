@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 10,
+  "total": 9,
   "tasks": [
     {
       "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
@@ -12,16 +12,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
-      "external_attempts": 3
-    },
-    {
-      "task_id": "1470edf2-a90f-43ec-b54a-255674ed6c86",
-      "title": "Resolve lockfile integrity mismatch anti-pattern",
-      "priority": "high",
-      "execution_priority": 2150,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-1470edf2-a90f-43ec-b54a-255674ed6c86.md",
       "external_attempts": 3
     },
     {
