@@ -3,14 +3,14 @@ task_id: a0dab50d-cbd0-42ef-bcc7-a23f8c846e5f
 title: افزودن تست‌های اعتبارسنجی render.yaml
 type: docs
 priority: low
-execution_priority: 4050
-status: pending
+execution_priority: 4350
+status: awaiting_review
 external_status: pending
-verification_status: needs_clarification
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-23T07:38:10.294582+00:00'
-updated_at: '2026-06-02T20:17:27.123940+00:00'
+updated_at: '2026-06-03T16:54:03.901414+00:00'
 target_files:
 - render.yaml
 ---
