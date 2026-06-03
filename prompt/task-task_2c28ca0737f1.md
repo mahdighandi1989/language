@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند
 type: other
 priority: critical
-execution_priority: 1800
-status: awaiting_review
-external_status: done
+execution_priority: 1500
+status: pending
+external_status: pending
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-03T12:11:30.137997+00:00'
+updated_at: '2026-06-03T12:11:40.077199+00:00'
 tags:
 - consolidated
 - post_verify_merge
