@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند
 type: other
 priority: critical
-execution_priority: 1300
-status: pending
+execution_priority: 1600
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-03T00:16:37.626658+00:00'
+updated_at: '2026-06-03T00:19:41.702355+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2412,7 +2412,7 @@ _(مستقل)_
 ```
 
 ### Step 8: انتقال توابع کمکی (splitIntoChunks) به فایل utils/
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی توابع کمکی مانند splitIntoChunks در backend/server.js و انتقال آن‌ها به فایل مجزا در پوشه backend/utils/ است. خارج از این مرحله: انتقال route handlers یا توابع سرویس. نکته حیاتی: توابع کمکی باید به صورت ماژولار و با export مناسب پیاده‌سازی شوند.
 **Excerpt:**
 ```
@@ -2420,7 +2420,7 @@ _(مستقل)_
 ```
 
 ### Step 9: تبدیل server.js به یک فایل راه‌انداز با کمتر از ۱۰۰ خط
-**Status:** `done` (100%)
+**Status:** `partial` (70%)
 **Scope:** این مرحله شامل بازنویسی backend/server.js به گونه‌ای است که فقط شامل importها، تنظیمات global (مانند middlewareهای عمومی) و mount کردن routeها باشد. خارج از این مرحله: تغییر منطق business یا endpointها. نکته حیاتی: فایل نهایی باید کمتر از ۱۰۰ خط باشد.
 **Excerpt:**
 ```
@@ -2428,7 +2428,7 @@ _(مستقل)_
 ```
 
 ### Step 10: تأیید عملکرد برنامه پس از refactor با تست endpoint /api/upload
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل اجرای برنامه backend و ارسال یک درخواست POST به endpoint /api/upload برای اطمینان از کارکرد صحیح آن است. خارج از این مرحله: تست تمام endpointها. نکته حیاتی: پاسخ باید شامل فیلدهای fileId و message با status 200 باشد.
 **Excerpt:**
 ```
