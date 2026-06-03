@@ -2,8 +2,18 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 16,
+  "total": 17,
   "tasks": [
+    {
+      "task_id": "task_0193aa4e943f",
+      "title": "امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری",
+      "priority": "critical",
+      "execution_priority": 1500,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_0193aa4e943f.md",
+      "external_attempts": 13
+    },
     {
       "task_id": "task_2c28ca0737f1",
       "title": "بازسازی ساختار بک‌اند",
