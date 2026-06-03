@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 9,
+  "total": 8,
   "tasks": [
-    {
-      "task_id": "08014f43-476a-409a-bfbe-8d611e64d160",
-      "title": "پیاده‌سازی اتصال مجدد WebSocket با بک‌آف نمایی",
-      "priority": "high",
-      "execution_priority": 2150,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-08014f43-476a-409a-bfbe-8d611e64d160.md",
-      "external_attempts": 3
-    },
     {
       "task_id": "task_3b614e2e1960",
       "title": "اعتبارسنجی پاسخ AI و رفع anti-pattern",
