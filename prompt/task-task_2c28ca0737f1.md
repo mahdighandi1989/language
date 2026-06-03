@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند
 type: other
 priority: critical
-execution_priority: 1350
-status: pending
+execution_priority: 1650
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-03T00:42:21.669859+00:00'
+updated_at: '2026-06-03T00:45:02.138041+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2356,7 +2356,7 @@ _(مستقل)_
 ## Task Steps
 
 ### Step 1: اضافه کردن وابستگی‌های گمشده به backend/package.json
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اضافه کردن وابستگی‌های multer, fluent-ffmpeg, ffmpeg-static, pdf-parse به بخش dependencies در فایل backend/package.json است. خارج از این مرحله: نصب وابستگی‌ها (npm install) در مرحله بعد انجام می‌شود. نکته حیاتی: نسخه‌های دقیق مشخص شده در نمونه قبل/بعد باید استفاده شوند.
 **Excerpt:**
 ```
@@ -2364,7 +2364,7 @@ _(مستقل)_
 ```
 
 ### Step 2: اجرای npm install در backend و بررسی عدم وجود خطا
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای دستور npm install در پوشه backend و اطمینان از اتمام آن بدون خطا است. خارج از این مرحله: اجرای سرور یا تست‌های دیگر. نکته حیاتی: این مرحله باید بعد از به‌روزرسانی package.json انجام شود.
 **Excerpt:**
 ```
@@ -2372,7 +2372,7 @@ _(مستقل)_
 ```
 
 ### Step 3: اجرای node backend/server و بررسی عدم وجود خطای MODULE_NOT_FOUND
-**Status:** `done` (100%)
+**Status:** `partial` (70%)
 **Scope:** این مرحله شامل اجرای دستور node backend/server.js و اطمینان از عدم بروز خطای MODULE_NOT_FOUND است. خارج از این مرحله: تست endpointها یا عملکرد کامل سرور. نکته حیاتی: این مرحله باید بعد از نصب وابستگی‌ها انجام شود.
 **Excerpt:**
 ```
@@ -2420,7 +2420,7 @@ _(مستقل)_
 ```
 
 ### Step 9: تبدیل server.js به یک فایل راه‌انداز با کمتر از ۱۰۰ خط
-**Status:** `partial` (70%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بازنویسی backend/server.js به گونه‌ای است که فقط شامل importها، تنظیمات global (مانند middlewareهای عمومی) و mount کردن routeها باشد. خارج از این مرحله: تغییر منطق business یا endpointها. نکته حیاتی: فایل نهایی باید کمتر از ۱۰۰ خط باشد.
 **Excerpt:**
 ```
@@ -2428,7 +2428,7 @@ _(مستقل)_
 ```
 
 ### Step 10: تأیید عملکرد برنامه پس از refactor با تست endpoint /api/upload
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای برنامه backend و ارسال یک درخواست POST به endpoint /api/upload برای اطمینان از کارکرد صحیح آن است. خارج از این مرحله: تست تمام endpointها. نکته حیاتی: پاسخ باید شامل فیلدهای fileId و message با status 200 باشد.
 **Excerpt:**
 ```
