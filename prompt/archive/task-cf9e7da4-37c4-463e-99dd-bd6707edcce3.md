@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:39:58.690012+00:00'
-updated_at: '2026-06-02T17:50:13.816179+00:00'
+updated_at: '2026-06-03T17:22:32.217272+00:00'
 archived: true
 archived_at: '2026-06-01T19:18:13.348592+00:00'
 tags:
@@ -76,7 +76,7 @@ _(file:line — symbol — snippet)_
 - `frontend/index.html:11-18` — `__firebase_config` — Firebase credentials در HTML عمومی
   ```
   var __firebase_config = JSON.stringify({
-    apiKey: "AIzaSy***REDACTED***",
+    apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
     authDomain: "labaneseapp.firebaseapp.com",
     projectId: "labaneseapp",
     storageBucket: "labaneseapp.firebasestorage.app",
@@ -143,7 +143,7 @@ const firebaseConfig = {
 تغییر کد در فایل‌های مرتبط، commit یا PR جدید با پیام واضح، و عبور تمام معیارهای پذیرش.
 
 ## 🧪 دستورات اعتبارسنجی
-- `grep -r 'AIzaSy***REDACTED***' frontend/`
+- `grep -r 'AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q' frontend/`
 - `grep -r 'VITE_FIREBASE' frontend/src/`
 
 ## ⚠️ ریسک‌ها و موارد احتیاط
