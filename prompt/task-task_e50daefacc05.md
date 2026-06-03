@@ -3,14 +3,14 @@ task_id: task_e50daefacc05
 title: حذف Inspector Bridge از بیلد فرانت‌اند
 type: other
 priority: critical
-execution_priority: 1500
-status: pending
+execution_priority: 1800
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-03T06:50:03.966422+00:00'
+updated_at: '2026-06-03T06:55:22.319855+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1738,7 +1738,7 @@ build پروژه بدون خطا انجام شود [verify_method=backend_test] 
 ```
 
 ### Step 9: بررسی وابستگی‌های جانبی (artifacts) برای تسک 1 (حذف Inspector Bridge)
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل شناسایی و مستندسازی وابستگی‌های جانبی (مستندات، تست‌ها، type definitions، infra config، monitoring، security، caches) برای تسک حذف Inspector Bridge است. خارج از این مرحله: تغییر کد، اجرای تست، یا بررسی upstream/downstream/cross-tier. نکته حیاتی: همه artifact‌ها باید بررسی و به‌روز شوند.
 **Excerpt:**
 ```
