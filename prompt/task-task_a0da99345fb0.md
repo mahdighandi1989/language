@@ -3,14 +3,14 @@ task_id: task_a0da99345fb0
 title: رفع anti-pattern در سیستم ردیابی Inspector Bridge
 type: other
 priority: high
-execution_priority: 2000
+execution_priority: 2050
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-03T16:58:13.819081+00:00'
-updated_at: '2026-06-03T18:44:55.623463+00:00'
+updated_at: '2026-06-03T23:50:38.326166+00:00'
 tags:
 - consolidated
 - post_verify_merge
