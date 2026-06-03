@@ -3,14 +3,14 @@ task_id: task_410fe171a0cb
 title: پیکربندی Inspector Bridge و پیاده‌سازی ردیابی خطا
 type: other
 priority: critical
-execution_priority: 1450
-status: pending
+execution_priority: 1750
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:22:56.705850+00:00'
-updated_at: '2026-06-03T01:39:44.504680+00:00'
+updated_at: '2026-06-03T01:44:50.131008+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -1861,7 +1861,7 @@ linter بدون warning عبور می‌کند [verify_method=static] [verify_pl
 ```
 
 ### Step 23: Verify type-check passes successfully (Task 5)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** This step focuses on verifying type-check passes successfully after all changes. This is a verification step that should be performed after all changes are made. This step does NOT modify any code.
 — [merged] This step focuses on verifying type-check passes successfully after all changes. This is a duplicate verification step from Task 5. This step does NOT modify any code.
 **Excerpt:**
