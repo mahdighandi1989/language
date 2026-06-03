@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 18,
+  "total": 17,
   "tasks": [
     {
       "task_id": "task_0193aa4e943f",
@@ -22,16 +22,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-task_410fe171a0cb.md",
-      "external_attempts": 8
-    },
-    {
-      "task_id": "task_e50daefacc05",
-      "title": "حذف Inspector Bridge از بیلد فرانت‌اند",
-      "priority": "critical",
-      "execution_priority": 1400,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_e50daefacc05.md",
       "external_attempts": 8
     },
     {
