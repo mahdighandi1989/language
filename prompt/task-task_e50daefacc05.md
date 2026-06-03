@@ -5,12 +5,12 @@ type: other
 priority: critical
 execution_priority: 1500
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:16.378846+00:00'
-updated_at: '2026-06-03T05:35:25.243589+00:00'
+updated_at: '2026-06-03T05:38:11.550244+00:00'
 tags:
 - consolidated
 - post_verify_merge
