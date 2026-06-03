@@ -73,7 +73,8 @@ export function applySecurity(app) {
       'Content-Security-Policy',
       "default-src 'self'; " +
         "script-src 'self'; " +
-        "style-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' data: https://fonts.gstatic.com; " +
         "img-src 'self' data: blob:; " +
         "media-src 'self' data: blob:; " +
         "connect-src 'self' https://*.googleapis.com wss://*.googleapis.com " +
