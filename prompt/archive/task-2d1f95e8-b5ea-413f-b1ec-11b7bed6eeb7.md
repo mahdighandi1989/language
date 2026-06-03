@@ -25,6 +25,14 @@ target_files:
 - .github/workflows/codeql-analysis.yml
 - .github/dependabot.yml
 - frontend/vite.config.js
+pipeline: ai_llm
+purpose: Wire CI/CD and quality gates (lint, build, CodeQL, dependabot) around the ai_llm backend so AI/LLM changes ship safely.
+responsibility: Own the GitHub Actions workflows and quality-gate configuration that validate every change to the Gemini-backed services.
+expected_inputs: Pushed commits and pull requests that touch the backend or frontend sources.
+expected_outputs: Pass/fail CI signal, security-scan results, and automated dependency-update pull requests.
+interacts_with: backend/server.js, the frontend build, .github/workflows, and the other ai_llm pipeline prompts.
+upstream: task-8ac8249d (automated backend tests) supplies the test suites these quality gates execute.
+downstream: Pipeline terminal stage — the CI/CD signal is the final gate; no further ai_llm prompt depends on it.
 ---
 
 # پیاده‌سازی CI/CD و Quality Gates
