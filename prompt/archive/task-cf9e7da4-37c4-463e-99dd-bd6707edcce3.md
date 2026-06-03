@@ -76,7 +76,7 @@ _(file:line — symbol — snippet)_
 - `frontend/index.html:11-18` — `__firebase_config` — Firebase credentials در HTML عمومی
   ```
   var __firebase_config = JSON.stringify({
-    apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
+    apiKey: "AIzaSy***REDACTED***",
     authDomain: "labaneseapp.firebaseapp.com",
     projectId: "labaneseapp",
     storageBucket: "labaneseapp.firebasestorage.app",
@@ -143,7 +143,7 @@ const firebaseConfig = {
 تغییر کد در فایل‌های مرتبط، commit یا PR جدید با پیام واضح، و عبور تمام معیارهای پذیرش.
 
 ## 🧪 دستورات اعتبارسنجی
-- `grep -r 'AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q' frontend/`
+- `grep -r 'AIzaSy***REDACTED***' frontend/`
 - `grep -r 'VITE_FIREBASE' frontend/src/`
 
 ## ⚠️ ریسک‌ها و موارد احتیاط

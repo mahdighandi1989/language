@@ -38,21 +38,33 @@ export function applySecurity(app) {
   app.use(helmet());
 
   // 2. Strict CORS allow-list (no wildcard). Disallowed origins are rejected and
-  //    translated to a 403 by the handler below.
+  //    translated to a 403 by the handler below. Same-origin requests (the
+  //    Origin host equals the request's own Host) are always permitted so the
+  //    deployed SPA can load its own Vite-emitted crossorigin <script>/<link>
+  //    assets and call its own /api on any host (e.g. *.onrender.com) without
+  //    that host having to appear in CORS_ORIGIN.
   const allowedOrigins = buildAllowedOrigins();
-  const corsOptions = {
-    origin: (origin, callback) => {
-      // Allow same-origin / non-browser requests (no Origin header).
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 204,
+  const isOriginAllowed = (origin, host) => {
+    if (!origin) return true; // same-origin GET / non-browser / server-to-server
+    if (allowedOrigins.includes(origin)) return true;
+    try {
+      return Boolean(host) && new URL(origin).host === host;
+    } catch {
+      return false; // malformed Origin header
+    }
   };
-  app.use(cors(corsOptions));
+  app.use(
+    cors((req, callback) => {
+      const allowed = isOriginAllowed(req.headers.origin, req.headers.host);
+      callback(allowed ? null : new Error('Not allowed by CORS'), {
+        origin: allowed,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
+        optionsSuccessStatus: 204,
+      });
+    })
+  );
 
   // 3. Relax the Content-Security-Policy so the SPA can still reach the Gemini
   //    and Firebase APIs while keeping the rest of helmet's protections.
