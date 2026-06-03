@@ -3,14 +3,14 @@ task_id: task_2c28ca0737f1
 title: بازسازی ساختار بک‌اند
 type: other
 priority: critical
-execution_priority: 1500
-status: pending
+execution_priority: 1800
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:31:38.274542+00:00'
-updated_at: '2026-06-03T03:50:43.619245+00:00'
+updated_at: '2026-06-03T03:53:27.394447+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2372,7 +2372,7 @@ _(مستقل)_
 ```
 
 ### Step 3: اجرای node backend/server و بررسی عدم وجود خطای MODULE_NOT_FOUND
-**Status:** `partial` (70%)
+**Status:** `partial` (80%)
 **Scope:** این مرحله شامل اجرای دستور node backend/server.js و اطمینان از عدم بروز خطای MODULE_NOT_FOUND است. خارج از این مرحله: تست endpointها یا عملکرد کامل سرور. نکته حیاتی: این مرحله باید بعد از نصب وابستگی‌ها انجام شود.
 **Excerpt:**
 ```
@@ -2428,7 +2428,7 @@ _(مستقل)_
 ```
 
 ### Step 10: تأیید عملکرد برنامه پس از refactor با تست endpoint /api/upload
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای برنامه backend و ارسال یک درخواست POST به endpoint /api/upload برای اطمینان از کارکرد صحیح آن است. خارج از این مرحله: تست تمام endpointها. نکته حیاتی: پاسخ باید شامل فیلدهای fileId و message با status 200 باشد.
 **Excerpt:**
 ```
