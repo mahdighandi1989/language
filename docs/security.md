@@ -41,12 +41,15 @@ hard-code نمی‌شود و فقط از `process.env.ENCRYPTION_KEY` خواند
 
 ## ۴. هدرهای امنیتی، CORS و Rate limiting
 
-- **هدرهای امنیتی:** `app.use(helmet())` به‌عنوان اولین middleware در
-  `backend/server.js` (قبل از CORS) اعمال می‌شود و هدرهایی مانند
-  `X-Content-Type-Options: nosniff`، `X-Frame-Options: SAMEORIGIN` و
-  `Strict-Transport-Security` را تنظیم می‌کند. یک
-  `Content-Security-Policy` نرم‌شده در `backend/middleware/security.js`
-  اجازه‌ی اتصال SPA به APIهای Gemini و Firebase را می‌دهد.
+- **هدرهای امنیتی:** کل پشتهٔ امنیتی پایه در
+  `backend/middleware/security.js` (تابع `applySecurity(app)`) متمرکز است و
+  `backend/server.js` تنها آن را به‌عنوان اولین middleware (قبل از body
+  parser و routeها) فراخوانی می‌کند تا فایل entry فقط ترکیب‌کننده بماند و
+  زیر ۱۰۰ خط نگه‌داشته شود. در این تابع `helmet()` نخستین middleware است و
+  هدرهایی مانند `X-Content-Type-Options: nosniff`،
+  `X-Frame-Options: SAMEORIGIN` و `Strict-Transport-Security` را تنظیم
+  می‌کند. یک `Content-Security-Policy` نرم‌شده در همان فایل اجازه‌ی اتصال
+  SPA به APIهای Gemini و Firebase را می‌دهد.
 - **CORS:** فهرست مجاز سخت‌گیرانه (بدون wildcard). originهای تولیدی از
   `CORS_ORIGIN`/`FRONTEND_URL` خوانده می‌شوند و `http://localhost:5173`
   برای توسعه همیشه مجاز است. متدهای مجاز
