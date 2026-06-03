@@ -1,8 +1,21 @@
 /**
- * HTTP + WebSocket composition root for the Lebanese-dialect backend. Holds no
- * handler bodies — only global wiring (env validation, security stack, rate
- * limiting, /api router, Gemini Live WS proxy, Telegram, SPA). Domain logic
- * lives in ./controllers, ./services, ./routes, ./middleware, ./utils, ./config.
+ * Purpose: HTTP + WebSocket composition root for the Lebanese-dialect backend.
+ * Holds no handler bodies — only global wiring: environment validation, the
+ * security stack (helmet headers + strict no-wildcard CORS allow-list), rate
+ * limiting, the /api router, the Gemini Live WS proxy, Telegram, and the SPA
+ * fallback. Domain logic lives in the layered folders below.
+ *
+ * Upstream (what this file depends on): ./config (validateEnv, env.js PORT,
+ * bootstrap.js firebaseConfig), ./utils (decrypt, redactSensitiveData),
+ * ./middleware (applySecurity, generalLimiter), ./routes (apiRouter),
+ * ./controllers (mountFallbacks) and ./services (Live proxy + Telegram). It
+ * also reads process.env (GEMINI_API_KEY, ENCRYPTION_KEY, CORS_ORIGIN,
+ * FRONTEND_URL, PORT) after dotenv loads the .env file.
+ *
+ * Downstream (what depends on this file): it is the process entry point
+ * (package.json "start"/"dev" run `node server.js`); nothing imports it. It
+ * boots the Express app + HTTP/WS server that every API client and the built
+ * SPA in frontend/dist talk to.
  */
 import express from 'express';
 import { createServer } from 'http';
