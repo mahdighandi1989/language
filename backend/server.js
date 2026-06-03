@@ -2,8 +2,9 @@
  * Purpose: HTTP + WebSocket entry point for the Lebanese-dialect backend. This
  * file is pure composition — it registers no handler body of its own. It wires
  * only global configuration: env validation, the baseline security stack
- * (applySecurity: helmet + strict no-wildcard CORS + relaxed CSP + CORS->403
- * translator, implemented in middleware/security.js), per-IP rate limiting, the
+ * (helmet + strict no-wildcard CORS + relaxed CSP + CORS->403 translator, wired
+ * inline below and mirrored as applySecurity() in middleware/security.js for
+ * reuse/tests), per-IP rate limiting, the
  * /api router, the Gemini Live WebSocket proxy, the Telegram integration and the
  * built frontend SPA. Domain logic lives in ./controllers, ./services, ./routes,
  * ./middleware, ./utils and ./config.
@@ -20,6 +21,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import cors from 'cors';
 import { validateEnv } from './config/validateEnv.js';
 import { firebaseConfig } from './config/bootstrap.js';
 import { PORT } from './config/env.js';
@@ -31,7 +34,10 @@ import { PORT } from './config/env.js';
 //   import { … } from './middleware'    → security, rate-limit, auth, upload, validate
 //   import { … } from './utils'         → pure helpers (encryption, redact, chunking)
 import { decrypt, redactSensitiveData as sharedRedact } from './utils/index.js';
-import { applySecurity, generalLimiter } from './middleware/index.js';
+// applySecurity is the reusable mirror of the inline security stack below
+// (kept in middleware/security.js for reuse/tests); generalLimiter is the
+// per-IP /api/* rate limiter.
+import { generalLimiter } from './middleware/index.js';
 import { apiRouter } from './routes/index.js';
 import { mountFallbacks } from './controllers/index.js';
 import { attachLiveProxy, attachLiveWsObserver, attachTelegram } from './services/index.js';
@@ -58,9 +64,63 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/live' });
 attachLiveWsObserver(wss); // Live-socket lifecycle + metrics (proxy attached later).
 
-// Baseline security stack (helmet + strict CORS + CSP + CORS->403 translator).
-// Registered before mountFallbacks() so forwarded errors reach the terminal handler.
-applySecurity(app);
+// Baseline security stack, wired directly here as the first middlewares so the
+// whole security posture is auditable at the entry point (registered before
+// mountFallbacks() so forwarded errors reach the terminal handler). The same
+// stack is kept as the reusable applySecurity(app) helper in
+// middleware/security.js — a mirror of this wiring, for reuse/tests.
+//   1. helmet() first so every response carries the security headers
+//      (X-Content-Type-Options: nosniff, X-Frame-Options: SAMEORIGIN,
+//      Strict-Transport-Security, ...).
+app.use(helmet());
+//   2. Strict, no-wildcard CORS allow-list. Production origins come from
+//      CORS_ORIGIN / FRONTEND_URL (comma-separated); the Vite dev origin
+//      (http://localhost:5173) is always permitted. Same-origin / non-browser
+//      requests (no Origin header) are allowed; any other origin is rejected.
+const allowedOrigins = Array.from(
+  new Set(
+    `${process.env.CORS_ORIGIN || ''},${process.env.FRONTEND_URL || ''},http://localhost:5173`
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean)
+  )
+);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 204,
+  })
+);
+//   3. Relaxed Content-Security-Policy so the SPA can still reach the Gemini
+//      and Firebase APIs while keeping helmet's other protections.
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+      "script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data: blob:; " +
+      "media-src 'self' data: blob:; " +
+      "connect-src 'self' https://*.googleapis.com wss://*.googleapis.com " +
+      'https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com ' +
+      'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;'
+  );
+  next();
+});
+//   4. Translate CORS rejections into a uniform 403 JSON response.
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'دسترسی از این دامنه مجاز نیست (CORS)' });
+  }
+  return next(err);
+});
 app.use(express.json({ limit: '10mb' }));
 
 // Telegram integration before the rate limiter (no bot token => link/status only).
