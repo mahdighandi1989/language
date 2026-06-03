@@ -3,14 +3,14 @@ task_id: task_0193aa4e943f
 title: 'امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری'
 type: other
 priority: critical
-execution_priority: 1400
-status: pending
+execution_priority: 1700
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:17:50.430047+00:00'
-updated_at: '2026-06-03T00:52:49.855130+00:00'
+updated_at: '2026-06-03T00:56:03.747280+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -6307,7 +6307,7 @@ app.post('/api/gemini/tts', validate(ttsSchema), async (req, res) => {
 ```
 
 ### Step 51: مدیریت ریسک‌های اعتبارسنجی در endpointهای backend/server.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش به تحلیل ریسک‌های ناشی از اعتبارسنجی سخت‌گیرانه در endpointهای مشخص شده (خطوط ۵۶-۱۱۴، ۱۱۷-۱۶۴، ۶۹۸-۸۰۰) می‌پردازد. شامل بررسی تداخل با middleware multer (خط ۶۸۶-۶۹۵) و اطمینان از سازگاری با proxy Vite (frontend/vite.config.js خط ۸-۱۲) است. همچنین ریسک استفاده از Zod و type inference ناقص را پوشش می‌دهد. خارج از scope: پیاده‌سازی validation یا تغییر کد.
 **Excerpt:**
 ```
