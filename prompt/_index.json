@@ -2,8 +2,28 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 8,
+  "total": 9,
   "tasks": [
+    {
+      "task_id": "task_35786c187ea9",
+      "title": "پیاده‌سازی API تحلیل فایل و رفع مشکلات پایداری وابستگی‌های بک‌اند",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_35786c187ea9.md",
+      "external_attempts": 0
+    },
+    {
+      "task_id": "task_a0da99345fb0",
+      "title": "رفع anti-pattern در سیستم ردیابی Inspector Bridge",
+      "priority": "high",
+      "execution_priority": 2000,
+      "status": "pending",
+      "external_status": "pending",
+      "path": "prompt/task-task_a0da99345fb0.md",
+      "external_attempts": 0
+    },
     {
       "task_id": "task_3b614e2e1960",
       "title": "اعتبارسنجی پاسخ AI و رفع anti-pattern",
@@ -63,16 +83,6 @@
       "external_status": "pending",
       "path": "prompt/task-task_ef0945bccb18.md",
       "external_attempts": 3
-    },
-    {
-      "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
-      "title": "ممیزی commit‌های Inspector Bridge Script",
-      "priority": "medium",
-      "execution_priority": 3400,
-      "status": "awaiting_review",
-      "external_status": "pending",
-      "path": "prompt/task-92c9dd21-d951-426b-9f25-709bbff53ef8.md",
-      "external_attempts": 2
     },
     {
       "task_id": "a0dab50d-cbd0-42ef-bcc7-a23f8c846e5f",
