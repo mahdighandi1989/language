@@ -85,17 +85,34 @@ const allowedOrigins = Array.from(
       .filter(Boolean)
   )
 );
+// Same-origin requests (the Origin host equals this request's own Host) are
+// always permitted. This is what lets the deployed SPA load its own
+// Vite-emitted <script crossorigin>/<link crossorigin> assets and call its own
+// /api on whatever host it runs on (e.g. *.onrender.com) WITHOUT that host
+// having to appear in CORS_ORIGIN. Browsers send an Origin header for the
+// crossorigin asset fetches, so a strict allow-list that omits the deploy URL
+// would reject the app's own JS/CSS with a 403 JSON body — which the browser
+// then reports as a failed script load and an "application/json is not a valid
+// stylesheet MIME type" error. Cross-origin callers still must be allow-listed.
+const isOriginAllowed = (origin, host) => {
+  if (!origin) return true; // same-origin GET / non-browser / server-to-server
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    return Boolean(host) && new URL(origin).host === host;
+  } catch {
+    return false; // malformed Origin header
+  }
+};
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-    optionsSuccessStatus: 204,
+  cors((req, callback) => {
+    const allowed = isOriginAllowed(req.headers.origin, req.headers.host);
+    callback(allowed ? null : new Error('Not allowed by CORS'), {
+      origin: allowed,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+      optionsSuccessStatus: 204,
+    });
   })
 );
 //   3. Relaxed Content-Security-Policy so the SPA can still reach the Gemini

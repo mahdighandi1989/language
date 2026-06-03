@@ -4244,7 +4244,7 @@ _(file:line — symbol — snippet)_
 - `frontend/index.html:11-18` — `__firebase_config` — Firebase برای احراز هویت استفاده می‌شود. subscription باید با user ID در Firebase مرتبط باشد.
   ```
   var __firebase_config = JSON.stringify({
-    apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
+    apiKey: "AIzaSy***REDACTED***",
     authDomain: "labaneseapp.firebaseapp.com",
     projectId: "labaneseapp",
     storageBucket: "labaneseapp.firebasestorage.app",
@@ -4838,7 +4838,7 @@ _(file:line — symbol — snippet)_
   ```
   // Firebase Configuration
         var __firebase_config = JSON.stringify({
-          apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
+          apiKey: "AIzaSy***REDACTED***",
           authDomain: "labaneseapp.firebaseapp.com",
           projectId: "labaneseapp",
           storageBucket: "labaneseapp.firebasestorage.app",
@@ -13095,7 +13095,7 @@ _(file:line — symbol — snippet)_
 - `frontend/index.html:11-18` — `__firebase_config` — Firebase برای احراز هویت استفاده می‌شود. subscription باید با user ID در Firebase مرتبط باشد.
   ```
   var __firebase_config = JSON.stringify({
-    apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
+    apiKey: "AIzaSy***REDACTED***",
     authDomain: "labaneseapp.firebaseapp.com",
     projectId: "labaneseapp",
     storageBucket: "labaneseapp.firebasestorage.app",
@@ -13689,7 +13689,7 @@ _(file:line — symbol — snippet)_
   ```
   // Firebase Configuration
         var __firebase_config = JSON.stringify({
-          apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
+          apiKey: "AIzaSy***REDACTED***",
           authDomain: "labaneseapp.firebaseapp.com",
           projectId: "labaneseapp",
           storageBucket: "labaneseapp.firebasestorage.app",
