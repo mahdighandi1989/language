@@ -15,6 +15,8 @@ responsibility: Own the GitHub Actions workflows and quality-gate configuration 
 expected_inputs: Pushed commits and pull requests that touch the backend or frontend sources.
 expected_outputs: Pass/fail CI signal, security-scan results, and automated dependency-update pull requests.
 interacts_with: backend/server.js, the frontend build, .github/workflows, and the other ai_llm pipeline prompts.
+upstream: task-8ac8249d (automated backend tests) supplies the test suites these quality gates execute.
+downstream: Pipeline terminal stage — the CI/CD signal is the final gate; no further ai_llm prompt depends on it.
 created_at: '2026-05-09T07:29:40.376193+00:00'
 updated_at: '2026-06-02T17:37:25.626766+00:00'
 archived: true
