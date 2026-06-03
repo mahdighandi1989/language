@@ -3,14 +3,14 @@ task_id: task_0193aa4e943f
 title: 'امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری'
 type: other
 priority: critical
-execution_priority: 1450
-status: pending
+execution_priority: 1750
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:17:50.430047+00:00'
-updated_at: '2026-06-03T01:33:48.184097+00:00'
+updated_at: '2026-06-03T01:37:16.318574+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -5199,7 +5199,7 @@ validateEnv();
 ```
 
 ### Step 5: اجرای دستورات اعتبارسنجی پیکربندی متغیرهای محیطی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل اجرای سه دستور اعتبارسنجی است: (1) تست validateEnv با کلید API خالی، (2) تست validateEnv با کلید API معتبر اما پورت نامعتبر، و (3) اجرای تست‌های واحد مرتبط با validateEnv. این مرحله صرفاً اجرای دستورات است و شامل طراحی یا پیاده‌سازی نمی‌شود. خروجی مورد انتظار: خطا برای حالت اول، خطا برای حالت دوم، و موفقیت برای تست‌ها.
 **Excerpt:**
 ```
@@ -5314,7 +5314,7 @@ GEMINI_API_KEY=encrypted_value_here
 ```
 
 ### Step 10: اجرای دستورات اعتبارسنجی امنیتی برای رمزنگاری و متغیرهای محیطی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل اجرای سه دستور اعتبارسنجی مشخص است: تست صحت توابع encrypt/decrypt در encryption.js، بررسی عدم استفاده مستقیم از process.env.GEMINI_API_KEY در server.js، و اطمینان از وجود ENCRYPTION_KEY در فایل .env.example. هیچ تغییری در کد ایجاد نمی‌شود و صرفاً اجرای دستورات خط فرمان برای تأیید وضعیت فعلی است.
 **Excerpt:**
 ```
@@ -5754,7 +5754,7 @@ import.meta.env.VITE_FIREBASE_API_KEY
 ```
 
 ### Step 30: پیاده‌سازی هدرهای امنیتی و CORS با helmet و rate limiter
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل پیاده‌سازی کامل هدرهای امنیتی با کتابخانه helmet، پیکربندی CORS با originهای مشخص (localhost:5173 و FRONTEND_URL)، اعمال rate limiter عمومی روی مسیرهای /api/*، ایجاد rate limiter اختصاصی برای /api/analyze-files، و ایجاد middlewareهای rateLimiter.js و validate.js و validators/schemas.js است. خارج از scope: پیاده‌سازی WebSocket، تست‌های دستی WebSocket، و پیکربندی متغیرهای محیطی.
 **Excerpt:**
 ```
