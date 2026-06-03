@@ -1,6 +1,6 @@
 ---
 task_id: task_a0da99345fb0
-title: بررسی، ممیزی و جایگزینی سیستم ردیابی Inspector Bridge
+title: رفع anti-pattern در سیستم ردیابی Inspector Bridge
 type: other
 priority: high
 execution_priority: 2000
@@ -10,13 +10,13 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-03T16:58:13.819081+00:00'
-updated_at: '2026-06-03T16:58:13.819088+00:00'
+updated_at: '2026-06-03T18:44:55.623463+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# بررسی، ممیزی و جایگزینی سیستم ردیابی Inspector Bridge
+# رفع anti-pattern در سیستم ردیابی Inspector Bridge
 
 ## Raw Idea
 
