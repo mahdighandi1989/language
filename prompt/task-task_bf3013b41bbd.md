@@ -10,7 +10,7 @@ verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-02T23:57:52.327770+00:00'
+updated_at: '2026-06-03T18:42:26.862514+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -4244,7 +4244,7 @@ _(file:line — symbol — snippet)_
 - `frontend/index.html:11-18` — `__firebase_config` — Firebase برای احراز هویت استفاده می‌شود. subscription باید با user ID در Firebase مرتبط باشد.
   ```
   var __firebase_config = JSON.stringify({
-    apiKey: "AIzaSy***REDACTED***",
+    apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
     authDomain: "labaneseapp.firebaseapp.com",
     projectId: "labaneseapp",
     storageBucket: "labaneseapp.firebasestorage.app",
@@ -4838,7 +4838,7 @@ _(file:line — symbol — snippet)_
   ```
   // Firebase Configuration
         var __firebase_config = JSON.stringify({
-          apiKey: "AIzaSy***REDACTED***",
+          apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
           authDomain: "labaneseapp.firebaseapp.com",
           projectId: "labaneseapp",
           storageBucket: "labaneseapp.firebasestorage.app",
@@ -13095,7 +13095,7 @@ _(file:line — symbol — snippet)_
 - `frontend/index.html:11-18` — `__firebase_config` — Firebase برای احراز هویت استفاده می‌شود. subscription باید با user ID در Firebase مرتبط باشد.
   ```
   var __firebase_config = JSON.stringify({
-    apiKey: "AIzaSy***REDACTED***",
+    apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
     authDomain: "labaneseapp.firebaseapp.com",
     projectId: "labaneseapp",
     storageBucket: "labaneseapp.firebasestorage.app",
@@ -13689,7 +13689,7 @@ _(file:line — symbol — snippet)_
   ```
   // Firebase Configuration
         var __firebase_config = JSON.stringify({
-          apiKey: "AIzaSy***REDACTED***",
+          apiKey: "AIzaSyAMFtV0zIMKKe0bIr68Z1wTORQ1jQpsv9Q",
           authDomain: "labaneseapp.firebaseapp.com",
           projectId: "labaneseapp",
           storageBucket: "labaneseapp.firebasestorage.app",
