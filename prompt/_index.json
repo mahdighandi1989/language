@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 11,
+  "total": 10,
   "tasks": [
     {
       "task_id": "task_35786c187ea9",
@@ -12,16 +12,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-task_35786c187ea9.md",
-      "external_attempts": 0
-    },
-    {
-      "task_id": "task_a0da99345fb0",
-      "title": "رفع anti-pattern در سیستم ردیابی Inspector Bridge",
-      "priority": "high",
-      "execution_priority": 2000,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_a0da99345fb0.md",
       "external_attempts": 0
     },
     {
