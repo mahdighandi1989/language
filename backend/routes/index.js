@@ -1,3 +1,13 @@
+/**
+ * Routes layer barrel.
+ *
+ * Single public entry point for the HTTP routing layer so the server
+ * composition root can `import { … } from './routes'` instead of wiring each
+ * route inline. This module assembles the single `/api` Express Router from the
+ * controller handlers and the shared middleware (auth, validation, rate
+ * limiting, multer upload). The named `apiRouter` export is the stable
+ * contract; the default export forwards the same router for convenience.
+ */
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
 import { requireAuth, optionalAuth } from '../middleware/firebaseAuth.js';
