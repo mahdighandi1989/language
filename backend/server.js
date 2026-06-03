@@ -15,20 +15,23 @@ import dotenv from 'dotenv';
 import { validateEnv } from './config/validateEnv.js';
 import { firebaseConfig } from './config/bootstrap.js';
 import { PORT } from './config/env.js';
-// Layer barrels — each folder exposes its public API through index.js.
+// Layer barrels (ESM requires the `/index.js` suffix; logical layer surface):
+//   import * from './controllers'
+//   import * from './services'
+//   import * from './routes'
+//   import * from './middleware'
+//   import * from './utils'
 import { decrypt, redactSensitiveData as sharedRedact } from './utils/index.js';
 import { applySecurity, generalLimiter } from './middleware/index.js';
 import { apiRouter } from './routes/index.js';
 import { mountFallbacks } from './controllers/index.js';
 import { attachLiveProxy, attachLiveWsObserver, attachTelegram } from './services/index.js';
 
-// Load .env, then fail fast on any missing/invalid required variable.
-dotenv.config();
+dotenv.config(); // load .env, then fail fast on any missing/invalid required var.
 validateEnv();
-// GEMINI_API_KEY may be AES-256-GCM encrypted (decrypt() handles plaintext too);
-// redactSensitiveData() is the safe sink that scrubs the key before stderr.
+// GEMINI_API_KEY may be AES-256-GCM encrypted (decrypt() handles plaintext too).
 const GEMINI_API_KEY = decrypt(process.env.GEMINI_API_KEY);
-const redactSensitiveData = sharedRedact;
+const redactSensitiveData = sharedRedact; // safe sink: scrubs the key before stderr.
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled promise rejection:', redactSensitiveData(reason?.message || String(reason)));
 });
@@ -38,8 +41,8 @@ app.set('trust proxy', 1); // req.ip / rate limiting use the real client address
 const server = createServer(app); // HTTP + WS server (Live API proxy on /ws/live).
 const wss = new WebSocketServer({ server, path: '/ws/live' });
 attachLiveWsObserver(wss); // Live-socket lifecycle + metrics (proxy attached later).
-// Security stack (order matters): helmet() headers, then a strict no-wildcard
-// CORS allow-list, then applySecurity() (relaxed CSP + CORS-rejection -> 403).
+// Security stack (order matters): helmet headers, then a strict no-wildcard CORS
+// allow-list, then applySecurity() (relaxed CSP + CORS-rejection -> 403).
 const DEV_ORIGIN = 'http://localhost:5173';
 const allowedOrigins = Array.from(
   new Set(
@@ -50,8 +53,6 @@ const allowedOrigins = Array.from(
   )
 );
 app.use(helmet());
-// Same-origin requests are always permitted, so the deployed SPA can call its
-// own /api without listing every host in CORS_ORIGIN.
 app.use(
   cors((req, callback) => {
     const { origin, host } = req.headers;
@@ -88,8 +89,7 @@ attachTelegram(app, {
   }),
 });
 app.use('/api', generalLimiter); // Rate-limit /api/* (the WS path is not under /api).
-// SPA static assets, then /api routes, then the fallback layer (404 / SPA / errors).
-app.use(express.static(join(__dirname, '../frontend/dist')));
+app.use(express.static(join(__dirname, '../frontend/dist'))); // SPA static assets,
 app.use(apiRouter);
 mountFallbacks(app); // Terminal 404 / SPA index / JSON error handlers.
 attachLiveProxy(wss); // Gemini Live API WebSocket proxy.
