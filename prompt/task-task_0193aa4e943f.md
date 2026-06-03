@@ -3,14 +3,14 @@ task_id: task_0193aa4e943f
 title: 'امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری'
 type: other
 priority: critical
-execution_priority: 1500
-status: pending
+execution_priority: 1800
+status: awaiting_review
 external_status: done
-verification_status: applied_externally_pending_verify
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:17:50.430047+00:00'
-updated_at: '2026-06-03T03:29:24.808811+00:00'
+updated_at: '2026-06-03T03:32:48.062733+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -5552,7 +5552,7 @@ _(مستقل)_
 ```
 
 ### Step 22: بررسی اولیه و تحلیل پیش‌نیازها قبل از اجرای تغییرات امنیتی
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش یک یادداشت راهنمایی برای مدل اجراکننده است و شامل دستورالعمل‌های اجرایی مستقیم نیست. وظیفه آن تعیین رویکرد صحیح برای پیاده‌سازی است: بررسی وجود پیاده‌سازی‌های قبلی، تحلیل مستقل ساختار repo، و تصمیم‌گیری بر اساس قضاوت شخصی. این بخش هیچ کد یا تغییری را مشخص نمی‌کند و صرفاً چارچوب رفتاری را تعریف می‌کند.
 **Excerpt:**
 ```
@@ -5674,7 +5674,7 @@ admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.F
 ```
 
 ### Step 27: بررسی اولیه و تحلیل وضعیت موجود پیش از اجرا
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش یک یادداشت هشداردهنده برای مدل اجراکننده است و شامل هیچ دستور اجرایی مستقیمی نیست. وظیفه آن الزام مدل به بررسی مستقل مخزن، شناسایی پیاده‌سازی‌های قبلی، و جلوگیری از بازسازی موارد موجود است. همچنین بر مسئولیت مدل در قبال تصمیم‌گیری در صورت ابهام یا خطا در پرامپت تأکید دارد. این بخش هیچ تغییری در کد ایجاد نمی‌کند و صرفاً یک مرحله تحلیلی-تصمیم‌گیری است.
 **Excerpt:**
 ```
