@@ -3,14 +3,14 @@ task_id: task_0193aa4e943f
 title: 'امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری'
 type: other
 priority: critical
-execution_priority: 1300
+execution_priority: 1350
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:17:50.430047+00:00'
-updated_at: '2026-06-02T23:10:24.600013+00:00'
+updated_at: '2026-06-03T00:26:12.935687+00:00'
 tags:
 - consolidated
 - post_verify_merge
