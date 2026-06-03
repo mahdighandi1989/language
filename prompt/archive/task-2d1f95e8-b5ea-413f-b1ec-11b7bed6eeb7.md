@@ -37,6 +37,13 @@ target_files:
 
 # پیاده‌سازی CI/CD و Quality Gates
 
+<!-- pipeline: ai_llm -->
+> **نقش در پایپ‌لاین `ai_llm` (purpose / هدف):** سیم‌کشیِ CI/CD و quality gates
+> (lint, build, CodeQL, dependabot) پیرامونِ بک‌اندِ `ai_llm` تا تغییراتِ AI/LLM
+> امن منتشر شوند — مرحلهٔ پایانیِ پایپ‌لاین.
+> **upstream:** `task-8ac8249d` (سوئیتِ تستِ خودکار) که این gateها اجرایش می‌کنند.
+> **downstream:** انتهای پایپ‌لاین؛ سیگنالِ CI آخرین گِیت است و تسکِ دیگری به آن وابسته نیست.
+
 ## Raw Idea
 
 پروژه فاقد GitHub Actions، pre-commit hooks، linting rules و code quality checks است. این موضوع باعث کاهش کیفیت کد، inconsistency در code style و افزایش احتمال merge شدن کدهای مشکل‌دار می‌شود.

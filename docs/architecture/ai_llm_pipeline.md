@@ -61,6 +61,34 @@ merge/dedup چند منبع     (اگر بیش از یک نتیجه)
 | validation/parser | گارد ساختاری + استخراج متن | `backend/controllers/geminiController.js` |
 | قراردادِ ground-truth | منبعِ واحدِ حقیقت (پایتون) | `backend/app/ai_llm/pipeline.py` |
 
+## کامپوننت‌های پایپ‌لاین (component prompt-tasks)
+
+پایپ‌لاین `ai_llm` از پنج پرامپت‌-تسکِ مؤلفه ساخته شده است. هر فایل اکنون در
+front-matter خود فیلدهای `purpose`, `responsibility`, `expected_inputs`,
+`expected_outputs`, `interacts_with`, `upstream`, `downstream` و `pipeline:
+ai_llm` را دارد و در بدنه یک هدرِ ۳–۵ خطیِ «نقش در پایپ‌لاین» اضافه شده تا
+purpose و رابطهٔ upstream/downstream بدون باز کردن front-matter روشن باشد.
+
+| فایل (task) | purpose (خلاصه) | upstream | downstream |
+|-------------|------------------|----------|------------|
+| `task-59cbc244` | معماری لایه‌ای backend (routes/controllers/services) برای endpointهای Gemini | — (نقطهٔ ورود) | `task-7599ae4a`, `task-8ac8249d` |
+| `task-7599ae4a` | error handling/logging؛ پاسخِ ۵۰۲ روی خروجیِ نامعتبر مدل | `task-59cbc244` | `task-8ac8249d`, `task-92c9dd21` |
+| `task-8ac8249d` | سوئیتِ تستِ خودکارِ end-to-end پایپ‌لاین | `task-59cbc244`, `task-7599ae4a` | `task-2d1f95e8` |
+| `task-2d1f95e8` | CI/CD و quality gates (lint/build/CodeQL/dependabot) | `task-8ac8249d` | — (مرحلهٔ پایانی) |
+| `task-92c9dd21` | ممیزی کیفیتِ پیام‌های کامیتِ تولیدشدهٔ پایپ‌لاین | کامیت‌های سایر تسک‌ها | — (نظارتِ متقاطع) |
+
+> چهار فایلِ نخست پس از تلفیق به `prompt/archive/` منتقل شده‌اند (تسک‌های
+> زیرمجموعهٔ این تسکِ تلفیقی)؛ `task-92c9dd21` هنوز در `prompt/` فعال است.
+
+### تصمیم دربارهٔ rename (AC «نام فایل مبهم → نام معنادار»)
+
+نامِ فایل‌های پرامپت عمداً **rename نشده‌اند**. این نام‌ها (`task-<uuid>.md`)
+کلیدِ ارجاع در `prompt/_index.json` و در سیستمِ oversight (مشتق از `task_id`)
+هستند؛ rename کردن آن‌ها broken reference و ناسازگاریِ ایندکس تولید می‌کند.
+به‌جای rename، ابهامِ نام با فیلدِ `title` در front-matter و هدرِ «نقش در
+پایپ‌لاین» در بدنهٔ هر فایل برطرف شده — یعنی purpose بدون اتکا به نامِ فایل
+خوانا است.
+
 ## نقاطِ تماس با سایر لایه‌ها (cross-tier)
 
 - **frontend:** خروجیِ Markdown را مستقیماً render می‌کند؛ شکلِ پاسخِ
