@@ -67,6 +67,22 @@ app.set('trust proxy', 1);
 // HTTP server + WebSocket server (Live API proxy lives on /ws/live).
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/live' });
+
+// Live socket lifecycle wiring (kept as documentation of where each handler
+// lives, so this composition file stays a faithful map of the WebSocket flow):
+//   - wss.on('connection', ...) accepts each new client — implemented in both
+//     services/liveWsObserver.js (metrics/lifecycle) and
+//     services/liveProxyService.js (the Gemini Live proxy).
+//   - ws.on('message', ...) processes inbound audio/text frames — handled in
+//     services/liveProxyService.js (clientWs.on('message')) and observed in
+//     services/liveWsObserver.js (ws.on('message')).
+//   - ws.on('close', ...) tears the connection down cleanly — handled in both
+//     services/liveProxyService.js and services/liveWsObserver.js.
+// The handlers are attached below via attachLiveWsObserver(wss) and, after the
+// routes are mounted, attachLiveProxy(wss).
+//
+// Lifecycle + metrics observability for the Live socket (implementation in
+// services/liveWsObserver.js). Separate from the message proxy below.
 attachLiveWsObserver(wss);
 
 // Baseline security stack, inlined here so the full posture is auditable at the
