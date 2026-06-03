@@ -55,16 +55,6 @@
       "external_attempts": 8
     },
     {
-      "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
-      "title": "ممیزی commit‌های Inspector Bridge Script",
-      "priority": "medium",
-      "execution_priority": 3100,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-92c9dd21-d951-426b-9f25-709bbff53ef8.md",
-      "external_attempts": 2
-    },
-    {
       "task_id": "task_ef0945bccb18",
       "title": "افزودن بررسی وابستگی‌ها و npm audit به CI/CD",
       "priority": "medium",
@@ -75,11 +65,21 @@
       "external_attempts": 3
     },
     {
+      "task_id": "92c9dd21-d951-426b-9f25-709bbff53ef8",
+      "title": "ممیزی commit‌های Inspector Bridge Script",
+      "priority": "medium",
+      "execution_priority": 3400,
+      "status": "awaiting_review",
+      "external_status": "pending",
+      "path": "prompt/task-92c9dd21-d951-426b-9f25-709bbff53ef8.md",
+      "external_attempts": 2
+    },
+    {
       "task_id": "a0dab50d-cbd0-42ef-bcc7-a23f8c846e5f",
       "title": "افزودن تست‌های اعتبارسنجی render.yaml",
       "priority": "low",
-      "execution_priority": 4050,
-      "status": "pending",
+      "execution_priority": 4350,
+      "status": "awaiting_review",
       "external_status": "pending",
       "path": "prompt/task-a0dab50d-cbd0-42ef-bcc7-a23f8c846e5f.md",
       "external_attempts": 1
