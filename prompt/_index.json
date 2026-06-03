@@ -5,14 +5,14 @@
   "total": 15,
   "tasks": [
     {
-      "task_id": "task_e50daefacc05",
-      "title": "حذف Inspector Bridge از بیلد فرانت‌اند",
+      "task_id": "task_0193aa4e943f",
+      "title": "امن‌سازی متغیرهای محیطی: اعتبارسنجی و رمزنگاری",
       "priority": "critical",
       "execution_priority": 1500,
       "status": "pending",
       "external_status": "pending",
-      "path": "prompt/task-task_e50daefacc05.md",
-      "external_attempts": 15
+      "path": "prompt/task-task_0193aa4e943f.md",
+      "external_attempts": 25
     },
     {
       "task_id": "31236cc5-eb3f-4b4e-be02-ee2362ecc8c4",
