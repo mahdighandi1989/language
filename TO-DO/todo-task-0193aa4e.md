@@ -29,9 +29,10 @@ Console.
 - ✅ Redaction اسرار: `backend/utils/redact.js` (`redactSensitiveData`)،
   surface‌شده در `server.js`؛ هیچ کلید واقعی در لاگ/پاسخ/`throw` افشا
   نمی‌شود؛ `keyPrefix` از پاسخ‌ها حذف شد.
-- ✅ هدرهای امنیتی (`helmet`)، CORS سخت‌گیرانه بدون wildcard
-  (`CORS_ORIGIN`/`FRONTEND_URL` + `localhost:5173`)، CSP، و مترجم
-  CORS→`403` در `backend/server.js` (آینه در `middleware/security.js`).
+- ✅ هدرهای امنیتی (`helmet`) و CORS سخت‌گیرانه بدون wildcard
+  (`CORS_ORIGIN`/`FRONTEND_URL` + `localhost:5173`) مستقیماً در
+  `backend/server.js`؛ CSP و مترجم CORS→`403` در
+  `backend/middleware/security.js` (`applySecurity`).
 - ✅ Rate limiting (`backend/middleware/rateLimiter.js`): عمومی
   ۱۰۰/۱۵دقیقه و تحلیل فایل ۱۰/۱۵دقیقه، هدرهای `X-RateLimit-*`.
 - ✅ اعتبارسنجی ورودی (`backend/validators/schemas.js` +

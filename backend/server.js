@@ -2,11 +2,15 @@
  * Purpose: HTTP + WebSocket entry point for the Lebanese-dialect backend. This
  * file is pure composition — it registers no handler body of its own. It wires
  * only global configuration: env validation, the baseline security stack
- * (applySecurity: helmet + strict no-wildcard CORS + relaxed CSP + CORS->403
- * translator, defined once in middleware/security.js), per-IP rate limiting, the
- * /api router, the Gemini Live WebSocket proxy, the Telegram integration and the
- * built frontend SPA. Domain logic lives in ./controllers, ./services, ./routes,
- * ./middleware, ./utils and ./config.
+ * (helmet() headers + strict no-wildcard CORS allow-list wired here, then
+ * applySecurity() for the relaxed CSP + CORS->403 translator from
+ * middleware/security.js), per-IP rate limiting, the /api router, the Gemini
+ * Live WebSocket proxy, the Telegram integration and the built frontend SPA.
+ * Domain logic lives in ./controllers, ./services, ./routes, ./middleware,
+ * ./utils and ./config.
+ *
+ * Lint/types: this is plain ESM JavaScript — `npm run lint` (eslint) keeps it
+ * warning-free; there is no separate type-check (tsc) step for this JS file.
  *
  * Upstream (inputs): process.env (GEMINI_API_KEY, ENCRYPTION_KEY, PORT,
  * CORS_ORIGIN, FRONTEND_URL, FIREBASE_*); the compiled frontend in
@@ -19,6 +23,8 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { WebSocketServer } from 'ws';
+import helmet from 'helmet';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import { validateEnv } from './config/validateEnv.js';
 import { firebaseConfig } from './config/bootstrap.js';
@@ -31,8 +37,10 @@ import { PORT } from './config/env.js';
 //   import { … } from './middleware'    → security, rate-limit, auth, upload, validate
 //   import { … } from './utils'         → pure helpers (encryption, redact, chunking)
 import { decrypt, redactSensitiveData as sharedRedact } from './utils/index.js';
-// applySecurity wires the full baseline security stack; generalLimiter is the
-// per-IP /api/* rate limiter. Both come from the middleware barrel.
+// applySecurity adds the relaxed CSP + the CORS-rejection -> 403 JSON translator
+// (kept in middleware/security.js so the error-handling contract lives in one
+// place); generalLimiter is the per-IP /api/* rate limiter. Both come from the
+// middleware barrel.
 import { applySecurity, generalLimiter } from './middleware/index.js';
 import { apiRouter } from './routes/index.js';
 import { mountFallbacks } from './controllers/index.js';
@@ -60,10 +68,60 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws/live' });
 attachLiveWsObserver(wss); // Live-socket lifecycle + metrics (proxy attached later).
 
-// Baseline security stack — helmet headers, strict no-wildcard CORS allow-list,
-// relaxed CSP for the Gemini/Firebase APIs and the CORS->403 JSON translator —
-// defined once in middleware/security.js and wired here as the first middlewares
-// (before mountFallbacks() so forwarded errors reach the terminal handler).
+// Baseline security stack, wired as the first middlewares (before
+// mountFallbacks() so forwarded errors reach the terminal handler):
+//   1. helmet() — security HTTP headers (X-Content-Type-Options: nosniff,
+//      X-Frame-Options: SAMEORIGIN, Strict-Transport-Security, ...). Must run
+//      first so every response carries the headers, before app.use(cors()).
+//   2. A strict, no-wildcard CORS allow-list. Production origins come from
+//      CORS_ORIGIN / FRONTEND_URL (comma-separated); the Vite dev server origin
+//      (http://localhost:5173) is always permitted. Same-origin / non-browser
+//      requests (no Origin header) pass through; any other origin is rejected
+//      with an Error('Not allowed by CORS') that applySecurity()'s 403 handler
+//      translates to a uniform JSON response.
+//   3. applySecurity(app) — the relaxed CSP (so the SPA can reach the Gemini /
+//      Firebase APIs) + the CORS-rejection -> 403 JSON translator.
+const DEV_ORIGIN = 'http://localhost:5173';
+const allowedOrigins = Array.from(
+  new Set(
+    `${process.env.CORS_ORIGIN || ''},${process.env.FRONTEND_URL || ''},${DEV_ORIGIN}`
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean)
+  )
+);
+// 1. helmet() first, before CORS, so every response carries security headers.
+app.use(helmet());
+// 2. Strict CORS allow-list (no wildcard). Same-origin requests (Origin host ==
+//    request Host) are always permitted so the deployed SPA can load its own
+//    crossorigin assets / call its own /api on any host without that host having
+//    to appear in CORS_ORIGIN.
+app.use(
+  cors((req, callback) => {
+    const origin = req.headers.origin;
+    const host = req.headers.host;
+    let allowed;
+    if (!origin) {
+      allowed = true; // same-origin GET / non-browser / server-to-server
+    } else if (allowedOrigins.includes(origin)) {
+      allowed = true;
+    } else {
+      try {
+        allowed = Boolean(host) && new URL(origin).host === host;
+      } catch {
+        allowed = false; // malformed Origin header
+      }
+    }
+    callback(allowed ? null : new Error('Not allowed by CORS'), {
+      origin: allowed,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+      optionsSuccessStatus: 204,
+    });
+  })
+);
+// 3. Relaxed CSP + the CORS-rejection -> 403 JSON translator.
 applySecurity(app);
 app.use(express.json({ limit: '10mb' }));
 
