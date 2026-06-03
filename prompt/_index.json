@@ -2,7 +2,7 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 18,
+  "total": 17,
   "tasks": [
     {
       "task_id": "task_0193aa4e943f",
@@ -32,16 +32,6 @@
       "status": "pending",
       "external_status": "pending",
       "path": "prompt/task-task_e50daefacc05.md",
-      "external_attempts": 7
-    },
-    {
-      "task_id": "task_f55414420332",
-      "title": "استانداردسازی و رفع ابهام پرامپت‌های AI/LLM",
-      "priority": "critical",
-      "execution_priority": 1350,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_f55414420332.md",
       "external_attempts": 7
     },
     {
