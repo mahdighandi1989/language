@@ -3,14 +3,14 @@ task_id: 31236cc5-eb3f-4b4e-be02-ee2362ecc8c4
 title: پیاده‌سازی File Analysis API با اعتبارسنجی فایل
 type: security
 priority: high
-execution_priority: 2050
+execution_priority: 2100
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-05-16T07:44:27.355859+00:00'
-updated_at: '2026-06-02T21:44:46.288240+00:00'
+updated_at: '2026-06-03T15:04:36.355882+00:00'
 ---
 
 # پیاده‌سازی File Analysis API با اعتبارسنجی فایل
