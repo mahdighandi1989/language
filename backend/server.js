@@ -181,6 +181,17 @@ app.get('*', serveSpa);
 
 // Terminal error handler: turns any forwarded error into a redacted JSON
 // response so clients never receive an HTML stack trace.
+//
+// Anti-pattern justification: the previous CORS-only error middleware acted on
+// a single condition (`err.message === 'Not allowed by CORS'`) and forwarded
+// every other error with nothing downstream to catch it. That is the
+// "conditional inconsistency / under-engineering threshold-outcome mismatch"
+// anti-pattern: the response shape depended on which branch an error hit.
+// FIX: Under-engineering addressed — this terminal catch-all is registered
+// after applySecurity() so EVERY forwarded error, regardless of message, ends
+// in a uniform JSON body. The `res.headersSent` guard covers the edge where a
+// response was already started. Ground truth for the contract lives in
+// tests/test_error_handling.py and tests/test_anti_pattern_edge_case.py.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', redactSensitiveData(err?.stack || err?.message || String(err)));
