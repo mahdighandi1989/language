@@ -1,22 +1,22 @@
 ---
 task_id: task_78af588c4541
-title: پیکربندی npm workspace برای وابستگی‌ها
+title: مدیریت وابستگی‌ها و بازآرایی کد بک‌اند
 type: other
 priority: high
-execution_priority: 2400
+execution_priority: 2450
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-04T17:03:54.782423+00:00'
+updated_at: '2026-06-04T17:09:59.164151+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# پیکربندی npm workspace برای وابستگی‌ها
+# مدیریت وابستگی‌ها و بازآرایی کد بک‌اند
 
 ## Raw Idea
 
@@ -1310,7 +1310,7 @@ Audio processing endpoints work correctly [verify_method=api_response] [verify_p
 ```
 
 ### Step 14: تبدیل package.json ریشه به npm workspace
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل به‌روزرسانی فایل package.json ریشه برای تعریف backend و frontend به‌عنوان workspace است. خارج از این مرحله: حذف package-lock.json ریشه یا تغییرات در package.json زیرپروژه‌ها. نکته حیاتی: از ویژگی workspaces npm استفاده کنید.
 **Excerpt:**
 ```
@@ -1318,7 +1318,7 @@ package.json ریشه را به‌عنوان یک workspace تعریف کنید 
 ```
 
 ### Step 15: حذف package-lock.json ریشه و ایجاد یک lockfile واحد
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل حذف فایل package-lock.json ریشه و اجرای npm install در ریشه برای ایجاد یک lockfile واحد است. خارج از این مرحله: تغییرات در package.json ریشه یا زیرپروژه‌ها. نکته حیاتی: مطمئن شوید که npm install در ریشه بدون خطا اجرا می‌شود.
 **Excerpt:**
 ```
@@ -1326,7 +1326,7 @@ package-lock.json ریشه را حذف کنید و اجازه دهید npm works
 ```
 
 ### Step 16: تأیید عدم شکستن تست‌های موجود پس از تغییرات workspace
-**Status:** `not_done` (0%)
+**Status:** `partial` (80%)
 **Scope:** این مرحله شامل اجرای تمام تست‌های موجود (در دایرکتوری tests/) برای اطمینان از عدم شکستن آن‌ها پس از تغییرات workspace است. خارج از این مرحله: تغییرات در کد منبع. نکته حیاتی: تست‌ها باید با timeout 120 ثانیه اجرا شوند.
 **Excerpt:**
 ```
