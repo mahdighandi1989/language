@@ -5,12 +5,12 @@ type: other
 priority: high
 execution_priority: 2500
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-04T17:38:37.751933+00:00'
+updated_at: '2026-06-04T17:47:56.254253+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -20326,7 +20326,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 74: ایجاد progressService.js و اضافه کردن route‌های progress به server.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل جدید backend/services/progressService.js با توابع update_progress, get_learning_streak, get_mastery_level, get_achievements و اضافه کردن route‌های مربوطه (POST /api/progress/update و GET /api/progress/streak) به backend/server.js است. خارج از scope: پیاده‌سازی منطق توابع، تست‌ها، و تغییرات frontend.
 **Excerpt:**
 ```
@@ -20365,7 +20365,7 @@ _بعد:_
 ```
 
 ### Step 76: نوشتن تست‌های واحد برای ماژول مدیریت گروه‌های مطالعه (Study Groups)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع ماژول study_groups (create_group, join_group, leave_group, get_group_members, assign_leaderboard) است. تست‌ها باید logic مجوزها و نقش‌های گروهی را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI. همچنین، تست‌ها باید از mock برای Firebase استفاده کنند تا داده‌های واقعی تحت تأثیر قرار نگیرند.
 — [merged] این بخش شامل ایجاد تست‌های واحد برای توابع create_group, join_group, leave_group, get_group_members, assign_leaderboard در ماژول study_groups است. تست‌ها باید logic مجوزها و نقش‌های گروهی را پوشش دهند. تست‌های integration یا UI خارج از این مرحله هستند. از آنجایی که ماژول study_groups در حال حاضر وجود ندارد، ابتدا باید فایل‌های backend/services/studyGroups.js و backend/services/studyGroups.js ایجاد شوند و سپس تست‌ها در backend/tests/studyGroups.test.js نوشته شوند.
 **Excerpt:**
@@ -20395,7 +20395,7 @@ _(مستقل)_
 ```
 
 ### Step 77: ایجاد ماژول study_groups با تست‌های واحد و پوشش خطوط 80%
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد ماژول جدید study_groups در بک‌اند شامل سرویس، مسیرها و تست‌های واحد است. تمام ACهای رفتاری ذکر شده باید پوشش داده شوند. خارج از scope: تغییرات فرانت‌اند، دیتابیس، یا ماژول‌های دیگر. نکته حیاتی: تست‌ها باید با vitest/jest اجرا شوند و پوشش خطوط حداقل 80% باشد.
 **Excerpt:**
 ```
@@ -22277,7 +22277,7 @@ export async function generate_thumbnail(inputPath, outputPath, size = 150) {
 ```
 
 ### Step 122: افزودن تست واحد برای endpointهای اصلی API
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل تست backend/tests/api.test.js با حداقل 5 تست برای endpointهای اصلی API است. تست‌ها باید با دستور npm test در backend اجرا شوند و پوشش حداقل 30% از کد backend را فراهم کنند. فایل‌های دخیل: backend/server.js. این بخش فقط به تست endpointهای اصلی API می‌پردازد و شامل تست ماژول‌های دیگر (مانند vocabulary, email service) نمی‌شود.
 **Excerpt:**
 ```
