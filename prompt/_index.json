@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 12,
+  "total": 11,
   "tasks": [
-    {
-      "task_id": "task_2c28ca0737f1",
-      "title": "بازسازی ساختار بک‌اند",
-      "priority": "critical",
-      "execution_priority": 1500,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_2c28ca0737f1.md",
-      "external_attempts": 43
-    },
     {
       "task_id": "task_35786c187ea9",
       "title": "پیاده‌سازی API تحلیل فایل و رفع مشکلات پایداری وابستگی‌های بک‌اند",
