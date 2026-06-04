@@ -1,22 +1,22 @@
 ---
 task_id: task_ce963d814d52
-title: پیاده‌سازی نوتیفیکیشن 'verify_failed' و اندازه‌گیری هدف خروجی
+title: پیاده‌سازی نوتیفیکیشن 'verify_failed' و اندازه‌گیری هدف
 type: other
 priority: high
-execution_priority: 2150
+execution_priority: 2200
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:27:46.879724+00:00'
-updated_at: '2026-06-03T18:42:35.102731+00:00'
+updated_at: '2026-06-04T05:59:20.778345+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# پیاده‌سازی نوتیفیکیشن 'verify_failed' و اندازه‌گیری هدف خروجی
+# پیاده‌سازی نوتیفیکیشن 'verify_failed' و اندازه‌گیری هدف
 
 ## Raw Idea
 
@@ -961,7 +961,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 5: گام ۳: نوشتن template message فارسی معنادار برای 'verify_failed'
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل نوشتن یک template message به زبان فارسی و معنادار برای event 'verify_failed' است. این template باید در فراخوانی `notify_event` استفاده شود. این مرحله فقط شامل نوشتن template است و شامل اضافه کردن فراخوانی یا تست نمی‌شود.
 **Excerpt:**
 ```
@@ -996,7 +996,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 9: گام ۲: تغییر کد برای محقق شدن outcome target
-**Status:** `partial` (70%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل تغییر کد در backend و frontend برای محقق شدن outcome target است. این تغییرات شامل اضافه کردن لاگ‌های تحلیلی برای ثبت معیارهایی مانند chat_success_rate, avg_response_time, user_engagement_rate, conversion_rate در فایل‌های backend/app/analytics.py و frontend/src/analytics.js است. این مرحله فقط شامل تغییر کد است و شامل نوشتن تست یا مستندات نمی‌شود.
 **Excerpt:**
 ```
@@ -1030,7 +1030,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 13: مراحل remaining که در super-task باید انجام شوند — لیست کامل مراحل باقی‌مانده
-**Status:** `partial` (70%)
+**Status:** `done` (100%)
 **Scope:** این مرحله لیست کامل مراحل باقی‌مانده (remaining parts) را که در super-task باید انجام شوند، مشخص می‌کند. این مراحل شامل: تعریف و مستندسازی معیارهای کلیدی عملکرد (KPIs) در outcome data، اضافه کردن لاگ‌های تحلیلی در بک‌اند، اضافه کردن لاگ‌های تحلیلی در فرانت‌اند، ایجاد endpoint بک‌اند برای دریافت و ذخیره لاگ‌های تحلیلی فرانت‌اند، محاسبه و به‌روزرسانی outcome data با معیارهای جدید، نوشتن تست E2E برای اندازه‌گیری outcome، و به‌روزرسانی مستندات است. این مرحله فقط شامل لیست کردن مراحل است و شامل پیاده‌سازی نمی‌شود.
 **Excerpt:**
 ```
