@@ -5,12 +5,12 @@ type: other
 priority: high
 execution_priority: 2500
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-04T17:52:00.112778+00:00'
+updated_at: '2026-06-04T17:57:28.653039+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -9194,8 +9194,8 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 - [ ] **مرحله 15: نوشتن تست‌های واحد برای ماژول مدیریت تمرین‌ها (Exercises)** — نوشتن تست‌های واحد برای توابع ماژول exercises (مثلاً generate_exercise, check_answer, get_exercise_types, calculate_score). تست‌ها باید انواع مختلف تمرین (چندگزینه‌ای، جورکردنی، پرکردن جای خالی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 16: نوشتن تست‌های واحد برای ماژول مدیریت اشتراک (Subscription)** — نوشتن تست‌های واحد برای توابع ماژول subscription (مثلاً create_subscription, cancel_subscription, check_subscription_status, get_available_plans). تست‌ها باید logic محدودیت‌های دسترسی بر اساس پلن اشتراک را پوشش دهند. خارج از این مرحله: تست‌های integration با سرویس‌های پرداخت واقعی.
 - [ ] **مرحله 17: نوشتن تست‌های واحد برای ماژول مدیریت نوتیفیکیشن (Notifications)** — نوشتن تست‌های واحد برای توابع ماژول notifications (مثلاً send_notification, get_user_notifications, mark_as_read, schedule_reminder). تست‌ها باید با mock کردن سرویس‌های ارسال نوتیفیکیشن (ایمیل، push) نوشته شوند. خارج از این مرحله: تست‌های integration با سرویس‌های واقعی.
-- [ ] **مرحله 18: نوشتن تست‌های واحد برای ماژول مدیریت محتوای آموزشی (Content Management)** — نوشتن تست‌های واحد برای توابع ماژول content (مثلاً add_lesson, get_lesson_content, update_lesson, delete_lesson). تست‌ها باید validation محتوای آموزشی (HTML sanitization، فرمت‌بندی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
-- [ ] **مرحله 19: نوشتن تست‌های واحد برای ماژول مدیریت پیشرفت (Progress Tracking)** — نوشتن تست‌های واحد برای توابع ماژول progress (مثلاً update_progress, get_learning_streak, get_mastery_level, get_achievements). تست‌ها باید logic محاسبه streak و mastery level را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 18: نوشتن تست‌های واحد برای ماژول مدیریت محتوای آموزشی (Content Management)** — نوشتن تست‌های واحد برای توابع ماژول content (مثلاً add_lesson, get_lesson_content, update_lesson, delete_lesson). تست‌ها باید validation محتوای آموزشی (HTML sanitization، فرمت‌بندی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 19: نوشتن تست‌های واحد برای ماژول مدیریت پیشرفت (Progress Tracking)** — نوشتن تست‌های واحد برای توابع ماژول progress (مثلاً update_progress, get_learning_streak, get_mastery_level, get_achievements). تست‌ها باید logic محاسبه streak و mastery level را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 20: نوشتن تست‌های واحد برای ماژول مدیریت گروه‌های مطالعه (Study Groups)** — نوشتن تست‌های واحد برای توابع ماژول study_groups (مثلاً create_group, join_group, leave_group, get_group_members, assign_leaderboard). تست‌ها باید logic مجوزها و نقش‌های گروهی را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 21: نوشتن تست‌های واحد برای ماژول مدیریت API Key (API Key Management)** — نوشتن تست‌های واحد برای توابع ماژول api_keys (مثلاً generate_api_key, revoke_api_key, validate_api_key, get_api_key_usage). تست‌ها باید logic rate limiting و محدودیت‌های دسترسی را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [x] **مرحله 22: نوشتن تست‌های واحد برای ماژول مدیریت خطاها و لاگینگ (Error Handling & Logging)** — نوشتن تست‌های واحد برای توابع ماژول error_handling (مثلاً log_error, get_error_logs, send_error_report, format_error_response). تست‌ها باید سناریوهای مختلف خطا (validation error, database error, external service error) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
@@ -18081,7 +18081,7 @@ app.get('/api/health', (req, res) => {
 ```
 
 ### Step 18: نوشتن تست‌های واحد برای ماژول احراز هویت (Authentication)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای توابع احراز هویت (register, login, logout, token validation) است. تست‌ها باید سناریوهای موفق و ناموفق (رمز عبور اشتباه، توکن منقضی، کاربر تکراری) را پوشش دهند. خارج از این مرحله: تست‌های integration با دیتابیس یا API endpoints. نکته حیاتی: ماژول study_sessions هنوز وجود ندارد و این تسک نیاز به طراحی و پیاده‌سازی کامل آن دارد. انتخاب دیتابیس (فایل JSON یا SQLite) می‌تواند بر عملکرد و مقیاس‌پذیری تأثیر بگذارد.
 **Excerpt:**
 ```
@@ -18110,7 +18110,7 @@ _(مستقل)_
 ```
 
 ### Step 19: نوشتن تست‌های واحد برای ماژول احراز هویت (register, login, logout, token validation)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد (unit tests) برای توابع اصلی ماژول احراز هویت است: register, login, logout, token validation. تست‌ها باید سناریوهای موفق و ناموفق (رمز عبور اشتباه، توکن منقضی، کاربر تکراری) را پوشش دهند. خارج از این مرحله: تست‌های integration با دیتابیس یا API endpoints، ایجاد خود ماژول authService، و هرگونه تغییر در frontend. این مرحله صرفاً بر روی تست‌های واحد متمرکز است و فرض می‌کند که ماژول احراز هویت (authService) قبلاً ایجاد شده است.
 **Excerpt:**
 ```
