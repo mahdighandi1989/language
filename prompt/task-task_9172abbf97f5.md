@@ -3,14 +3,14 @@ task_id: task_9172abbf97f5
 title: مستندسازی جامع پروژه و بهبود فرآیند راه‌اندازی
 type: other
 priority: high
-execution_priority: 2150
+execution_priority: 2200
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:26:36.892083+00:00'
-updated_at: '2026-06-03T18:42:32.882926+00:00'
+updated_at: '2026-06-04T05:37:56.903791+00:00'
 tags:
 - consolidated
 - post_verify_merge
