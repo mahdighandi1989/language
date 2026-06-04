@@ -39,14 +39,15 @@ export function applySecurity(app) {
     res.setHeader(
       'Content-Security-Policy',
       "default-src 'self'; " +
-        "script-src 'self'; " +
+        "script-src 'self' https://apis.google.com; " +
+        "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://apis.google.com; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "font-src 'self' data: https://fonts.gstatic.com; " +
-        "img-src 'self' data: blob:; " +
+        "img-src 'self' data: blob: https://*.googleusercontent.com; " +
         "media-src 'self' data: blob:; " +
         "connect-src 'self' https://*.googleapis.com wss://*.googleapis.com " +
         'https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com ' +
-        'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com;'
+        'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com;'
     );
     next();
   });
