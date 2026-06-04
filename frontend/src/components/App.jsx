@@ -5522,33 +5522,6 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           {chatHistory.map((msg, index) => (<ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={openSaveModal} voice={aiVoice} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} isVoiceCall={msg.isVoiceCall} isVoiceCallHeader={msg.isVoiceCallHeader} isCallAnalysis={msg.isCallAnalysis} />))}
           {isLoading && (<div className="flex justify-start"><div className="max-w-[80%] py-2 px-4 rounded-2xl bg-white text-slate-500 rounded-bl-none shadow-sm">...</div></div>)}
         </div>
-        {/* Voice Conversation Mode Indicator */}
-        {voiceConversationMode && (
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-xl mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MessageCircle size={20} className="animate-pulse" />
-              <span className="font-bold">حالت مکالمه صوتی</span>
-              {isRecording && <span className="text-sm bg-white/20 px-2 py-1 rounded-full animate-pulse flex items-center gap-1"><Mic size={14} /> صحبت کنید...</span>}
-              {isLoading && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال پاسخگویی...</span>}
-              {!isRecording && !isLoading && currentAudioRef.current && <span className="text-sm bg-white/20 px-2 py-1 rounded-full flex items-center gap-1"><Volume2 size={14} /> استاد صحبت میکنه...</span>}
-              {!isRecording && !isLoading && !currentAudioRef.current && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">منتظر بوق...</span>}
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Stop audio button - only show when audio is playing */}
-              {!isRecording && !isLoading && voiceConvStatus?.isPlaying && (
-                <button onClick={stopCurrentAudio} className="bg-red-500/50 hover:bg-red-500 p-2 rounded-lg flex items-center gap-1" title="قطع صدا">
-                  <Square size={16} fill="currentColor" />
-                  <span className="text-xs">قطع</span>
-                </button>
-              )}
-              <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-1" title="پایان مکالمه">
-                <PhoneOff size={18} />
-                <span className="text-xs">پایان</span>
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="pt-2 flex-shrink-0 space-y-2">
           <div className="flex items-center gap-2">
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 p-3 border rounded-xl text-base bg-white" placeholder="پیام خود را بنویسید..." disabled={isLoading || voiceConversationMode} />
@@ -5588,6 +5561,32 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             </div>
             <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold flex-shrink-0 mr-auto" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
           </div>
+          {/* Voice Conversation Mode Indicator — sits below the action buttons so
+              it never overlaps the chat (works on web and mobile). */}
+          {voiceConversationMode && (
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 rounded-xl flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <MessageCircle size={20} className="animate-pulse flex-shrink-0" />
+                <span className="font-bold">حالت مکالمه صوتی</span>
+                {isRecording && <span className="text-sm bg-white/20 px-2 py-1 rounded-full animate-pulse flex items-center gap-1"><Mic size={14} /> صحبت کنید...</span>}
+                {isLoading && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">در حال پاسخگویی...</span>}
+                {!isRecording && !isLoading && voiceConvStatus?.isPlaying && <span className="text-sm bg-white/20 px-2 py-1 rounded-full flex items-center gap-1"><Volume2 size={14} /> استاد صحبت میکنه...</span>}
+                {!isRecording && !isLoading && !voiceConvStatus?.isPlaying && <span className="text-sm bg-white/20 px-2 py-1 rounded-full">منتظر بوق...</span>}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {voiceConvStatus?.isPlaying && (
+                  <button onClick={stopCurrentAudio} className="bg-red-500/60 hover:bg-red-500 p-2 rounded-lg flex items-center gap-1" title="قطع صدا">
+                    <Square size={16} fill="currentColor" />
+                    <span className="text-xs">قطع صدا</span>
+                  </button>
+                )}
+                <button onClick={toggleVoiceConversationMode} className="bg-white/20 hover:bg-white/30 p-2 rounded-lg flex items-center gap-1" title="پایان مکالمه">
+                  <PhoneOff size={18} />
+                  <span className="text-xs">پایان</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {/* LiveVoiceChat is now rendered globally at App level via GlobalLiveVoiceChat */}
@@ -5856,6 +5855,18 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
 const Card = ({ title, children, actionButton }) => (<div className="bg-white p-6 rounded-2xl shadow-md"><div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold text-slate-800">{title}</h3>{actionButton}</div><div>{children}</div></div>);
 const StatCard = ({ title, value, icon }) => (<div className="bg-white p-5 rounded-2xl shadow-md flex items-center gap-4"><div className="bg-slate-100 p-3 rounded-full">{icon}</div><div><h4 className="text-slate-500 font-bold">{title}</h4><p className="text-2xl font-bold text-slate-800 mt-1">{value}</p></div></div>);
 
+// Only one chat TTS clip may play at a time across all message speaker buttons.
+// Tracking the active <audio> at module scope means starting any clip (or an
+// orphaned one left over after a re-render) reliably stops the previous one,
+// so clicks never stack audio-over-audio.
+let activeTtsAudio = null;
+function stopActiveTtsAudio() {
+    if (activeTtsAudio) {
+        try { activeTtsAudio.pause(); activeTtsAudio.currentTime = 0; } catch { /* ignore */ }
+        activeTtsAudio = null;
+    }
+}
+
 function TTSButton({ textToSpeak, voice, audioUrl }) {
     const { stopVoiceConvAudio } = useLiveChat();
     const [isLoading, setIsLoading] = useState(false);
@@ -5865,55 +5876,50 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
     const playAudio = async () => {
         if (!textToSpeak) return;
 
-        // If already playing, stop it
+        // Clicking while THIS clip plays → stop it (toggle off).
         if (isPlaying && audioRef.current) {
+            if (activeTtsAudio === audioRef.current) activeTtsAudio = null;
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
             setIsPlaying(false);
             return;
         }
 
-        // Stop any voice conversation audio before playing to prevent double audio
+        // Otherwise stop whatever else is playing first (another message clip,
+        // an orphaned clip, or the live voice-conversation audio).
+        stopActiveTtsAudio();
         stopVoiceConvAudio();
 
-        // If we have a pre-generated audio URL, use it
-        if (audioUrl) {
-            // Stop any existing audio
-            if (audioRef.current) {
-                audioRef.current.pause();
-            }
-
-            const audio = new Audio(audioUrl);
+        const startAudio = (url, onEnd) => {
+            const audio = new Audio(url);
             audioRef.current = audio;
-
+            activeTtsAudio = audio;
             audio.onplay = () => setIsPlaying(true);
-            audio.onended = () => setIsPlaying(false);
-            audio.onerror = () => setIsPlaying(false);
             audio.onpause = () => setIsPlaying(false);
+            audio.onerror = () => { setIsPlaying(false); if (activeTtsAudio === audio) activeTtsAudio = null; };
+            audio.onended = () => {
+                setIsPlaying(false);
+                if (activeTtsAudio === audio) activeTtsAudio = null;
+                if (onEnd) onEnd();
+            };
+            audio.play().catch(() => { setIsPlaying(false); if (activeTtsAudio === audio) activeTtsAudio = null; });
+        };
 
-            audio.play().catch(() => setIsPlaying(false));
+        // If we have a pre-generated audio URL, use it.
+        if (audioUrl) {
+            startAudio(audioUrl);
             return;
         }
 
-        // Generate new TTS
+        // Generate new TTS.
         if (isLoading) return;
         setIsLoading(true);
 
         const result = await callGeminiTTS(`Say: ${textToSpeak}`, voice);
         if (result) {
             const newAudioUrl = getWavUrl(result.audioData, result.mimeType);
-            const audio = new Audio(newAudioUrl);
-            audioRef.current = audio;
-
-            audio.onplay = () => setIsPlaying(true);
-            audio.onended = () => {
-                setIsPlaying(false);
-                setIsLoading(false);
-                URL.revokeObjectURL(newAudioUrl);
-            };
-            audio.onerror = () => { setIsPlaying(false); setIsLoading(false); };
-
-            audio.play().catch(() => { setIsPlaying(false); setIsLoading(false); });
+            startAudio(newAudioUrl, () => URL.revokeObjectURL(newAudioUrl));
+            setIsLoading(false);
         } else {
             setIsLoading(false);
         }
