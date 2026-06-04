@@ -2,18 +2,8 @@
   "version": 1,
   "project": "mahdighandi1989/language",
   "watched_id": "6b04f8bd-b562-4fb9-9cd9-0c27458ced59",
-  "total": 4,
+  "total": 3,
   "tasks": [
-    {
-      "task_id": "task_78af588c4541",
-      "title": "تفکیک server.js و یکپارچه‌سازی وابستگی‌های بک‌اند",
-      "priority": "high",
-      "execution_priority": 2300,
-      "status": "pending",
-      "external_status": "pending",
-      "path": "prompt/task-task_78af588c4541.md",
-      "external_attempts": 6
-    },
     {
       "task_id": "task_bf3013b41bbd",
       "title": "راه‌اندازی زیرساخت تست Pytest بک‌اند",
