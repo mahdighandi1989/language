@@ -5,12 +5,12 @@ type: other
 priority: high
 execution_priority: 2050
 status: pending
-external_status: claimed
-verification_status: pending
+external_status: done
+verification_status: applied_externally_pending_verify
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-03T16:58:28.433313+00:00'
-updated_at: '2026-06-04T05:13:19.643323+00:00'
+updated_at: '2026-06-04T05:17:00.443810+00:00'
 tags:
 - consolidated
 - post_verify_merge
