@@ -19,6 +19,8 @@ correctly-shaped `GEMINI_API_KEY` is injected by fixtures).
 | `backend/tests/__init__.py` | Marks `backend/tests` as a package. |
 | `backend/tests/conftest.py` | Backend fixtures that mock `GEMINI_API_KEY`. |
 | `backend/tests/test_infrastructure.py` | Smoke tests asserting the infra contract. |
+| `backend/services/*.js` (domain modules) | Pure, in-memory domain logic: study sessions, statistics, flashcards (SM-2), users, languages, exercises, progress. |
+| `backend/tests/*.test.js` | Node built-in test-runner unit tests for the domain modules above (one file per service, fully offline). |
 
 ## Running
 
@@ -35,13 +37,17 @@ python -m pytest tests/
 
 # With coverage
 cd backend && python -m pytest --cov=. --cov-report=term-missing
+
+# Backend domain-module unit tests (Node built-in test runner)
+cd backend && npm run test:node
 ```
 
 The backend `package.json` exposes these via npm scripts:
 
 ```jsonc
 "test":     "python -m pytest",
-"test:cov": "python -m pytest --cov=. --cov-report=term-missing"
+"test:cov": "python -m pytest --cov=. --cov-report=term-missing",
+"test:node": "node --test 'tests/test_*.js' 'tests/*.test.js'"
 ```
 
 ## Fixtures
