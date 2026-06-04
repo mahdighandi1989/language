@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { GEMINI_API_KEY } from '../config/env.js';
 import { defaultLivePrompts } from './prompts.js';
 
-const GEMINI_LIVE_MODEL = 'gemini-2.0-flash-live-001';
+const GEMINI_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
 const GEMINI_LIVE_WS_URL = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent`;
 
 // Attaches the Gemini Live API WebSocket proxy to the given WebSocketServer.
