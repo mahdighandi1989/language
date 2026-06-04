@@ -3,14 +3,14 @@ task_id: task_2cd58167a90c
 title: یکپارچه‌سازی معماری فرانت‌اند
 type: other
 priority: high
-execution_priority: 2250
+execution_priority: 2300
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:19:25.307394+00:00'
-updated_at: '2026-06-03T18:42:22.874216+00:00'
+updated_at: '2026-06-04T16:47:53.739995+00:00'
 tags:
 - consolidated
 - post_verify_merge
