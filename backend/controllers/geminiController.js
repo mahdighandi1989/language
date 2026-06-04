@@ -1,5 +1,16 @@
 import { GEMINI_API_KEY } from '../config/env.js';
 import { redactSensitiveData } from '../utils/redact.js';
+import { probeLiveModels } from '../services/liveProxyService.js';
+
+// GET /api/live-model-check — diagnostic: report which Live (bidiGenerateContent)
+// model + API-version pairs this key can actually open a session with.
+export async function liveModelCheck(req, res) {
+  try {
+    res.json({ results: await probeLiveModels() });
+  } catch (error) {
+    res.status(500).json({ error: redactSensitiveData(error?.message || String(error)) });
+  }
+}
 
 // validation: structural guard for Gemini generateContent responses. The
 // upstream API is trusted to be well-formed, but the anti-pattern we are
