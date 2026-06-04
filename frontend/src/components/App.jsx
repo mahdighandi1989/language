@@ -9,7 +9,7 @@
 // Downstream (what depends on this file): src/main.jsx renders <App/>; this is
 // the SPA entry component served from frontend/index.html.
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle, Square } from 'lucide-react';
+import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Trash2, ChevronDown, ChevronUp, Sparkles, Volume2, Loader, ClipboardList, LifeBuoy, Users, GraduationCap, Clock, CheckCircle, Mic, MicOff, Settings, BrainCircuit, Brain, Search, X, Edit, FileText, Paperclip, Archive, Phone, PhoneOff, MessageCircle, Check, RotateCcw, Activity, Zap, Circle, ArrowRight, Database, Save, RefreshCw, AlertCircle, Square, Menu } from 'lucide-react';
 
 // --- Firebase Imports ---
 // Auth + Firestore primitives used directly by the root component. App/auth/db
@@ -959,22 +959,29 @@ export default function App() {
 
 function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick }) {
     const fileInputRef = useRef(null);
+    const [mobileOpen, setMobileOpen] = useState(false);
     const handleImportClick = () => fileInputRef.current.click();
     const NavLink = ({ view, icon: Icon, label }) => (
         <li>
-            <button onClick={() => navigateTo(view)} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-slate-300 hover:bg-slate-700 hover:text-white ${activeView === view ? 'bg-slate-900 text-white font-bold' : ''}`}>
+            <button onClick={() => { navigateTo(view); setMobileOpen(false); }} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-slate-300 hover:bg-slate-700 hover:text-white ${activeView === view ? 'bg-slate-900 text-white font-bold' : ''}`}>
                 <Icon size={22} /><span>{label}</span>
             </button>
         </li>
     );
     return (
-        <nav className="w-full md:w-72 bg-slate-800 text-white p-6 flex flex-col shadow-2xl">
-            <div className="flex items-center gap-3 mb-8">
-                <div className="bg-teal-500 p-2 rounded-lg"><GraduationCap size={28} /></div>
-                <h1 className="text-2xl font-bold">لهجه لبنانی</h1>
+        <nav className="w-full md:w-72 bg-slate-800 text-white md:p-6 flex flex-col shadow-2xl md:sticky md:top-0 md:h-screen">
+            <div className="flex items-center justify-between gap-3 p-4 md:p-0 md:mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="bg-teal-500 p-2 rounded-lg"><GraduationCap size={28} /></div>
+                    <h1 className="text-2xl font-bold">لهجه لبنانی</h1>
+                </div>
+                <button onClick={() => setMobileOpen(o => !o)} className="md:hidden p-2 rounded-lg hover:bg-slate-700" aria-label="منو" aria-expanded={mobileOpen}>
+                    {mobileOpen ? <X size={26} /> : <Menu size={26} />}
+                </button>
             </div>
+            <div className={`${mobileOpen ? 'flex' : 'hidden'} md:flex flex-col flex-1 px-4 pb-4 md:p-0 md:overflow-y-auto`}>
              <div className="mb-8">
-                <button onClick={onSearchClick} className="w-full flex items-center gap-3 py-3 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
+                <button onClick={() => { onSearchClick(); setMobileOpen(false); }} className="w-full flex items-center gap-3 py-3 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors">
                     <Search size={20} /><span>جستجوی کلی...</span>
                 </button>
             </div>
@@ -988,10 +995,11 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
                 <NavLink view="archivedConversations" icon={Archive} label="مکالمات بایگانی شده" />
             </ul>
             <div className="space-y-2 pt-4 border-t border-slate-700">
-                <button onClick={() => navigateTo('settings')} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Settings size={20} /><span>تنظیمات و شخصی‌سازی</span></button>
+                <button onClick={() => { navigateTo('settings'); setMobileOpen(false); }} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Settings size={20} /><span>تنظیمات و شخصی‌سازی</span></button>
                 <button onClick={exportData} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Download size={20} /><span>خروجی (JSON)</span></button>
                 <button onClick={handleImportClick} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Upload size={20} /><span>بارگذاری (JSON)</span></button>
                 <input type="file" ref={fileInputRef} onChange={importData} className="hidden" accept=".json" />
+            </div>
             </div>
         </nav>
     );
@@ -5323,14 +5331,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
           <div className="flex items-center gap-2">
             <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} className="flex-1 p-3 border rounded-xl text-base bg-white" placeholder="پیام خود را بنویسید..." disabled={isLoading || voiceConversationMode} />
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex gap-2">
-              <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200" disabled={voiceConversationMode}><Paperclip size={20}/></button>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200 flex-shrink-0" disabled={voiceConversationMode}><Paperclip size={20}/></button>
               <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-              <button onClick={handleMicClick} className={`p-2 border rounded-xl ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`} disabled={voiceConversationMode}><Mic size={20}/></button>
+              <button onClick={handleMicClick} className={`p-2 border rounded-xl flex-shrink-0 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`} disabled={voiceConversationMode}><Mic size={20}/></button>
               <button
                 onClick={toggleVoiceConversationMode}
-                className={`p-2 border rounded-xl flex items-center gap-1 ${voiceConversationMode ? 'bg-purple-500 text-white' : 'hover:bg-purple-100 text-purple-600 border-purple-300'}`}
+                className={`p-2 border rounded-xl flex items-center gap-1 flex-shrink-0 ${voiceConversationMode ? 'bg-purple-500 text-white' : 'hover:bg-purple-100 text-purple-600 border-purple-300'}`}
                 title="حالت مکالمه صوتی (با تشخیص سکوت خودکار)"
               >
                 <MessageCircle size={20}/>
@@ -5349,14 +5357,14 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                   initialHistory: chatHistory
                 })}
                 disabled={isLiveChatActive}
-                className={`p-2 border rounded-xl flex items-center gap-1 ${isLiveChatActive ? 'bg-pink-200 text-pink-400 border-pink-200 cursor-not-allowed' : 'hover:bg-pink-100 text-pink-600 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50'}`}
+                className={`p-2 border rounded-xl flex items-center gap-1 flex-shrink-0 ${isLiveChatActive ? 'bg-pink-200 text-pink-400 border-pink-200 cursor-not-allowed' : 'hover:bg-pink-100 text-pink-600 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50'}`}
                 title="مکالمه زنده با جاد (Gemini Live)"
               >
                 <Phone size={20}/>
                 <span className="text-xs font-bold">Live</span>
               </button>
             </div>
-            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
+            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold flex-shrink-0 ml-auto" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
           </div>
         </div>
       </div>
