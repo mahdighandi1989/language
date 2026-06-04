@@ -3,14 +3,14 @@ task_id: task_ce963d814d52
 title: پیاده‌سازی نوتیفیکیشن 'verify_failed' و اندازه‌گیری هدف
 type: other
 priority: high
-execution_priority: 2200
+execution_priority: 2250
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:27:46.879724+00:00'
-updated_at: '2026-06-04T10:19:52.380931+00:00'
+updated_at: '2026-06-04T16:43:37.659403+00:00'
 tags:
 - consolidated
 - post_verify_merge
