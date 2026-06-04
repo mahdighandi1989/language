@@ -170,9 +170,16 @@ export async function listModels(req, res) {
       return res.status(response.status).json({ error: redactSensitiveData(data) });
     }
 
-    // Return just model names for easier reading
-    const modelNames = data.models?.map((m) => m.name) || [];
-    res.json({ models: modelNames, count: modelNames.length });
+    // Return model names plus, crucially, which ones support the Live API
+    // (bidiGenerateContent) so the correct Live model can be picked per key.
+    const models = (data.models || []).map((m) => ({
+      name: m.name,
+      methods: m.supportedGenerationMethods || [],
+    }));
+    const liveModels = models
+      .filter((m) => m.methods.includes('bidiGenerateContent'))
+      .map((m) => m.name);
+    res.json({ count: models.length, liveModels, models });
   } catch (error) {
     res.status(500).json({ error: redactSensitiveData(error.message) });
   }
