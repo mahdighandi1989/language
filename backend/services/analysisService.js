@@ -205,7 +205,7 @@ export async function analyzeUploads({ files = [], textContent = '', userInstruc
 لطفاً تمام گفتار را رونویسی کن و نکات آموزشی را استخراج کن.
 اگر اشتباهی در تلفظ یا گرامر وجود دارد، تصحیح کن.`,
                     systemPrompt,
-                    'gemini-2.0-flash'
+                    'gemini-2.5-flash'
                   );
                 } finally {
                   await deleteGeminiFile(uploadedAudioFile);
@@ -279,7 +279,7 @@ ${frameResults.length > 0 ? frameResults.join('\n\n---\n\n') : 'متن قابل 
                   uploadedFileName,
                   smartVideoPrompt,
                   systemPrompt,
-                  'gemini-2.0-flash'
+                  'gemini-2.5-flash'
                 );
               } finally {
                 await deleteGeminiFile(uploadedFileName);

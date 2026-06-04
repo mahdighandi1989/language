@@ -5,7 +5,7 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
 
 // Analyze content with Gemini (text, audio, image, video) using inline parts.
 export async function analyzeWithGemini(parts, systemPrompt) {
-  const apiUrl = `${GEMINI_BASE}/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const apiUrl = `${GEMINI_BASE}/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   const payload = {
     contents: [{ role: 'user', parts }],
@@ -159,7 +159,7 @@ export async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemP
 
 // Analyze a large uploaded file using the Gemini File API (default model).
 export async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useExtendedModel = false) {
-  const model = useExtendedModel ? 'gemini-2.0-flash-exp' : 'gemini-2.0-flash';
+  const model = useExtendedModel ? 'gemini-2.0-flash-exp' : 'gemini-2.5-flash';
   return analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemPrompt, model);
 }
 

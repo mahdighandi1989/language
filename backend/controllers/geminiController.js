@@ -63,7 +63,7 @@ export async function chat(req, res) {
       }));
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -185,7 +185,7 @@ export async function testGemini(req, res) {
       contents: [{ role: 'user', parts: [{ text: 'Say hello in Lebanese Arabic' }] }],
     };
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     console.log('Testing Gemini API with URL:', redactSensitiveData(apiUrl));
 
