@@ -184,3 +184,57 @@ ${getPrompt('liveVoiceClosing')}`;
 }
 
 export default attachLiveProxy;
+
+// Diagnostic: probe a set of candidate Live models against both API versions to
+// discover which (model, version) pair this API key can actually open a
+// BidiGenerateContent session with. Returns a result per candidate.
+export async function probeLiveModels() {
+  const candidates = [
+    ['v1beta', 'gemini-2.0-flash-live-001'],
+    ['v1beta', 'gemini-live-2.5-flash-preview'],
+    ['v1beta', 'gemini-2.5-flash-preview-native-audio-dialog'],
+    ['v1beta', 'gemini-2.5-flash-native-audio-preview-09-2025'],
+    ['v1alpha', 'gemini-2.0-flash-live-001'],
+    ['v1alpha', 'gemini-2.0-flash-exp'],
+    ['v1alpha', 'gemini-live-2.5-flash-preview'],
+  ];
+
+  const probe = ([version, model]) => new Promise((resolve) => {
+    const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.${version}.GenerativeService.BidiGenerateContent?key=${GEMINI_API_KEY}`;
+    let ws;
+    let done = false;
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      try { ws && ws.close(); } catch { /* ignore */ }
+      resolve({ version, model, result });
+    };
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      return resolve({ version, model, result: 'connect_error' });
+    }
+    const timer = setTimeout(() => finish('timeout'), 6000);
+    ws.on('open', () => {
+      ws.send(JSON.stringify({ setup: { model: `models/${model}`, generationConfig: { responseModalities: ['AUDIO'] } } }));
+    });
+    ws.on('message', (data) => {
+      clearTimeout(timer);
+      let msg = {};
+      try { msg = JSON.parse(data.toString()); } catch { /* non-JSON */ }
+      finish(msg.setupComplete ? 'OK' : `unexpected: ${data.toString().slice(0, 120)}`);
+    });
+    ws.on('close', (code, reason) => {
+      clearTimeout(timer);
+      finish(`closed ${code}: ${(reason && reason.toString().slice(0, 160)) || ''}`);
+    });
+    ws.on('error', () => { /* a close event with the reason follows */ });
+  });
+
+  const results = [];
+  for (const c of candidates) {
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await probe(c));
+  }
+  return results;
+}

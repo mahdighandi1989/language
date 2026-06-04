@@ -22,6 +22,7 @@ import {
   status,
   listModels,
   testGemini,
+  liveModelCheck,
 } from '../controllers/geminiController.js';
 import { analyzeFiles } from '../controllers/analysisController.js';
 import { ingestAnalytics, getAnalytics } from '../controllers/analyticsController.js';
@@ -42,6 +43,7 @@ apiRouter.get('/api/gemini/status', requireAuth, status);
 
 // Model utilities
 apiRouter.get('/api/list-models', requireGeminiKey, listModels);
+apiRouter.get('/api/live-model-check', requireGeminiKey, liveModelCheck);
 apiRouter.get('/api/test-gemini', requireGeminiKey, testGemini);
 
 // File analysis
