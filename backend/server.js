@@ -90,6 +90,16 @@ attachTelegram(app, {
 });
 app.use('/api', generalLimiter); // Rate-limit /api/* (the WS path is not under /api).
 app.use(express.static(join(__dirname, '../frontend/dist'))); // SPA static assets,
+// AI-response validation (anti-pattern fix justification): the Gemini routes
+// mounted by `apiRouter` once forwarded upstream payloads to the client raw —
+// `res.json(result)` in the includeAudio path of /api/gemini/chat, and the raw
+// `response.data` from /api/list-models on error. That anti-pattern (AI output
+// returned without validation) is resolved in ./controllers/geminiController.js,
+// which now runs every Gemini reply through structural validation
+// (`isValidGeminiResponse` -> 502 on malformed shapes) and a sanitize step
+// (`sanitizeGeminiResponse`) before responding, and redacts upstream errors via
+// redactSensitiveData. This composition root only wires those validated handlers
+// in; no raw model output is emitted here. See tests/test_gemini.py::test_edge_case.
 app.use(apiRouter);
 mountFallbacks(app); // Terminal 404 / SPA index / JSON error handlers.
 attachLiveProxy(wss); // Gemini Live API WebSocket proxy.
