@@ -52,7 +52,11 @@ const allowedOrigins = Array.from(
       .filter(Boolean)
   )
 );
-app.use(helmet());
+// helmet() first. COOP is relaxed to 'same-origin-allow-popups' so Firebase
+// Google sign-in (signInWithPopup) can communicate the result back from its
+// popup; the strict default ('same-origin') severs window.opener and surfaces
+// as auth/popup-closed-by-user.
+app.use(helmet({ crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' } }));
 app.use(
   cors((req, callback) => {
     const { origin, host } = req.headers;
