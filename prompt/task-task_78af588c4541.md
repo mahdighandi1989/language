@@ -3,14 +3,14 @@ task_id: task_78af588c4541
 title: مدیریت وابستگی‌ها و بازآرایی کد بک‌اند
 type: other
 priority: high
-execution_priority: 2450
+execution_priority: 2500
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:20:22.192691+00:00'
-updated_at: '2026-06-04T17:12:02.476343+00:00'
+updated_at: '2026-06-04T17:18:19.001045+00:00'
 tags:
 - consolidated
 - post_verify_merge
