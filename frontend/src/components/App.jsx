@@ -917,7 +917,7 @@ export default function App() {
         <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
             <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} />
-            <main className="flex-1 p-4 sm:p-6 md:p-8 bg-slate-100">{renderContent()}</main>
+            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">{renderContent()}</main>
             <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
             {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
             <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
@@ -2334,7 +2334,7 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
             <h3 className="text-lg font-bold mb-4 text-slate-700">ایجاد درس جدید</h3>
             <div className="flex gap-2">
               <input type="text" value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} placeholder="مثال: مکالمه در رستوران" className="flex-1 p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent transition" />
-              <button onClick={handleAddLesson} className="bg-teal-500 text-white px-5 py-3 rounded-xl hover:bg-teal-600 flex items-center gap-2 font-bold transition-transform hover:scale-105"><Plus size={20} /> ایجاد</button>
+              <button onClick={handleAddLesson} className="bg-teal-500 text-white px-5 py-3 rounded-xl hover:bg-teal-600 flex items-center gap-2 font-bold transition-transform hover:scale-105 flex-shrink-0 whitespace-nowrap"><Plus size={20} /> ایجاد</button>
             </div>
             <h3 className="text-lg font-bold mt-8 mb-4 text-slate-700">آخرین دروس</h3>
             <ul className="space-y-3">{lessons.slice(-3).reverse().map(lesson => (<li key={lesson.id} className="p-4 bg-slate-50 rounded-xl hover:bg-teal-50 cursor-pointer transition-colors" onClick={() => navigateTo('lesson', lesson)}>{lesson.title}</li>))}</ul>
@@ -5364,7 +5364,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
                 <span className="text-xs font-bold">Live</span>
               </button>
             </div>
-            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold flex-shrink-0 ml-auto" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
+            <button onClick={() => handleSend()} className="bg-teal-500 text-white px-6 py-2 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 font-bold flex-shrink-0 mr-auto" disabled={isLoading || voiceConversationMode}>{isLoading ? '...' : 'ارسال'}</button>
           </div>
         </div>
       </div>
