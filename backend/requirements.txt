@@ -4,3 +4,7 @@
 pytest>=8.0
 pytest-cov>=5.0
 pytest-mock>=3.14
+# PyYAML powers the render.yaml deployment-config validation suite
+# (tests/test_render_yaml.py). Without it those tests importorskip and the
+# render.yaml invariants go unchecked, so it is a required test dependency.
+PyYAML>=6.0
