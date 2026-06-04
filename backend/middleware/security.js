@@ -45,7 +45,7 @@ export function applySecurity(app) {
         "font-src 'self' data: https://fonts.gstatic.com; " +
         "img-src 'self' data: blob: https://*.googleusercontent.com; " +
         "media-src 'self' data: blob:; " +
-        "connect-src 'self' https://*.googleapis.com wss://*.googleapis.com " +
+        "connect-src 'self' blob: data: https://*.googleapis.com wss://*.googleapis.com " +
         'https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com ' +
         'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com;'
     );
