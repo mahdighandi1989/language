@@ -5,12 +5,12 @@ type: other
 priority: high
 execution_priority: 2200
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: pending
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:27:46.879724+00:00'
-updated_at: '2026-06-04T06:01:39.468075+00:00'
+updated_at: '2026-06-04T10:19:52.380931+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -961,7 +961,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 5: گام ۳: نوشتن template message فارسی معنادار برای 'verify_failed'
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن یک template message به زبان فارسی و معنادار برای event 'verify_failed' است. این template باید در فراخوانی `notify_event` استفاده شود. این مرحله فقط شامل نوشتن template است و شامل اضافه کردن فراخوانی یا تست نمی‌شود.
 **Excerpt:**
 ```
@@ -996,7 +996,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 9: گام ۲: تغییر کد برای محقق شدن outcome target
-**Status:** `done` (100%)
+**Status:** `partial` (99%)
 **Scope:** این مرحله شامل تغییر کد در backend و frontend برای محقق شدن outcome target است. این تغییرات شامل اضافه کردن لاگ‌های تحلیلی برای ثبت معیارهایی مانند chat_success_rate, avg_response_time, user_engagement_rate, conversion_rate در فایل‌های backend/app/analytics.py و frontend/src/analytics.js است. این مرحله فقط شامل تغییر کد است و شامل نوشتن تست یا مستندات نمی‌شود.
 **Excerpt:**
 ```
@@ -1004,7 +1004,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 10: گام ۳: نوشتن یک end-to-end test برای اندازه‌گیری outcome
-**Status:** `not_done` (0%)
+**Status:** `partial` (99%)
 **Scope:** این مرحله شامل نوشتن یک end-to-end test است که outcome را اندازه‌گیری می‌کند. این تست باید در فایل tests/e2e/test_outcome_metrics.py قرار گیرد و تابع test_outcome_metrics_collected را شامل شود. این مرحله فقط شامل نوشتن تست است و شامل تغییر کد یا مستندات نمی‌شود.
 **Excerpt:**
 ```
