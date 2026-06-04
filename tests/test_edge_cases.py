@@ -19,6 +19,7 @@ while a valid one is accepted.
 """
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -28,6 +29,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # The AI-command guards were extracted from src/App.jsx into a dedicated module.
 GUARD_SOURCE = REPO_ROOT / "frontend" / "src" / "components" / "InspectorBridge.jsx"
+
+# The npm lockfile that pins the backend's dependencies. The original finding
+# pointed at ``backend/package-lock.json``; this repo keeps a single root
+# lockfile (``package-lock.json``) that pins those same backend dependencies, so
+# the test checks whichever lockfile(s) actually exist.
+_LOCKFILE_CANDIDATES = (
+    REPO_ROOT / "package-lock.json",
+    REPO_ROOT / "backend" / "package-lock.json",
+)
 
 
 def _app_source() -> str:
@@ -59,6 +69,71 @@ def test_invalid_selector_or_url():
     # Behavioral check: run the pure validators in Node to confirm the edge
     # cases actually behave. Skips cleanly when Node is unavailable.
     _assert_validator_behavior(source)
+
+
+def _existing_lockfiles() -> list[Path]:
+    return [p for p in _LOCKFILE_CANDIDATES if p.is_file()]
+
+
+def _resolved_without_integrity(lockfile: Path) -> list[str]:
+    """Return registry-``resolved`` packages in *lockfile* that lack an
+    ``integrity`` hash — exactly the threshold-outcome mismatch under test."""
+    data = json.loads(lockfile.read_text(encoding="utf-8"))
+    packages = data.get("packages", {})
+    offenders: list[str] = []
+    for name, meta in packages.items():
+        # The workspace root ("") and linked workspaces resolve from disk, not
+        # the registry, so they legitimately carry no integrity hash.
+        if not name or not isinstance(meta, dict) or meta.get("link"):
+            continue
+        if meta.get("resolved") and not meta.get("integrity"):
+            offenders.append(name)
+    return offenders
+
+
+def test_integrity_mismatch():
+    """Lockfile edge case: ``resolved`` (condition) must imply ``integrity``
+    (outcome).
+
+    The reported anti-pattern was a threshold-outcome mismatch: some packages
+    pinned with a ``resolved`` registry URL carried no ``integrity`` hash, so
+    npm could install those tarballs without Subresource-Integrity verification
+    while others were verified. This test pins the invariant — every
+    registry-resolved package must also carry an integrity hash — so the
+    mismatch cannot silently reappear. It also re-checks the two packages named
+    in the original report (``accepts`` and ``array-flatten``).
+    """
+    lockfiles = _existing_lockfiles()
+    assert lockfiles, (
+        "no package-lock.json found; expected the root (or backend) lockfile to "
+        "pin dependencies with integrity hashes"
+    )
+
+    for lockfile in lockfiles:
+        # A malformed lockfile raises here, doubling as the JSON-validity check
+        # the task asked for.
+        data = json.loads(lockfile.read_text(encoding="utf-8"))
+        assert isinstance(data.get("packages"), dict) and data["packages"], (
+            f"{lockfile.name} has no 'packages' map"
+        )
+
+        offenders = _resolved_without_integrity(lockfile)
+        assert not offenders, (
+            "threshold-outcome mismatch in "
+            f"{lockfile.name}: these packages are pinned with a 'resolved' URL "
+            "but have no 'integrity' hash, so their install is unverifiable:\n  "
+            + "\n  ".join(sorted(offenders))
+        )
+
+        # Guard the exact packages from the original report when present.
+        for pkg in ("node_modules/accepts", "node_modules/array-flatten"):
+            meta = data["packages"].get(pkg)
+            if meta is None:
+                continue
+            assert meta.get("integrity", "").startswith("sha"), (
+                f"{pkg} in {lockfile.name} must carry a Subresource-Integrity "
+                f"hash (got {meta.get('integrity')!r})"
+            )
 
 
 def _extract_function(source: str, name: str) -> str:
