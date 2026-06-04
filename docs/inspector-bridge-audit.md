@@ -162,3 +162,26 @@ silently on `main`.
 - Keep debug/monitoring instrumentation out of `index.html`; gate any such code
   behind an env flag (`import.meta.env.DEV`) so it can never reach production.
 - Never use `postMessage(..., '*')`; always pass an explicit target origin.
+
+---
+
+## 6. Verification log
+
+**2026-06-04 — re-verification.** Confirmed the resolution still holds end to end:
+
+- `frontend/index.html` carries no Inspector Bridge tracking — no `isInIframe`
+  branch, no `window.parent.postMessage`, no `wss://` socket, no `console.log`.
+- The surviving `frontend/src/components/InspectorBridge.jsx` does no
+  cross-origin messaging and opens no external socket; it only validates
+  commands arriving over the app's own `postMessage` channel.
+- Edge-case coverage is green:
+  `tests/test_oversight.py::test_no_iframe_skip`,
+  `tests/test_oversight.py::test_surviving_bridge_does_not_phone_home`, and
+  `tests/test_inspector_bridge_no_iframe.py` all pass.
+- The eight duplicated `Add Inspector Bridge Script` commits and their per-commit
+  diffs remain documented above and under
+  [`docs/inspector-bridge-diffs/`](inspector-bridge-diffs/); no history was
+  rewritten (see §5b).
+
+No code change was required — the anti-pattern is already resolved and every
+acceptance criterion is covered by the files cited in this audit.
