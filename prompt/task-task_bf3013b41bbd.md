@@ -3,14 +3,14 @@ task_id: task_bf3013b41bbd
 title: راه‌اندازی زیرساخت تست Pytest بک‌اند
 type: other
 priority: high
-execution_priority: 2450
+execution_priority: 2500
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:21:26.867239+00:00'
-updated_at: '2026-06-04T17:25:42.210875+00:00'
+updated_at: '2026-06-04T17:36:26.831636+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -9184,9 +9184,9 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 - [x] **مرحله 5: نوشتن تست‌های واحد برای ماژول احراز هویت (Authentication)** — نوشتن تست‌های واحد برای توابع احراز هویت (register, login, logout, token validation). تست‌ها باید سناریوهای موفق و ناموفق (رمز عبور اشتباه، توکن منقضی، کاربر تکراری) را پوشش دهند. خارج از این مرحله: تست‌های integration با دیتابیس یا API endpoints.
 - [x] **مرحله 6: نوشتن تست‌های واحد برای ماژول API (Endpoints اصلی)** — نوشتن تست‌های واحد برای API endpoints اصلی با استفاده از TestClient فریم‌ورک وب (FastAPI TestClient یا Flask test client). تست‌ها باید status codes، response body، و validation خطاها را بررسی کنند. پوشش حداقل 70% از endpoints. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا سرویس‌های خارج
 - [x] **مرحله 7: نوشتن تست‌های integration برای دیتابیس (Database Layer)** — نوشتن تست‌های integration که با دیتابیس واقعی (SQLite در حافظه یا PostgreSQL تستی) کار می‌کنند. تست‌ها باید CRUD operations، روابط بین جداول (مثلاً کاربر-واژه، جلسه-واژه)، و transaction rollback را بررسی کنند. خارج از این مرحله: تست‌های performance یا stress testing.
-- [ ] **مرحله 8: نوشتن تست‌های integration برای API با دیتابیس واقعی** — نوشتن تست‌های integration که API endpoints را با دیتابیس واقعی (در حافظه) تست می‌کنند. این تست‌ها flow کامل کاربر (ثبت‌نام → ورود → افزودن واژه → ایجاد جلسه مطالعه → تکمیل جلسه) را پوشش می‌دهند. خارج از این مرحله: تست‌های UI یا سرویس‌های خارجی.
+- [x] **مرحله 8: نوشتن تست‌های integration برای API با دیتابیس واقعی** — نوشتن تست‌های integration که API endpoints را با دیتابیس واقعی (در حافظه) تست می‌کنند. این تست‌ها flow کامل کاربر (ثبت‌نام → ورود → افزودن واژه → ایجاد جلسه مطالعه → تکمیل جلسه) را پوشش می‌دهند. خارج از این مرحله: تست‌های UI یا سرویس‌های خارجی.
 - [x] **مرحله 9: نوشتن تست‌های واحد برای ماژول آمار و گزارش‌گیری (Statistics)** — نوشتن تست‌های واحد برای توابع ماژول statistics (مثلاً get_user_stats, get_learning_progress, get_weak_words). تست‌ها باید محاسبات آماری (میانگین، درصد پیشرفت، تعداد کلمات یادگرفته‌شده) را بررسی کنند. خارج از این مرحله: تست‌های integration یا UI.
-- [ ] **مرحله 10: نوشتن تست‌های واحد برای ماژول مدیریت فلش‌کارت‌ها (Flashcards)** — نوشتن تست‌های واحد برای توابع ماژول flashcards (مثلاً create_flashcard, review_flashcard, get_due_cards, update_card_rating). تست‌ها باید logic الگوریتم SM-2 (spaced repetition) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 10: نوشتن تست‌های واحد برای ماژول مدیریت فلش‌کارت‌ها (Flashcards)** — نوشتن تست‌های واحد برای توابع ماژول flashcards (مثلاً create_flashcard, review_flashcard, get_due_cards, update_card_rating). تست‌ها باید logic الگوریتم SM-2 (spaced repetition) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 11: نوشتن تست‌های واحد برای ماژول مدیریت کاربران (User Management)** — نوشتن تست‌های واحد برای توابع ماژول user (مثلاً update_profile, change_password, delete_account, get_user_settings). تست‌ها باید validation داده‌ها و مجوزهای دسترسی را بررسی کنند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 12: نوشتن تست‌های واحد برای ماژول ابزارهای کمکی (Utilities)** — نوشتن تست‌های واحد برای توابع کمکی (مثلاً text_processing, date_helpers, validators, formatters). تست‌ها باید edge cases (ورودی‌های خالی، کاراکترهای خاص، مقادیر مرزی) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 13: نوشتن تست‌های واحد برای ماژول مدیریت زبان‌ها (Language Management)** — نوشتن تست‌های واحد برای توابع ماژول language (مثلاً add_language, get_supported_languages, detect_language, get_language_pairs). تست‌ها باید logic تشخیص زبان و اعتبارسنجی کدهای زبان (ISO 639-1) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
@@ -9198,10 +9198,10 @@ _(همهٔ URL ها، آدرس‌ها، نام‌ها، و کلمات کلیدی
 - [ ] **مرحله 19: نوشتن تست‌های واحد برای ماژول مدیریت پیشرفت (Progress Tracking)** — نوشتن تست‌های واحد برای توابع ماژول progress (مثلاً update_progress, get_learning_streak, get_mastery_level, get_achievements). تست‌ها باید logic محاسبه streak و mastery level را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 20: نوشتن تست‌های واحد برای ماژول مدیریت گروه‌های مطالعه (Study Groups)** — نوشتن تست‌های واحد برای توابع ماژول study_groups (مثلاً create_group, join_group, leave_group, get_group_members, assign_leaderboard). تست‌ها باید logic مجوزها و نقش‌های گروهی را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [ ] **مرحله 21: نوشتن تست‌های واحد برای ماژول مدیریت API Key (API Key Management)** — نوشتن تست‌های واحد برای توابع ماژول api_keys (مثلاً generate_api_key, revoke_api_key, validate_api_key, get_api_key_usage). تست‌ها باید logic rate limiting و محدودیت‌های دسترسی را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
-- [ ] **مرحله 22: نوشتن تست‌های واحد برای ماژول مدیریت خطاها و لاگینگ (Error Handling & Logging)** — نوشتن تست‌های واحد برای توابع ماژول error_handling (مثلاً log_error, get_error_logs, send_error_report, format_error_response). تست‌ها باید سناریوهای مختلف خطا (validation error, database error, external service error) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
-- [ ] **مرحله 23: نوشتن تست‌های واحد برای ماژول مدیریت کش (Caching)** — نوشتن تست‌های واحد برای توابع ماژول caching (مثلاً cache_get, cache_set, cache_delete, cache_invalidate_pattern). تست‌ها باید logic انقضای کش و invalidate کردن را پوشش دهند. خارج از این مرحله: تست‌های integration با Redis یا Memcached واقعی.
-- [ ] **مرحله 24: نوشتن تست‌های واحد برای ماژول مدیریت فایل (File Management)** — نوشتن تست‌های واحد برای توابع ماژول file (مثلاً upload_file, download_file, delete_file, get_file_metadata). تست‌ها باید validation نوع فایل، محدودیت حجم، و virus scanning mock را پوشش دهند. خارج از این مرحله: تست‌های integration با سرویس‌های ذخیره‌سازی ابری.
-- [ ] **مرحله 25: نوشتن تست‌های واحد برای ماژول مدیریت تنظیمات (Settings Management)** — نوشتن تست‌های واحد برای توابع ماژول settings (مثلاً get_setting, update_setting, reset_to_default, get_all_settings). تست‌ها باید validation مقادیر و type checking را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 22: نوشتن تست‌های واحد برای ماژول مدیریت خطاها و لاگینگ (Error Handling & Logging)** — نوشتن تست‌های واحد برای توابع ماژول error_handling (مثلاً log_error, get_error_logs, send_error_report, format_error_response). تست‌ها باید سناریوهای مختلف خطا (validation error, database error, external service error) را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
+- [x] **مرحله 23: نوشتن تست‌های واحد برای ماژول مدیریت کش (Caching)** — نوشتن تست‌های واحد برای توابع ماژول caching (مثلاً cache_get, cache_set, cache_delete, cache_invalidate_pattern). تست‌ها باید logic انقضای کش و invalidate کردن را پوشش دهند. خارج از این مرحله: تست‌های integration با Redis یا Memcached واقعی.
+- [x] **مرحله 24: نوشتن تست‌های واحد برای ماژول مدیریت فایل (File Management)** — نوشتن تست‌های واحد برای توابع ماژول file (مثلاً upload_file, download_file, delete_file, get_file_metadata). تست‌ها باید validation نوع فایل، محدودیت حجم، و virus scanning mock را پوشش دهند. خارج از این مرحله: تست‌های integration با سرویس‌های ذخیره‌سازی ابری.
+- [x] **مرحله 25: نوشتن تست‌های واحد برای ماژول مدیریت تنظیمات (Settings Management)** — نوشتن تست‌های واحد برای توابع ماژول settings (مثلاً get_setting, update_setting, reset_to_default, get_all_settings). تست‌ها باید validation مقادیر و type checking را پوشش دهند. خارج از این مرحله: تست‌های integration یا UI.
 - [x] **مرحله 26: نوشتن تست‌های واحد برای ماژول مدیریت ایمیل (Email Service)** — نوشتن تست‌های واحد برای توابع ماژول email (مثلاً send_email, send_verification_email, send_password_reset, get_email_templates). تست‌ها باید با mock کردن سرویس SMTP نوشته شوند و سناریوهای مختلف (موفق، خطای سرویس، invalid email) را پوشش دهند. خارج از این مرحله: تست‌های integration با سرویس‌های واقعی.
 - [x] **مرحله 27: نوشتن تست‌های واحد برای ماژول مدیریت جستجو (Search Service)** — نوشتن تست‌های واحد برای توابع ماژول search (مثلاً search_words, search_lessons, search_users, get_search_suggestions). تست‌ها باید logic جستجوی فازی (fuzzy search) و ranking نتایج را پوشش دهند. خارج از این مرحله: تست‌های integration با Elasticsearch یا Algolia واقعی.
 - [x] **مرحله 28: نوشتن تست‌های واحد برای ماژول مدیریت ترجمه (Translation Service)** — نوشتن تست‌های واحد برای توابع ماژول translation (مثلاً translate_text, get_translation_languages, detect_source_language, get_translation_history). تست‌ها باید با mock کردن سرویس‌های ترجمه (Google Translate, DeepL) نوشته شوند. خارج از این مرحله: تست‌های integration با سرویس‌های واقعی.
@@ -17755,7 +17755,7 @@ def app():
 ```
 
 ### Step 8: ایجاد ساختار پایه دایرکتوری تست و تنظیمات اولیه pytest و jest
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد دایرکتوری‌های tests/، tests/unit/، tests/integration/ در ریشه پروژه، ایجاد فایل‌های __init__.py خالی، ایجاد فایل conftest.py با fixtureهای سراسری، و تنظیمات اولیه backend/package.json برای اجرای تست‌های jest است. خارج از scope: نوشتن تست‌های خاص، fixtureهای ماژولار، یا اجرای واقعی تست‌ها.
 **Excerpt:**
 ```
@@ -17829,7 +17829,7 @@ tests/
 ```
 
 ### Step 10: راه‌اندازی ساختار تست‌ها و نصب وابستگی‌های تست در بک‌اند
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد دایرکتوری‌ها و فایل‌های اولیه تست (unit و integration)، نصب کتابخانه‌های تست (jest, supertest, nock) در بک‌اند، و اجرای دستورات اعتبارسنجی برای اطمینان از صحت پیکربندی است. فایل‌های backend/tests/__init__.py و backend/tests/conftest.py در روت پروژه و همچنین backend/tests/__init__.py و backend/tests/__init__.py ایجاد می‌شوند. دستورات npm install و pytest/npm test برای اعتبارسنجی اجرا می‌شوند.
 **Excerpt:**
 ```
@@ -18241,7 +18241,7 @@ export async function register(username, email, password) {
 ```
 
 ### Step 22: نوشتن تست‌های واحد برای API endpoints اصلی با TestClient
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای API endpoints اصلی با استفاده از TestClient فریم‌ورک وب (FastAPI TestClient یا Flask test client) است. تست‌ها باید status codes، response body، و validation خطاها را بررسی کنند. پوشش حداقل 70% از endpoints. خارج از این مرحله: تست‌های integration با دیتابیس واقعی یا سرویس‌های خارجی. ریسک‌های احراز هویت (مانند شکستن درخواست‌های frontend به دلیل عدم ارسال token) باید در طراحی تست‌ها لحاظ شود.
 **Excerpt:**
 ```
@@ -18270,7 +18270,7 @@ _(مستقل)_
 ```
 
 ### Step 23: نوشتن تست‌های واحد برای API endpoints اصلی بک‌اند (Express.js)
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای ۶ endpoint اصلی در فایل backend/server.js است: POST /api/gemini/chat, POST /api/gemini/tts, GET /api/health, GET /api/list-models, GET /api/test-gemini, POST /api/analyze-files. تست‌ها باید با استفاده از Vitest و Supertest نوشته شوند و موارد زیر را پوشش دهند: بررسی status codes (200, 400, 500)، بررسی response body (text, audioData, error)، بررسی validation خطاها (API key not configured, missing fields)، بررسی رفتار در حالت‌های مختلف (includeAudio=true/false). همچنین نیاز به export کردن app از server.js برای استفاده در تست‌ها وجود دارد. این مرحله شامل نوشتن فایل تست در backend/tests/ و به‌روزرسانی backend/package.json برای اضافه کردن وابستگی‌ها و script تست نیست (این موارد در مرحله جداگانه‌ای انجام می‌شود).
 **Excerpt:**
 ```
@@ -18296,7 +18296,7 @@ endpoints اصلی:
 ```
 
 ### Step 24: ایجاد تست‌های خودکار برای API endpoints بک‌اند با استفاده از Supertest و Vitest
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل ایجاد فایل تست backend/tests/api.test.js با تست‌های واحد برای 6 endpoint اصلی بک‌اند (health, gemini/chat, gemini/tts, list-models, test-gemini, analyze-files) است. همچنین شامل تغییر backend/server.js برای export app، نصب وابستگی‌های supertest و vitest، و اضافه کردن اسکریپت تست به package.json می‌باشد. mock کردن فراخوانی‌های خارجی (fetch به Gemini API) و پوشش حداقل 70% از endpoints نیز جزو این بخش است. موارد خارج از scope: تست‌های frontend، تست‌های integration، تست‌های end-to-end، و تست‌های مربوط به سرویس‌های دیگر.
 **Excerpt:**
 ```
@@ -18334,7 +18334,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 25: افزودن تست‌های خودکار برای endpoint‌های health و chat با export app از server.js
-**Status:** `pending` (0%)
+**Status:** `done` (100%)
 **Scope:** این بخش شامل تغییر server.js برای export کردن app (به جای export پیش‌فرض یا عدم export)، افزودن تست برای GET /api/health با استفاده از vitest و supertest، و افزودن تست برای POST /api/gemini/chat در حالت عدم وجود API key است. خارج از scope: تست‌های مربوط به emailService، تست‌های frontend، یا هر endpoint دیگر. نکته حیاتی: تست POST نیاز به import داینامیک بعد از clear کردن env دارد.
 **Excerpt:**
 ```
