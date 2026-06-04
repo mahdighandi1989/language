@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// =============================================================================
+// Firestore Security Rules — the REAL enforcement layer for the Google sign-in
+// + admin-approval access control. Client-side gating in the SPA is only UX;
+// these rules are what actually stop an unapproved (or unauthenticated) user
+// from reading or writing data.
+//
+// HOW TO DEPLOY: open Firebase Console -> Firestore Database -> Rules, paste the
+// whole content of this file, then "Publish".
+//
+// IMPORTANT: replace the placeholder in adminEmails() below with YOUR admin
+// Gmail address (the same value you put in the VITE_ADMIN_EMAILS env var on
+// Render). This is what lets the owner bootstrap their own admin record on the
+// very first login. It is not a secret.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // <<< EDIT THIS: your admin Gmail address(es) >>>
+    function adminEmails() {
+      return ['your-admin-email@gmail.com'];
+    }
+
+    function isAdminByEmail() {
+      return isSignedIn() && request.auth.token.email in adminEmails();
+    }
+
+    // True if the *caller* is an admin: either bootstrapped by email, or their
+    // own accessControl record carries role == 'admin'.
+    function callerIsAdmin(appId) {
+      return isAdminByEmail() ||
+        (isSignedIn() &&
+         exists(/databases/$(database)/documents/artifacts/$(appId)/accessControl/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/artifacts/$(appId)/accessControl/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // True if the caller's own accessControl record is approved.
+    function callerIsApproved(appId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/artifacts/$(appId)/accessControl/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/artifacts/$(appId)/accessControl/$(request.auth.uid)).data.status == 'approved';
+    }
+
+    // Access-control records: one per user. Only the owner/admin may approve,
+    // change roles or permissions. A signed-in user may read their own record
+    // and create their initial PENDING record (but can never self-approve).
+    match /artifacts/{appId}/accessControl/{uid} {
+      allow read: if callerIsAdmin(appId) || (isSignedIn() && request.auth.uid == uid);
+
+      allow create: if callerIsAdmin(appId) ||
+        (isSignedIn() && request.auth.uid == uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.role == 'user');
+
+      allow update, delete: if callerIsAdmin(appId);
+    }
+
+    // Per-user application data. Readable/writable only by the owning, APPROVED
+    // user — or by an admin (for support / one-time data migration).
+    match /artifacts/{appId}/users/{uid}/{document=**} {
+      allow read, write: if callerIsAdmin(appId) ||
+        (callerIsApproved(appId) && request.auth.uid == uid);
+    }
+
+    // Everything else is denied by default.
+  }
+}

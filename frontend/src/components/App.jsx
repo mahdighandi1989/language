@@ -14,8 +14,9 @@ import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Tras
 // --- Firebase Imports ---
 // Auth + Firestore primitives used directly by the root component. App/auth/db
 // bootstrapping lives in ../hooks/useFirebase.
-import { signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { isAdminEmail, fullPermissions, emptyPermissions, normalizePermissions, canAccess, PERMISSION_SECTIONS } from '../auth/access';
 
 // --- Extracted modules (contexts, hooks, command guard, utilities) ---
 import { ExecutionFlowProvider, useExecutionFlow, FLOW_NODES } from '../contexts/ExecutionFlowContext';
@@ -477,6 +478,15 @@ export default function App() {
   const [firebaseServices, setFirebaseServices] = useState({ auth: null, db: null });
   const dataRef = useRef(data);
 
+  // --- Auth / access-control state ---
+  // authUser: the signed-in Google user (or null). accessRecord: that user's
+  // accessControl document ({ status, role, permissions, ... }). accessStatus is
+  // the gate the UI renders against: 'loading' until known, then one of
+  // 'nofirebase' (local dev), 'signedOut', 'pending', 'rejected', 'approved'.
+  const [authUser, setAuthUser] = useState(null);
+  const [accessRecord, setAccessRecord] = useState(null);
+  const [accessStatus, setAccessStatus] = useState('loading');
+
   // localStorage helper functions
   const STORAGE_KEY = 'lebanese_dialect_app_data';
   const BACKUP_KEY = 'lebanese_dialect_app_backup';
@@ -558,143 +568,145 @@ export default function App() {
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-    // If no Firebase config, use localStorage
+    // No Firebase configured (local dev): single-user localStorage mode with no
+    // sign-in gate, so the app remains usable offline / in development.
     if (!firebaseConfig) {
-        console.log("Firebase not configured - using localStorage for data persistence");
-        const savedData = loadFromLocalStorage();
-        setData(savedData);
-        setUserId('local-user');
-        setIsAuthReady(true);
-        return;
+      console.log('Firebase not configured - using localStorage (no sign-in gate)');
+      setData(loadFromLocalStorage());
+      setUserId('local-user');
+      setAccessRecord({ status: 'approved', role: 'admin', permissions: fullPermissions(), email: 'local' });
+      setAccessStatus('nofirebase');
+      setIsAuthReady(true);
+      return;
     }
-
-    // Firebase setup with SHARED user ID for cross-device sync
-    // Using a fixed user ID so all devices share the same data
-    const SHARED_USER_ID = 'shared-user-mahdi';
 
     const { auth, db } = initFirebase(firebaseConfig, { debug: true });
     setFirebaseServices({ auth, db });
 
-    // Sign in anonymously (required for Firestore access) but use shared user ID for data
-    const setupFirestore = async () => {
-      try {
-        await signInAnonymously(auth);
-        console.log("Signed in anonymously, using shared user ID for data sync");
+    let unsubData = null;     // listener on the user's own data document
+    let unsubAccess = null;   // listener on the user's accessControl record
 
-        setUserId(SHARED_USER_ID);
-        const userDocRef = doc(db, `/artifacts/${appId}/users/${SHARED_USER_ID}/data/main`);
+    const stopData = () => { if (unsubData) { unsubData(); unsubData = null; } };
+    const stopAccess = () => { if (unsubAccess) { unsubAccess(); unsubAccess = null; } };
 
-        const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const firestoreData = docSnap.data();
-            console.log("Data loaded from Firestore (shared)");
-
-            // Check if Firestore data is empty but we have a backup
-            const firestoreHasContent = firestoreData.lessons?.length > 0 ||
-              Object.values(firestoreData.knowledgeBase || {}).some(arr => arr?.length > 0);
-
-            if (!firestoreHasContent) {
-              const backup = loadBackup();
-              if (backup) {
-                console.log("Firestore is empty but backup found! Showing recovery option.");
-                setModalConfig({
-                  title: "🔄 بازیابی داده‌ها",
-                  message: `داده‌های شما در سرور خالی است، اما یک نسخه پشتیبان از تاریخ ${backup.timestamp} یافت شد. آیا می‌خواهید داده‌ها را بازیابی کنید؟`,
-                  buttons: [
-                    {
-                      label: "بازیابی کن",
-                      onClick: () => {
-                        setData(backup.data);
-                        setDoc(userDocRef, backup.data).catch(err => console.error("Error restoring backup to Firestore:", err));
-                        setModalConfig(null);
-                      },
-                      className: "bg-teal-600 text-white hover:bg-teal-700"
-                    },
-                    {
-                      label: "شروع از اول",
-                      onClick: () => {
-                        setData({...initialData, ...firestoreData});
-                        setModalConfig(null);
-                      },
-                      className: "bg-slate-200 hover:bg-slate-300"
-                    }
-                  ]
-                });
-                setData({...initialData, ...firestoreData});
-              } else {
-                setData(prevData => ({...initialData, ...firestoreData}));
-              }
-            } else {
-              setData(prevData => ({...initialData, ...firestoreData}));
-              // Save backup when we have valid data
-              saveBackup({...initialData, ...firestoreData});
-            }
-          } else {
-            console.log("Firestore document doesn't exist - checking for backup");
-            const backup = loadBackup();
-            if (backup) {
-              console.log("Found backup! Restoring to Firestore.");
-              setModalConfig({
-                title: "🔄 بازیابی داده‌ها",
-                message: `سند در سرور یافت نشد، اما یک نسخه پشتیبان از تاریخ ${backup.timestamp} یافت شد. آیا می‌خواهید داده‌ها را بازیابی کنید؟`,
-                buttons: [
-                  {
-                    label: "بازیابی کن",
-                    onClick: () => {
-                      setData(backup.data);
-                      setDoc(userDocRef, backup.data).catch(err => console.error("Error restoring backup to Firestore:", err));
-                      setModalConfig(null);
-                    },
-                    className: "bg-teal-600 text-white hover:bg-teal-700"
-                  },
-                  {
-                    label: "شروع از اول",
-                    onClick: () => {
-                      setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
-                      setData(initialData);
-                      setModalConfig(null);
-                    },
-                    className: "bg-slate-200 hover:bg-slate-300"
-                  }
-                ]
-              });
-              setData(initialData); // Set initial while waiting for user choice
-            } else {
-              console.log("No backup found - creating initial document");
-              setDoc(userDocRef, initialData).catch(err => console.error("Error creating initial document:", err));
-              setData(initialData);
-            }
-          }
-          setIsAuthReady(true);
-        }, (error) => {
-            console.error("Error listening to document:", error);
-            // Report the Firebase/Firestore failure so it counts toward error_rate.
-            reportError(error, { source: 'firebase' });
-            // Fallback to localStorage if Firestore fails
-            const savedData = loadFromLocalStorage();
-            setData(savedData);
-            setUserId('local-user');
-            setIsAuthReady(true);
-        });
-
-        return unsubscribe;
-      } catch (error) {
-        console.error("Authentication failed:", error);
-        // Report the Firebase auth failure so it counts toward error_rate.
-        reportError(error, { source: 'firebase' });
-        // Fallback to localStorage
-        const savedData = loadFromLocalStorage();
-        setData(savedData);
-        setUserId('local-user');
+    // Stream the approved user's own data document (load or initialize).
+    const startDataSync = (uid) => {
+      if (unsubData) return;
+      setUserId(uid);
+      const userDocRef = doc(db, `/artifacts/${appId}/users/${uid}/data/main`);
+      unsubData = onSnapshot(userDocRef, (snap) => {
+        if (snap.exists()) {
+          const merged = { ...initialData, ...snap.data() };
+          setData(merged);
+          saveBackup(merged);
+        } else {
+          setDoc(userDocRef, initialData).catch((e) => console.error('init data doc:', e));
+          setData(initialData);
+        }
         setIsAuthReady(true);
+      }, (error) => {
+        console.error('Data listener error:', error);
+        reportError(error, { source: 'firebase' });
+        setIsAuthReady(true);
+      });
+    };
+
+    // One-time migration: copy the legacy shared document into the owner's own
+    // data doc on first admin login so existing lessons are not lost.
+    const migrateSharedDataForAdmin = async (uid) => {
+      try {
+        const adminRef = doc(db, `/artifacts/${appId}/users/${uid}/data/main`);
+        const adminSnap = await getDoc(adminRef);
+        if (adminSnap.exists() && (adminSnap.data()?.lessons?.length > 0)) return;
+        const sharedSnap = await getDoc(doc(db, `/artifacts/${appId}/users/shared-user-mahdi/data/main`));
+        if (sharedSnap.exists()) {
+          await setDoc(adminRef, sharedSnap.data(), { merge: true });
+          console.log('Migrated legacy shared data to the owner account.');
+        }
+      } catch (e) {
+        console.warn('Shared-data migration skipped:', e?.message || e);
       }
     };
 
-    let unsubscribe = null;
-    setupFirestore().then(unsub => { unsubscribe = unsub; });
+    const handleSignedIn = async (user) => {
+      setAuthUser(user);
+      const email = user.email || '';
+      const accessRef = doc(db, `/artifacts/${appId}/accessControl/${user.uid}`);
+
+      // Ensure an accessControl record exists / is correct for this user.
+      try {
+        const snap = await getDoc(accessRef);
+        if (isAdminEmail(email)) {
+          // Bootstrap / maintain the owner as an approved admin.
+          await setDoc(accessRef, {
+            email,
+            displayName: user.displayName || '',
+            photoURL: user.photoURL || '',
+            role: 'admin',
+            status: 'approved',
+            permissions: fullPermissions(),
+            updatedAt: serverTimestamp(),
+            ...(snap.exists() ? {} : { requestedAt: serverTimestamp() }),
+          }, { merge: true });
+        } else if (!snap.exists()) {
+          // First sign-in for a normal user: create a PENDING request.
+          await setDoc(accessRef, {
+            email,
+            displayName: user.displayName || '',
+            photoURL: user.photoURL || '',
+            role: 'user',
+            status: 'pending',
+            permissions: emptyPermissions(),
+            requestedAt: serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        console.error('accessControl bootstrap error:', e);
+      }
+
+      // Live-subscribe so approvals / permission changes apply without reload.
+      unsubAccess = onSnapshot(accessRef, async (snap) => {
+        const rec = snap.exists()
+          ? snap.data()
+          : { status: 'pending', role: 'user', permissions: emptyPermissions(), email };
+        setAccessRecord(rec);
+        const approved = rec.role === 'admin' || rec.status === 'approved';
+        setAccessStatus(approved ? 'approved' : (rec.status === 'rejected' ? 'rejected' : 'pending'));
+        if (approved) {
+          if (rec.role === 'admin') await migrateSharedDataForAdmin(user.uid);
+          startDataSync(user.uid);
+        } else {
+          stopData();
+          setUserId(null);
+          setIsAuthReady(true);
+        }
+      }, (error) => {
+        console.error('Access listener error:', error);
+        setAccessStatus('pending');
+        setIsAuthReady(true);
+      });
+    };
+
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      stopData();
+      stopAccess();
+      if (!user) {
+        setAuthUser(null);
+        setAccessRecord(null);
+        setUserId(null);
+        setData(initialData);
+        setAccessStatus('signedOut');
+        setIsAuthReady(true);
+        return;
+      }
+      setAccessStatus('loading');
+      handleSignedIn(user);
+    });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      stopData();
+      stopAccess();
+      if (unsubAuth) unsubAuth();
     };
   }, []);
 
@@ -887,6 +899,18 @@ export default function App() {
         return <div className="w-full h-full flex items-center justify-center"><Loader size={48} className="animate-spin text-teal-500" /></div>;
     }
     const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection, addPronunciationCorrection };
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    // Admin-only management panel.
+    if (activeView === 'admin') {
+      return accessRecord?.role === 'admin'
+        ? <AdminPanel db={firebaseServices.db} appId={appId} currentUid={authUser?.uid} />
+        : <AccessNotice title="دسترسی محدود" message="این بخش فقط برای مدیر است." />;
+    }
+    // Per-section access gate (admins bypass via canAccess). Applies only when a
+    // real access record exists (Firebase mode); local dev mode is full access.
+    if (accessRecord && !canAccess(accessRecord, activeView)) {
+      return <AccessNotice title="دسترسی ندارید" message="هنوز به این بخش دسترسی داده نشده است. لطفاً با مدیر تماس بگیرید." />;
+    }
     switch (activeView) {
       case 'dashboard': return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
       case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} addLesson={addLesson} />;
@@ -902,6 +926,35 @@ export default function App() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      const { auth } = firebaseServices;
+      if (!auth) return;
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (e) {
+      console.error('Google sign-in failed:', e);
+      setModalConfig({ title: 'خطای ورود', message: 'ورود با گوگل ناموفق بود. دوباره تلاش کنید.' });
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      const { auth } = firebaseServices;
+      if (auth) await signOut(auth);
+    } catch (e) { console.error('sign-out failed:', e); }
+  };
+
+  // --- Auth gate: render the access screen until the user is approved ---
+  if (accessStatus === 'loading') {
+    return <AuthGateScreen variant="loading" />;
+  }
+  if (accessStatus === 'signedOut') {
+    return <AuthGateScreen variant="login" onSignIn={handleGoogleSignIn} />;
+  }
+  if (accessStatus === 'pending' || accessStatus === 'rejected') {
+    return <AuthGateScreen variant={accessStatus} user={authUser} onSignOut={handleSignOut} />;
+  }
+
   return (
     <ExecutionFlowProvider firebaseServices={firebaseServices} userId={userId}>
       <LiveChatProvider
@@ -916,14 +969,16 @@ export default function App() {
         <InspectorBridge />
         <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
-            <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} />
+            <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} />
             <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">{renderContent()}</main>
             <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
             {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
-            <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
-              <Sparkles size={28} />
-            </button>
-            {isAssistantOpen && <GlobalAssistant onClose={() => setIsAssistantOpen(false)} updateKnowledgeBase={updateKnowledgeBase} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />}
+            {canAccess(accessRecord, 'assistant') && (
+              <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
+                <Sparkles size={28} />
+              </button>
+            )}
+            {isAssistantOpen && canAccess(accessRecord, 'assistant') && <GlobalAssistant onClose={() => setIsAssistantOpen(false)} updateKnowledgeBase={updateKnowledgeBase} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />}
             {globalSelectionPopup && (
                 <button
                     onMouseDown={(e) => e.stopPropagation()}
@@ -957,17 +1012,22 @@ export default function App() {
 
 // --- Components ---
 
-function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick }) {
+function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick, accessRecord, onSignOut, userEmail }) {
     const fileInputRef = useRef(null);
     const [mobileOpen, setMobileOpen] = useState(false);
     const handleImportClick = () => fileInputRef.current.click();
-    const NavLink = ({ view, icon: Icon, label }) => (
-        <li>
-            <button onClick={() => { navigateTo(view); setMobileOpen(false); }} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-slate-300 hover:bg-slate-700 hover:text-white ${activeView === view ? 'bg-slate-900 text-white font-bold' : ''}`}>
-                <Icon size={22} /><span>{label}</span>
-            </button>
-        </li>
-    );
+    const isAdmin = accessRecord?.role === 'admin';
+    // Only render a nav entry the user is actually allowed to open.
+    const NavLink = ({ view, icon: Icon, label }) => {
+        if (!canAccess(accessRecord, view)) return null;
+        return (
+            <li>
+                <button onClick={() => { navigateTo(view); setMobileOpen(false); }} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-slate-300 hover:bg-slate-700 hover:text-white ${activeView === view ? 'bg-slate-900 text-white font-bold' : ''}`}>
+                    <Icon size={22} /><span>{label}</span>
+                </button>
+            </li>
+        );
+    };
     return (
         <nav className="w-full md:w-72 bg-slate-800 text-white md:p-6 flex flex-col shadow-2xl md:sticky md:top-0 md:h-screen">
             <div className="flex items-center justify-between gap-3 p-4 md:p-0 md:mb-8">
@@ -993,15 +1053,177 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
                 <NavLink view="cultural" icon={LifeBuoy} label="فرهنگ لبنان" />
                 <NavLink view="journal" icon={Edit3} label="ژورنال فعالیت‌ها" />
                 <NavLink view="archivedConversations" icon={Archive} label="مکالمات بایگانی شده" />
+                {isAdmin && (
+                    <li>
+                        <button onClick={() => { navigateTo('admin'); setMobileOpen(false); }} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-amber-300 hover:bg-slate-700 hover:text-white ${activeView === 'admin' ? 'bg-slate-900 text-white font-bold' : ''}`}>
+                            <Users size={22} /><span>مدیریت کاربران</span>
+                        </button>
+                    </li>
+                )}
             </ul>
             <div className="space-y-2 pt-4 border-t border-slate-700">
-                <button onClick={() => { navigateTo('settings'); setMobileOpen(false); }} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Settings size={20} /><span>تنظیمات و شخصی‌سازی</span></button>
+                {canAccess(accessRecord, 'settings') && (
+                    <button onClick={() => { navigateTo('settings'); setMobileOpen(false); }} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Settings size={20} /><span>تنظیمات و شخصی‌سازی</span></button>
+                )}
                 <button onClick={exportData} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Download size={20} /><span>خروجی (JSON)</span></button>
                 <button onClick={handleImportClick} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Upload size={20} /><span>بارگذاری (JSON)</span></button>
                 <input type="file" ref={fileInputRef} onChange={importData} className="hidden" accept=".json" />
+                {userEmail && (
+                    <div className="pt-3 mt-2 border-t border-slate-700">
+                        <p className="text-xs text-slate-400 px-4 mb-1 truncate" title={userEmail}>{userEmail}</p>
+                        <button onClick={onSignOut} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-red-300 hover:bg-red-900/40 hover:text-white"><X size={20} /><span>خروج از حساب</span></button>
+                    </div>
+                )}
             </div>
             </div>
         </nav>
+    );
+}
+
+// Full-screen auth gate: login, pending-approval, rejected, and loading states.
+function AuthGateScreen({ variant, user, onSignIn, onSignOut }) {
+    const Wrapper = ({ children }) => (
+        <div dir="rtl" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-teal-900 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+                <div className="bg-teal-500 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white"><GraduationCap size={36} /></div>
+                <h1 className="text-2xl font-bold text-slate-800 mb-2">لهجه لبنانی</h1>
+                {children}
+            </div>
+        </div>
+    );
+    if (variant === 'loading') {
+        return <Wrapper><div className="flex justify-center py-6"><Loader size={40} className="animate-spin text-teal-500" /></div></Wrapper>;
+    }
+    if (variant === 'login') {
+        return (
+            <Wrapper>
+                <p className="text-slate-600 mb-6">برای استفاده از برنامه، با حساب گوگل خود وارد شوید.</p>
+                <button onClick={onSignIn} className="w-full flex items-center justify-center gap-3 bg-teal-500 text-white py-3 rounded-xl hover:bg-teal-600 font-bold transition-colors">
+                    ورود با گوگل
+                </button>
+            </Wrapper>
+        );
+    }
+    if (variant === 'pending') {
+        return (
+            <Wrapper>
+                <div className="text-4xl mb-3">⏳</div>
+                <h2 className="text-lg font-bold text-slate-800 mb-2">در انتظار تأیید مدیر</h2>
+                <p className="text-slate-600 mb-2">درخواست شما ثبت شد. پس از تأیید مدیر می‌توانید وارد شوید.</p>
+                {user?.email && <p className="text-xs text-slate-400 mb-6">{user.email}</p>}
+                <button onClick={onSignOut} className="w-full bg-slate-200 text-slate-700 py-2 rounded-xl hover:bg-slate-300 transition-colors">خروج از حساب</button>
+            </Wrapper>
+        );
+    }
+    // rejected
+    return (
+        <Wrapper>
+            <div className="text-4xl mb-3">🚫</div>
+            <h2 className="text-lg font-bold text-slate-800 mb-2">دسترسی رد شد</h2>
+            <p className="text-slate-600 mb-2">متأسفانه دسترسی شما به این برنامه تأیید نشده است.</p>
+            {user?.email && <p className="text-xs text-slate-400 mb-6">{user.email}</p>}
+            <button onClick={onSignOut} className="w-full bg-slate-200 text-slate-700 py-2 rounded-xl hover:bg-slate-300 transition-colors">خروج از حساب</button>
+        </Wrapper>
+    );
+}
+
+// Inline notice shown when an approved user opens a section they lack access to.
+function AccessNotice({ title, message }) {
+    return (
+        <div className="max-w-md mx-auto mt-12 bg-white rounded-2xl shadow p-8 text-center" dir="rtl">
+            <div className="text-4xl mb-3">🔒</div>
+            <h2 className="text-lg font-bold text-slate-800 mb-2">{title}</h2>
+            <p className="text-slate-600">{message}</p>
+        </div>
+    );
+}
+
+// Admin-only panel: review access requests, approve/reject, and grant per-section
+// permissions. All writes are guarded by Firestore rules (admin-only).
+function AdminPanel({ db, appId, currentUid }) {
+    const [users, setUsers] = useState([]);
+    const [error, setError] = useState(null);
+    useEffect(() => {
+        if (!db) return;
+        const col = collection(db, `/artifacts/${appId}/accessControl`);
+        const unsub = onSnapshot(col,
+            (snap) => setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() }))),
+            (e) => { console.error('admin list error:', e); setError('خطا در خواندن لیست کاربران (قوانین Firestore را بررسی کنید).'); }
+        );
+        return () => unsub();
+    }, [db, appId]);
+
+    const patchUser = (uid, patch) =>
+        updateDoc(doc(db, `/artifacts/${appId}/accessControl/${uid}`), { ...patch, updatedAt: serverTimestamp() })
+            .catch((e) => console.error('update user error:', e));
+    const setStatus = (uid, status) => patchUser(uid, { status, decidedAt: serverTimestamp() });
+    const togglePerm = (u, key) => {
+        const perms = normalizePermissions(u.permissions);
+        perms[key] = !perms[key];
+        patchUser(u.uid, { permissions: perms });
+    };
+    const setAllPerms = (u, val) => patchUser(u.uid, { permissions: val ? fullPermissions() : emptyPermissions() });
+
+    const StatusBadge = ({ status }) => {
+        const map = { approved: 'bg-green-100 text-green-700', pending: 'bg-amber-100 text-amber-700', rejected: 'bg-red-100 text-red-700' };
+        const label = { approved: 'تأییدشده', pending: 'در انتظار', rejected: 'ردشده' };
+        return <span className={`text-xs px-2 py-1 rounded-full ${map[status] || 'bg-slate-100 text-slate-600'}`}>{label[status] || status}</span>;
+    };
+
+    const UserCard = ({ u }) => {
+        const perms = normalizePermissions(u.permissions);
+        const isSelf = u.uid === currentUid;
+        return (
+            <div className="bg-white rounded-xl shadow-sm border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                        <p className="font-bold text-slate-800">{u.displayName || u.email || u.uid}</p>
+                        <p className="text-xs text-slate-500">{u.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {u.role === 'admin' && <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">مدیر</span>}
+                        <StatusBadge status={u.status} />
+                    </div>
+                </div>
+                {!isSelf && (
+                    <div className="flex gap-2 flex-wrap">
+                        <button onClick={() => setStatus(u.uid, 'approved')} disabled={u.status === 'approved'} className="px-3 py-1.5 rounded-lg text-sm bg-green-500 text-white hover:bg-green-600 disabled:bg-slate-300">تأیید</button>
+                        <button onClick={() => setStatus(u.uid, 'rejected')} disabled={u.status === 'rejected'} className="px-3 py-1.5 rounded-lg text-sm bg-red-500 text-white hover:bg-red-600 disabled:bg-slate-300">رد</button>
+                        <button onClick={() => setAllPerms(u, true)} className="px-3 py-1.5 rounded-lg text-sm bg-slate-200 hover:bg-slate-300">همه دسترسی‌ها</button>
+                        <button onClick={() => setAllPerms(u, false)} className="px-3 py-1.5 rounded-lg text-sm bg-slate-200 hover:bg-slate-300">حذف همه</button>
+                    </div>
+                )}
+                {isSelf && <p className="text-xs text-slate-400">(این حساب شماست)</p>}
+                {!isSelf && u.role !== 'admin' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {PERMISSION_SECTIONS.map((s) => (
+                            <label key={s.key} className="flex items-center gap-2 text-sm bg-slate-50 rounded-lg px-2 py-1.5 cursor-pointer">
+                                <input type="checkbox" checked={perms[s.key]} onChange={() => togglePerm(u, s.key)} />
+                                <span>{s.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const pending = users.filter((u) => u.status === 'pending');
+    const others = users.filter((u) => u.status !== 'pending');
+
+    return (
+        <div dir="rtl" className="max-w-4xl mx-auto space-y-6">
+            <h1 className="text-2xl font-bold text-slate-800">مدیریت کاربران</h1>
+            {error && <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
+            <section className="space-y-3">
+                <h2 className="font-bold text-slate-700">درخواست‌های در انتظار ({pending.length})</h2>
+                {pending.length === 0 ? <p className="text-slate-500 text-sm">درخواست جدیدی نیست.</p> : pending.map((u) => <UserCard key={u.uid} u={u} />)}
+            </section>
+            <section className="space-y-3">
+                <h2 className="font-bold text-slate-700">همهٔ کاربران ({others.length})</h2>
+                {others.map((u) => <UserCard key={u.uid} u={u} />)}
+            </section>
+        </div>
     );
 }
 
