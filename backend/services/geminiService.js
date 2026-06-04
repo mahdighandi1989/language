@@ -159,7 +159,7 @@ export async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemP
 
 // Analyze a large uploaded file using the Gemini File API (default model).
 export async function analyzeWithGeminiFileAPI(fileUri, prompt, systemPrompt, useExtendedModel = false) {
-  const model = useExtendedModel ? 'gemini-2.0-flash-exp' : 'gemini-2.5-flash';
+  const model = useExtendedModel ? 'gemini-2.5-flash' : 'gemini-2.5-flash';
   return analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemPrompt, model);
 }
 
