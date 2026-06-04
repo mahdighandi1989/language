@@ -3,14 +3,14 @@ task_id: task_ef0945bccb18
 title: افزودن بررسی وابستگی و تست App.jsx به CI/CD
 type: other
 priority: medium
-execution_priority: 3300
+execution_priority: 3350
 status: pending
 external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:59.888932+00:00'
-updated_at: '2026-06-04T17:52:51.930995+00:00'
+updated_at: '2026-06-04T18:43:58.913149+00:00'
 tags:
 - consolidated
 - post_verify_merge
