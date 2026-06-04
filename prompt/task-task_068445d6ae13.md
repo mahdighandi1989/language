@@ -5,12 +5,12 @@ type: other
 priority: high
 execution_priority: 2150
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: pending
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:30:57.201755+00:00'
-updated_at: '2026-06-03T18:42:39.004345+00:00'
+updated_at: '2026-06-03T22:34:53.519181+00:00'
 tags:
 - consolidated
 - post_verify_merge
@@ -2328,7 +2328,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 5: اجرای گام ۳ از Task 1: Align کردن طرف دیگر با Ground Truth
-**Status:** `done` (100%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای گام ۳ از مراحل اجرایی پیشنهادی Task 1 است: 'طرف دیگر را با ground truth align کن.' این شامل تغییر کد یا مستندات در فایل‌های مرتبط (مانند backend/app/ai_llm/pipeline.py یا docs/design/ai_llm_pipeline.md) برای هماهنگ‌سازی طرف غیرمرجع (مثلاً پارسر خروجی) با طرف مرجع (ground truth) است. خارج از این مرحله: تصمیم‌گیری در مورد ground truth (گام ۲) یا نوشتن integration test (گام ۴).
 — [merged] این مرحله شامل اجرای گام ۳ از مراحل اجرایی پیشنهادی Task 2 است: 'طرف دیگر را با ground truth align کن.' این شامل تغییر کد یا مستندات در فایل‌های مرتبط (مانند backend/app/ai_llm/pipeline.py یا docs/design/ai_llm_pipeline.md) برای هماهنگ‌سازی طرف غیرمرجع (مثلاً اطلاعات موجود) با طرف مرجع (ground truth) است. خارج از این مرحله: تصمیم‌گیری در مورد ground truth (گام ۲) یا نوشتن integration test (گام ۴).
 **Excerpt:**
@@ -2337,7 +2337,7 @@ verify می‌تواند پیاده‌سازی متفاوت ولی هم‌ارز
 ```
 
 ### Step 6: اجرای گام ۴ از Task 1: نوشتن Integration Test
-**Status:** `partial` (50%)
+**Status:** `not_done` (0%)
 **Scope:** این مرحله شامل اجرای گام ۴ از مراحل اجرایی پیشنهادی Task 1 است: 'integration test برای این pipeline بنویس تا regression جلوگیری شود.' این شامل نوشتن یک تست یکپارچه‌سازی در فایل tests/integration/test_ai_llm_pipeline.py است که pipeline `ai_llm` را با فرض ground truth جدید اجرا کرده و عبور می‌کند. خارج از این مرحله: align کردن کد (گام ۳) یا تست‌های واحد.
 — [merged] این مرحله شامل اجرای گام ۴ از مراحل اجرایی پیشنهادی Task 2 است: 'integration test برای این pipeline بنویس تا regression جلوگیری شود.' این شامل نوشتن یک تست یکپارچه‌سازی در فایل tests/backend/ai_llm/test_pipeline_integration.py است که pipeline `ai_llm` را با ارکستراسیون جدید اجرا کرده و عبور می‌کند. خارج از این مرحله: align کردن کد (گام ۳) یا تست‌های واحد.
 **Excerpt:**
