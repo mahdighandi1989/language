@@ -1,22 +1,22 @@
 ---
 task_id: task_ef0945bccb18
-title: افزودن بررسی وابستگی‌ها و تست App.jsx به CI/CD
+title: افزودن بررسی وابستگی و تست App.jsx به CI/CD
 type: other
 priority: medium
-execution_priority: 3250
+execution_priority: 3300
 status: pending
-external_status: done
-verification_status: applied_externally_pending_verify
+external_status: claimed
+verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:59.888932+00:00'
-updated_at: '2026-06-04T17:47:10.250794+00:00'
+updated_at: '2026-06-04T17:52:51.930995+00:00'
 tags:
 - consolidated
 - post_verify_merge
 ---
 
-# افزودن بررسی وابستگی‌ها و تست App.jsx به CI/CD
+# افزودن بررسی وابستگی و تست App.jsx به CI/CD
 
 ## Raw Idea
 
@@ -1541,7 +1541,7 @@ _(مستقل)_
 ```
 
 ### Step 3: تغییر کد برای اضافه کردن بررسی وابستگی‌ها در CI/CD و npm audit برای تسک 1
-**Status:** `partial` (70%)
+**Status:** `partial` (80%)
 **Scope:** این مرحله شامل تغییر کد برای محقق کردن outcome target است. باید مرحله بررسی و به‌روزرسانی وابستگی‌ها در CI/CD pipeline (فایل .github/workflows/ci.yml) اضافه شود و npm audit به صورت منظم اجرا شود. فایل‌های frontend/package.json و frontend/package.json نیز ممکن است نیاز به تغییر داشته باشند. خارج از این مرحله: نوشتن تست E2E و اضافه کردن metric/log. نکته حیاتی: verify_method=static است و grep_patterns شامل 'npm audit', 'package-lock.json', 'ci/cd', 'dependency check' است.
 **Excerpt:**
 ```
@@ -1592,7 +1592,7 @@ _(مستقل)_
 ```
 
 ### Step 9: بررسی اولیه و شناسایی وضعیت فعلی repo برای تسک 2 (تست واحد App.jsx)
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل بررسی کامل repo برای تشخیص وجود تست‌های واحد برای frontend/src/App.jsx است. باید با grep/search و خواندن فایل‌های مرتبط مشخص شود که چه تست‌هایی از قبل وجود دارند و چه کامپوننت‌ها و logicهایی در App.jsx نیاز به تست دارند. خارج از این مرحله: هیچ تغییری در کد ایجاد نمی‌شود. نکته حیاتی: اگر همه چیز از قبل به‌درستی انجام شده، باید یک کامیت توضیحی (no-op) ثبت شود.
 **Excerpt:**
 ```
@@ -1607,7 +1607,7 @@ _(مستقل)_
 ```
 
 ### Step 10: نوشتن تست‌های واحد برای کامپوننت‌ها و logic در App.jsx برای تسک 2
-**Status:** `not_done` (0%)
+**Status:** `done` (100%)
 **Scope:** این مرحله شامل نوشتن تست‌های واحد برای کامپوننت‌ها و logic موجود در frontend/src/App.jsx است. باید از فریم‌ورک تست (احتمالاً Jest با React Testing Library) استفاده شود. تست‌ها باید رفتارهای observable کامپوننت‌ها را پوشش دهند. خارج از این مرحله: تغییر کد App.jsx. نکته حیاتی: تست‌های موجود نباید شکسته شوند.
 **Excerpt:**
 ```
