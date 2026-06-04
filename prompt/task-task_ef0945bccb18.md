@@ -3,14 +3,14 @@ task_id: task_ef0945bccb18
 title: افزودن بررسی وابستگی‌ها و npm audit به CI/CD
 type: other
 priority: medium
-execution_priority: 3150
+execution_priority: 3200
 status: pending
-external_status: pending
+external_status: claimed
 verification_status: partial
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-01T19:32:59.888932+00:00'
-updated_at: '2026-06-03T18:42:44.961043+00:00'
+updated_at: '2026-06-04T17:26:31.771580+00:00'
 tags:
 - consolidated
 - post_verify_merge
