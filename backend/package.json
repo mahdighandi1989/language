@@ -11,7 +11,8 @@
     "test:cov": "python -m pytest --cov=. --cov-report=term-missing",
     "test:node": "node --test 'tests/test_*.js'",
     "deps:check": "npm ci --ignore-scripts",
-    "audit": "npm audit --omit=dev --audit-level=critical"
+    "audit": "npm audit --omit=dev --audit-level=critical",
+    "ci:deps": "echo 'CI/CD dependency check: npm ci validates package-lock.json against package.json, then npm audit scans for vulnerabilities' && npm run deps:check && npm run audit"
   },
   "dependencies": {
     "cors": "^2.8.5",

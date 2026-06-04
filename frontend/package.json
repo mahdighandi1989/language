@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "deps:check": "npm ci --ignore-scripts",
-    "audit": "npm audit --omit=dev --audit-level=critical"
+    "audit": "npm audit --omit=dev --audit-level=critical",
+    "ci:deps": "echo 'CI/CD dependency check: npm ci validates package-lock.json against package.json, then npm audit scans for vulnerabilities' && npm run deps:check && npm run audit"
   },
   "dependencies": {
     "firebase": "^10.7.0",

@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2026-06-03T00:00:00+00:00",
-  "total": 1,
+  "generated_at": "2026-06-04T00:00:00+00:00",
+  "total": 2,
   "items": [
     {
       "task_id": "task_0193aa4e943f",
@@ -10,6 +10,14 @@
       "file": "TO-DO/todo-task-0193aa4e.md",
       "status": "pending",
       "summary": "اقدام دستی کاربر: محدودسازی کلید وب Firebase به دامنه‌های مجاز در Google Cloud/Firebase Console (راهنما در docs/security.md §6)."
+    },
+    {
+      "task_id": "task_ef0945bccb18",
+      "task_title": "افزودن بررسی وابستگی‌ها و npm audit به CI/CD",
+      "execution_priority": 3150,
+      "file": "TO-DO/todo-task-task_ef0.md",
+      "status": "pending",
+      "summary": "اقدام دستی maintainer: کپی docs/ci.workflow.example.yml به .github/workflows/ci.yml (توکن اتوماسیون مجوز workflows ندارد). همهٔ بررسی‌ها فعلاً با `npm run ci:deps` و تست E2E قابل اجرا هستند."
     }
   ]
 }

@@ -136,7 +136,14 @@ rather than as "keep dependencies tidy":
 - **Where it runs:** the `.github/workflows/ci.yml` pipeline performs the
   `npm ci` dependency check and the `npm audit` vulnerability scan on every push
   and pull request (and on a weekly schedule), turning "are our dependencies
-  consistent and safe?" into an objective, regression-guarded check.
+  consistent and safe?" into an objective, regression-guarded check. The same
+  checks are runnable locally (and in any CI runner) without GitHub Actions via
+  `npm run ci:deps` at the repo root or inside either workspace — it runs the
+  `npm ci` dependency check followed by `npm audit`. The ready-to-install
+  workflow lives at `docs/ci.workflow.example.yml`; copy it to
+  `.github/workflows/ci.yml` (a maintainer with the `workflows` permission must
+  perform this one-time install, as the automation token cannot write under
+  `.github/workflows/`).
 
 ## Testing
 
