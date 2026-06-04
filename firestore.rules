@@ -22,9 +22,9 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // <<< EDIT THIS: your admin Gmail address(es) >>>
+    // Admin Gmail address(es) — must match VITE_ADMIN_EMAILS on Render.
     function adminEmails() {
-      return ['your-admin-email@gmail.com'];
+      return ['mohamad.mahdi1988@gmail.com'];
     }
 
     function isAdminByEmail() {

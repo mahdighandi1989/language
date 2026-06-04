@@ -33,6 +33,11 @@ services:
         sync: false
       - key: VITE_APP_ID
         sync: false
+      # Admin allow-list for the Google sign-in + approval system (build-time,
+      # comma-separated Gmail addresses). The owner listed here is auto-approved
+      # as admin. Must match the adminEmails() list in firestore.rules.
+      - key: VITE_ADMIN_EMAILS
+        sync: false
       # Two-way Telegram bot (optional). Set the token in the dashboard to
       # enable; leave unset to keep the bot dormant. See docs/telegram-user-guide.md
       - key: TELEGRAM_BOT_TOKEN
