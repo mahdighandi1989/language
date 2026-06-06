@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-06T07:55:56.682858+00:00'
-updated_at: '2026-06-06T07:55:56.699743+00:00'
+updated_at: '2026-06-06T08:02:34.831977+00:00'
 target_files:
 - tests/_backend_helpers.py
 ---
@@ -460,6 +460,6 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. ریشه anti-pattern تشخیص داده شد
-2. یا کد اصلاح شد، یا کامنت توجیهی اضافه شد
-3. تست edge case نوشته شد
+1. ریشه anti-pattern تشخیص داده شد _(verify: manual_only)_
+2. یا کد اصلاح شد، یا کامنت توجیهی اضافه شد _(verify: static)_
+3. تست edge case نوشته شد _(verify: backend_test)_
