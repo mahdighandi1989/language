@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-06T07:57:19.277144+00:00'
-updated_at: '2026-06-06T07:57:19.277145+00:00'
+updated_at: '2026-06-06T08:04:05.915542+00:00'
 target_files:
 - backend/middleware/security.js
 ---
@@ -477,6 +477,6 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. CSP فقط دامنه‌های دقیق مورد نیاز را مجاز کند.
-2. عملکرد Firebase Auth و Gemini API بدون مشکل باقی بماند.
-3. تست‌های E2E برای اطمینان از عدم شکستن ارتباطات اضافه شود.
+1. CSP فقط دامنه‌های دقیق مورد نیاز را مجاز کند. _(verify: static)_
+2. عملکرد Firebase Auth و Gemini API بدون مشکل باقی بماند. _(verify: ui_interaction)_
+3. تست‌های E2E برای اطمینان از عدم شکستن ارتباطات اضافه شود. _(verify: backend_test)_
