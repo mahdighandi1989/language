@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-06T07:55:56.682858+00:00'
-updated_at: '2026-06-06T08:02:34.831977+00:00'
+updated_at: '2026-06-13T08:13:37.898522+00:00'
 target_files:
 - tests/_backend_helpers.py
 ---
@@ -30,6 +30,15 @@ The `boot_backend` function starts the Node.js server on an ephemeral port (`POR
 ---
 [scan #3 at 2026-06-06T07:55:56.699738+00:00]
 The `boot_backend` function is under-engineered for its stated purpose: 'to boot and *interact* with the Node.js backend server'. By not providing the dynamically assigned port (which is crucial for interaction), the function fails to fully support its intended use case. While `expected_outputs` lis
+---
+[scan #4 at 2026-06-13T08:10:56.685309+00:00]
+The `boot_backend` function's Node.js probe uses a fixed `setTimeout(() => process.exit(0), 600)` to signal readiness. This is a significant anti-pattern. It makes a stale assumption that the Node.js server will be fully initialized and listening within 600 milliseconds. This creates a race conditio
+---
+[scan #5 at 2026-06-13T08:10:56.734644+00:00]
+The `ensure_node_modules` function assumes that if the `node_modules` directory exists, the frontend dependencies are up-to-date. This is a stale assumption; changes to `package.json` or `package-lock.json` would not trigger a re-installation, potentially leading to builds failing due to outdated or
+---
+[scan #6 at 2026-06-13T08:12:03.361837+00:00]
+The `ensure_node_modules` function checks for the mere presence of `node_modules` directories (`REPO_ROOT/node_modules` or `BACKEND_DIR/node_modules`) to determine if dependencies are installed. This is a brittle assumption. The presence of the directory does not guarantee that all dependencies are 
 
 ## Prompt
 
