@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-13T08:10:56.605690+00:00'
-updated_at: '2026-06-13T08:10:56.605692+00:00'
+updated_at: '2026-06-13T08:17:46.728660+00:00'
 target_files:
 - backend/services/geminiService.js
 - backend/services/geminiService.js
@@ -486,6 +486,6 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. اگر Gemini ظرف timeout پاسخ ندهد، تابع یک خطای مشخص (مثلاً 'Gemini request timed out') throw می‌کند
-2. کنترلر چت برای timeout کد 504 یا 502 برمی‌گرداند نه hang نامحدود
-3. تست واحد با fetch ساختگی کند، رفتار timeout را تأیید می‌کند
+1. اگر Gemini ظرف timeout پاسخ ندهد، تابع یک خطای مشخص (مثلاً 'Gemini request timed out') throw می‌کند _(verify: backend_test)_
+2. کنترلر چت برای timeout کد 504 یا 502 برمی‌گرداند نه hang نامحدود _(verify: api_response)_
+3. تست واحد با fetch ساختگی کند، رفتار timeout را تأیید می‌کند _(verify: backend_test)_
