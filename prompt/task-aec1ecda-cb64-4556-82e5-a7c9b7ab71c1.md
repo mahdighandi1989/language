@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-13T08:11:44.209275+00:00'
-updated_at: '2026-06-13T08:11:44.209288+00:00'
+updated_at: '2026-06-13T08:18:18.855006+00:00'
 ---
 
 # [Effectiveness] Enhance AI Pipeline Robustness and Hallucination Guards
@@ -455,10 +455,10 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. outcome target به‌صورت measurable بازنویسی شد
-2. کد تغییر کرد تا outcome target محقق شود
-3. test E2E که outcome را اندازه می‌گیرد عبور می‌کند
-4. metric/log اضافه شد تا در production outcome rate قابل تشخیص باشد
+1. outcome target به‌صورت measurable بازنویسی شد _(verify: manual_only)_
+2. کد تغییر کرد تا outcome target محقق شود _(verify: static)_
+3. test E2E که outcome را اندازه می‌گیرد عبور می‌کند _(verify: backend_test)_
+4. metric/log اضافه شد تا در production outcome rate قابل تشخیص باشد _(verify: static)_
 
 ## Task Steps
 
