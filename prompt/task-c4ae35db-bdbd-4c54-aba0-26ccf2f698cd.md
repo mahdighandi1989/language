@@ -10,7 +10,7 @@ verification_status: pending
 watched_id: 6b04f8bd-b562-4fb9-9cd9-0c27458ced59
 project: mahdighandi1989/language
 created_at: '2026-06-13T08:09:10.568130+00:00'
-updated_at: '2026-06-13T08:09:10.568132+00:00'
+updated_at: '2026-06-13T08:15:50.430576+00:00'
 target_files:
 - backend/middleware/firebaseAuth.js
 ---
@@ -467,5 +467,5 @@ _(مستقل)_
 
 ## Acceptance Criteria
 
-1. هنگامی که `FIREBASE_PROJECT_ID` تنظیم نشده است و یک توکن احراز هویت نامعتبر به یک مسیر `optionalAuth` ارسال می‌شود، پاسخ 401 Unauthorized باشد.
-2. هنگامی که `FIREBASE_PROJECT_ID` تنظیم نشده است و هیچ توکن احراز هویتی ارسال نمی‌شود، درخواست همچنان به لایه‌های بعدی منتقل شود.
+1. هنگامی که `FIREBASE_PROJECT_ID` تنظیم نشده است و یک توکن احراز هویت نامعتبر به یک مسیر `optionalAuth` ارسال می‌شود، پاسخ 401 Unauthorized باشد. _(verify: api_response)_
+2. هنگامی که `FIREBASE_PROJECT_ID` تنظیم نشده است و هیچ توکن احراز هویتی ارسال نمی‌شود، درخواست همچنان به لایه‌های بعدی منتقل شود. _(verify: api_response)_
