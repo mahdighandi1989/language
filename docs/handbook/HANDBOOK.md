@@ -61,10 +61,18 @@
 |---|---|---|---|
 | 2026-11-02 | قواعدِ چندعاملی: AGENTS.md (همهٔ ابزارها) + CLAUDE.md (فارسی) + docs_gate در ship | ابزارهای مختلف قواعدِ متفاوت می‌خواندند | فقط CLAUDE.md؛ قواعد در README |
 | 2026-11-02 | «به‌روزبودن» = تغییرِ کد ⇒ WORKLOG و PROGRESS در همان ارسال | دفترِ کار عقب می‌ماند | مقایسهٔ mtime؛ شمارشِ کامیت |
+| 2026-11-02 | «نظارت» = API ِ Express + ذخیره‌سازِ دوگانه (Firestore با حسابِ سرویس، وگرنه فایل با هشدارِ «موقت») | بک‌اند اعتبارنامهٔ نوشتن در Firestore نداشت | نوشتن از مرورگر با قوانینِ Firestore (حسابِ ناظر Firebase Auth می‌خواست و نگهبان‌ها در rules ناقص می‌ماند)؛ JSON روی دیسکِ Render بی‌هشدار (پاک‌شدنِ بی‌صدا)؛ مسدودکردنِ کامل تا حسابِ سرویس (مالک امشب نمی‌توانست بیازماید) |
+| 2026-11-02 | ناظر = حسابِ ماشینی با `SUPERVISOR_PASSWORD` و توکنِ HMAC ِ ۱۲ ساعته | رمز فقط روی Render | حسابِ گوگلِ جدا (ورودِ تعاملی لازم)؛ کلیدِ ثابتِ API در ریپو |
+| 2026-11-02 | مسیرِ صفحه در hash (`#/lessons`) | «بازگشت» به جای کادر و عکسِ ناظر بدونِ URL ممکن نبود | react-router (وابستگیِ تازه و تغییرِ بزرگ در App.jsx) |
 | 2026-11-02 | `render.yaml` آینهٔ دستیِ سرویسِ `language` | Blueprint ِ متصل وجود ندارد | ساختنِ Blueprint (سرویسِ تکراری می‌ساخت) |
 
 ## ۷. نظارت و سرکشی
-(مرحلهٔ ۲ — هنوز ساخته نشده.)
+برگه‌های مالک روی صفحه‌های برنامه + ناظرِ خودکار (دو روتین). شرحِ کامل، نگهبان‌های API، متغیرها و روتین‌ها:
+[`../supervisor/README.md`](../supervisor/README.md)؛ دستورِ ناظر: [`../supervisor/PROMPT.md`](../supervisor/PROMPT.md).
+- وضعیتِ گفت‌وگو (`pending/open/answered/approved/filed/declined`) جدا از نتیجهٔ واقعی (`fixed/partial/not-done/needs-owner`).
+- رنگ از نتیجه مشتق می‌شود؛ «سبز» فقط `fixed` با تصویرِ بعد.
+- **محدودیتِ فعلی:** تا `FIREBASE_SERVICE_ACCOUNT` تنظیم نشود، ذخیره موقت است (OPEN_ITEMS ۱)؛ تا `FIREBASE_PROJECT_ID` و
+  `SUPERVISOR_PASSWORD` تنظیم نشوند، مالک/ناظر وارد نمی‌شوند (OPEN_ITEMS ۴).
 
 ## ۸. روند
 نمودارِ عددی در [`PROGRESS.md`](PROGRESS.md): ستونِ «تست‌ها» و جهتِ ▲/▼/↩ برای هر رویداد.
@@ -75,4 +83,5 @@
 | 1 | ثبتِ hook ِ Stop در `.claude/settings.json` (محتوا: `docs/claude/settings.example.json`) | اجازهٔ مالک |
 | 2 | `FIREBASE_PROJECT_ID` روی Render | مرحلهٔ ۳ |
 | 3 | هشدارِ «Payment failed» ِ Render از API دیده نمی‌شود | بررسیِ مالک در داشبورد |
+| 5 | `FIREBASE_PROJECT_ID`، `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT` روی Render (نظارت) | مالک — تنظیم از نشست رد شد |
 | 4 | محدودکردنِ کلیدِ وبِ Firebase به دامنه (`docs/security.md` §۶، TO-DO مالک) | مالک |

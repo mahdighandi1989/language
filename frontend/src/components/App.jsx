@@ -27,6 +27,11 @@ import { initFirebase } from '../hooks/useFirebase';
 import { resolveLiveWsUrl } from '../utils/wsUrl';
 import { nextReconnectDelay, shouldReconnect } from '../utils/wsReconnect';
 import { installGlobalErrorTracking, reportError } from '../inspectorBridge.js';
+// «نظارت و سرکشی» (owner's inspection sheets) — NOT the Inspector Bridge above.
+import InspectionLayer from '../inspection/InspectionLayer.jsx';
+import InspectionBoard from '../inspection/InspectionBoard.jsx';
+import { createInspectionApi } from '../inspection/api.js';
+import { routeFromHash, hashFor } from '../inspection/geometry.js';
 
 // --- Analytics ---
 // Client-side product analytics tracker. Records chat interactions and flushes
@@ -462,9 +467,14 @@ async function callGeminiTTS(fullPrompt, voiceName = "Kore", signal = null) {
 
 // --- Main App Component ---
 export default function App() {
-  const [activeView, setActiveView] = useState('dashboard');
+  // The view lives in the URL hash (#/lessons, #/lesson/<id>) so a page can be
+  // reopened from a link — the inspection sheets and the supervisor rely on it.
+  const initialRoute = typeof window !== 'undefined' ? routeFromHash(window.location.hash) : null;
+  const [activeView, setActiveView] = useState(initialRoute?.view || 'dashboard');
   const [data, setData] = useState(initialData);
-  const [selectedLessonId, setSelectedLessonId] = useState(null);
+  const [selectedLessonId, setSelectedLessonId] = useState(
+    initialRoute?.view === 'lesson' && initialRoute.id ? (Number(initialRoute.id) || initialRoute.id) : null
+  );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -865,7 +875,35 @@ export default function App() {
     setActiveView(view);
     setSelectedLessonId(lesson ? lesson.id : null);
     setIsSearchOpen(false);
+    try {
+      const next = hashFor(view, lesson ? lesson.id : null);
+      if (window.location.hash !== next) window.history.pushState(null, '', next);
+    } catch { /* non-browser */ }
   };
+
+  // Back/forward and pasted links: follow the hash.
+  useEffect(() => {
+    const onHash = () => {
+      const r = routeFromHash(window.location.hash);
+      if (!r) return;
+      setActiveView(r.view);
+      setSelectedLessonId(r.view === 'lesson' && r.id ? (Number(r.id) || r.id) : null);
+    };
+    window.addEventListener('popstate', onHash);
+    window.addEventListener('hashchange', onHash);
+    return () => { window.removeEventListener('popstate', onHash); window.removeEventListener('hashchange', onHash); };
+  }, []);
+
+  // Inspection API: every call carries the signed-in user's Firebase ID token.
+  const inspectionApi = useMemo(
+    () => createInspectionApi(async () => firebaseServices.auth?.currentUser?.getIdToken?.()),
+    [firebaseServices.auth]
+  );
+  const inspectionEnabled = Boolean(firebaseServices.auth && authUser);
+  const PAGE_LABELS = useMemo(() => ({
+    ...Object.fromEntries(PERMISSION_SECTIONS.map((x) => [x.key, x.label])),
+    lesson: 'جزئیاتِ درس', admin: 'مدیریتِ کاربران', inspection: 'نظارت و سرکشی', stats: 'آمار',
+  }), []);
   
   const openSaveModal = (text) => {
     setItemToSave(text);
@@ -900,6 +938,16 @@ export default function App() {
     }
     const commonProps = { navigateTo, addJournalEntry, setModalConfig, data, setData, removePronunciationCorrection, addPronunciationCorrection };
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    // «نظارت و سرکشی»: any signed-in user may file sheets; the server shows a
+    // normal user only their own and gives the owner-only actions to the owner.
+    if (activeView === 'inspection') {
+      return inspectionEnabled
+        ? <InspectionBoard api={inspectionApi} onReopenPage={(sh) => {
+            const r = routeFromHash(sh.reopen);
+            if (r) navigateTo(r.view, r.id ? { id: Number(r.id) || r.id } : null);
+          }} />
+        : <AccessNotice title="نظارت و سرکشی" message="این بخش فقط با ورودِ گوگل (حالتِ Firebase) کار می‌کند." />;
+    }
     // Admin-only management panel.
     if (activeView === 'admin') {
       return accessRecord?.role === 'admin'
@@ -969,7 +1017,7 @@ export default function App() {
         <InspectorBridge />
         <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
-            <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} />
+            <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} showInspection={inspectionEnabled} />
             <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">{renderContent()}</main>
             <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
             {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
@@ -1005,6 +1053,17 @@ export default function App() {
         <GlobalLiveVoiceChat />
         <FloatingLiveChatWidget />
         <FloatingVoiceConvWidget />
+        {inspectionEnabled && (
+          <InspectionLayer
+            key={`${activeView}-${selectedLessonId ?? ''}`}
+            api={inspectionApi}
+            isOwner={accessRecord?.role === 'admin'}
+            page={activeView}
+            pageLabel={PAGE_LABELS[activeView] || activeView}
+            reopen={hashFor(activeView, activeView === 'lesson' ? selectedLessonId : null)}
+            onOpenBoard={() => navigateTo('inspection')}
+          />
+        )}
       </LiveChatProvider>
     </ExecutionFlowProvider>
   );
@@ -1012,7 +1071,7 @@ export default function App() {
 
 // --- Components ---
 
-function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick, accessRecord, onSignOut, userEmail }) {
+function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick, accessRecord, onSignOut, userEmail, showInspection = false }) {
     const fileInputRef = useRef(null);
     const [mobileOpen, setMobileOpen] = useState(false);
     const handleImportClick = () => fileInputRef.current.click();
@@ -1053,6 +1112,13 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
                 <NavLink view="cultural" icon={LifeBuoy} label="فرهنگ لبنان" />
                 <NavLink view="journal" icon={Edit3} label="ژورنال فعالیت‌ها" />
                 <NavLink view="archivedConversations" icon={Archive} label="مکالمات بایگانی شده" />
+                {showInspection && (
+                    <li>
+                        <button onClick={() => { navigateTo('inspection'); setMobileOpen(false); }} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-orange-300 hover:bg-slate-700 hover:text-white ${activeView === 'inspection' ? 'bg-slate-900 text-white font-bold' : ''}`}>
+                            <ClipboardList size={22} /><span>نظارت و سرکشی</span>
+                        </button>
+                    </li>
+                )}
                 {isAdmin && (
                     <li>
                         <button onClick={() => { navigateTo('admin'); setMobileOpen(false); }} className={`w-full flex items-center gap-3 py-3 px-4 rounded-lg text-right transition-colors duration-200 text-amber-300 hover:bg-slate-700 hover:text-white ${activeView === 'admin' ? 'bg-slate-900 text-white font-bold' : ''}`}>

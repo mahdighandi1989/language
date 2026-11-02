@@ -225,6 +225,17 @@ Implementation: `backend/controllers/uploadController.js` (wired in
 `backend/middleware/upload.js`); covered by
 `tests/test_refactor.py::test_upload_endpoint_returns_file_handle`.
 
+## «نظارت و سرکشی» (owner inspection sheets + automated supervisor)
+
+Any signed-in user presses **«📝 نظارت»** on any page, draws a box, writes what is
+wrong and attaches files (text is extracted at upload and must be read in full by
+the supervisor). The owner's board (`#/inspection`) shows the conversation, the
+supervisor's outcome with proof, and owner-only actions (tick, reopen, accept/decline,
+⚡ urgent). Nothing can be deleted. API: `/api/inspection/*`
+(`backend/routes/inspection.js`); rules: `backend/services/inspection/model.js`.
+Needs `FIREBASE_PROJECT_ID`, `SUPERVISOR_PASSWORD` and (for durable storage)
+`FIREBASE_SERVICE_ACCOUNT` on Render. Full guide: [`docs/supervisor/README.md`](docs/supervisor/README.md).
+
 ## Two-way Telegram bot (optional)
 
 The backend ships an optional two-way Telegram bot that adds: **notifications**

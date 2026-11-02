@@ -71,3 +71,42 @@
   نمونه `decision: block` داد، `tests/test_render_yaml.py` ‏۴/۴. ship.sh خودش همهٔ تست‌ها را پیش از ارسال اجرا می‌کند.
 - **[TODO]** مرحلهٔ ۲ (نظارت و سرکشی) و مرحلهٔ ۳ (ذخیره‌سازی/امنیت/ورود).
 > **امضا:** `Claude Code` · 2026-11-02 · ship.sh (همهٔ تست‌ها + build + docs gate) پیش از ارسال اجرا شد
+
+## 2026-11-02 (۲) — «نظارت و سرکشی» و ناظرِ خودکار
+
+- **[OWNER]** پیاده‌سازیِ همان قابلیتِ Detective-1/ALLIN1 متناسب با React/Vite + Express + Gemini + Firestore: کادرکشی روی
+  هر صفحه + متن + پیوست؛ استخراج و خواندنِ پیوست؛ وضعیت جدا از نتیجه؛ `fixed` بی‌تصویرِ بعد رد؛ تیک فقط مالک؛ برگهٔ
+  غیرادمین با تأییدِ ادمین؛ حذف ممنوع؛ صفِ فوری؛ حسابِ ناظر با `SUPERVISOR_PASSWORD` فقط روی Render؛ دو روتین؛
+  پرامپتِ نسخه‌دار با archive/RUNLOG/OPEN_ITEMS؛ شش قاعده؛ بازرسیِ بدبینانه و اجرایی.
+- **[FINDING]** مرجع از ریپوی Detective-1 خوانده شد (`CLAUDE.md`، `AGENTS.md`، `scripts/ship.sh`، `scripts/docs_gate.py`،
+  `.claude/`، `docs/supervisor/README|PROMPT|OPEN_ITEMS`، `backend/detective/models_inspection.py` کامل،
+  `routers/inspection.py` بخشِ یادداشت/نگهبان‌ها و فهرستِ مسیرها). ALLIN1 در دسترس بود ولی باز نشد (Detective-1 نسخهٔ
+  کامل‌ترِ همان الگوست).
+- **[FINDING]** بک‌اند هیچ اعتبارنامهٔ نوشتن در Firestore ندارد (فقط `verifyIdToken` با `projectId`) و دیسکِ Render
+  با هر دیپلوی پاک می‌شود ⇒ ذخیرهٔ ماندگار بدونِ اقدامِ مالک ممکن نیست.
+- **[DECISION]** ذخیره‌سازِ دوگانه با یک رابط و **بی‌عملیاتِ حذف**: `FirestoreStore` (Admin SDK با `FIREBASE_SERVICE_ACCOUNT`،
+  مسیرِ `artifacts/{appId}/inspection*`، بایت‌ها در تکه‌های ۷۰۰KB) یا `FileStore` (JSON + blobs) با برچسبِ `durable:false`
+  که در صفحه هشدارِ قرمز و در `prod_check` P1 می‌شود. ردشده‌ها: نوشتن از مرورگر با قوانینِ Firestore (نگهبان‌هایی مثلِ
+  «پیوستِ ناخوانده» در rules قابلِ بیان نیست و ناظر حسابِ Firebase می‌خواست)؛ فایلِ بی‌هشدار (پاک‌شدنِ بی‌صدا)؛ مسدودکردنِ
+  کاملِ ثبت تا حسابِ سرویس (مالک نمی‌توانست بیازماید).
+- **[DECISION]** حسابِ ناظر = ورود با `SUPERVISOR_PASSWORD` (≥۱۶ نویسه، مقایسهٔ زمان‌ثابت، ۱۰ تلاش/۱۵ دقیقه) و توکنِ HMAC
+  ۱۲ ساعته `sup.<exp>.<sig>`. مالک = ایمیلِ تأییدشدهٔ گوگل در `ADMIN_EMAILS ∪ VITE_ADMIN_EMAILS ∪ ایمیلِ مالک در firestore.rules`.
+  ردشده: حسابِ گوگلِ جدا برای ناظر (ورودِ تعاملی)، کلیدِ ثابت در ریپو.
+- **[DECISION]** مسیرِ صفحه‌ها در hash (`#/lessons`، `#/lesson/<id>`) تا «بازگشت» و عکسِ ناظر ممکن شود. ردشده: react-router.
+- **[CHANGE]** بک‌اند: `services/inspection/{model,store,extract,auth}.js`، `routes/inspection.js` (پیش از محدودکنندهٔ
+  عمومی، با محدودکنندهٔ خودش ۶۰۰/۱۵ دقیقه)، اتصال در `server.js`. استخراج: متن/کد، PDF، docx/xlsx/pptx، ODF، EPUB، ZIP
+  (تودرتو)، رونویسیِ کاملِ صوت/ویدیو با Gemini (≤۱۵MB)؛ وضعیت‌های ok/empty/unsupported/failed/image/pending.
+- **[CHANGE]** فرانت: `frontend/src/inspection/` (لایهٔ کادرکشی + فرم + هایلایت، صفحهٔ مالک بی‌دکمهٔ حذف، geometry با
+  گره و کسرها، کلاینتِ API با توکنِ ID)؛ `App.jsx`: مسیرِ hash، منوی «نظارت و سرکشی»، نمای `inspection`، لایه روی همهٔ صفحه‌ها.
+- **[CHANGE]** ناظر: `scripts/supervisor/{client,inspection,deploys,prod_check}.py`، `screenshot.mjs`؛ مستندات
+  `docs/supervisor/{README,PROMPT,URGENT_PROMPT,RUNLOG,OPEN_ITEMS}.md`، `archive/`، `inspection/README.md`؛ `.gitignore` برای
+  پوشهٔ کاری؛ `render.yaml` و `backend/.env.example` (متغیرهای تازه)؛ درسِ `machine-reviewer-guards-belong-in-the-api`.
+- **[VERIFY]** `node --test tests/inspection.test.js` ‏۱۸/۱۸ (قواعد + API ِ واقعی روی سرورِ موقت: چرخهٔ کامل، ۴۲۲ ِ پیوستِ
+  ناخوانده و پریدن به جلو، ۴۲۲ ِ fixed بی‌تصویر، ۴۰۳ ِ تیک/فوری/claim برای ناظر/کاربر، ۴۰۵ ِ حذف، پنهان‌بودنِ برگهٔ کاربر از ناظر
+  تا پذیرش، صفِ فوری)؛ vitest ‏۱۲ تستِ تازه (geometry، API client، صفحه و لایه). آزمونِ سرتاسریِ ابزارها روی سرورِ محلی
+  (`RUNLOG` 2026-11-02)؛ `screenshot.mjs '#/lessons'` صفحهٔ درست را بی‌خطای کنسول نشان داد (تصویر دیده شد).
+- **[BLOCKED]** تنظیمِ `FIREBASE_PROJECT_ID=labaneseapp` و `SUPERVISOR_PASSWORD` (تصادفی) روی Render از این نشست توسطِ
+  سامانهٔ مجوز («Modify Shared Resources») رد شد؛ دور زده نشد ⇒ اقدامِ مالک (OPEN_ITEMS ۴). `FIREBASE_SERVICE_ACCOUNT` را
+  فقط مالک می‌تواند بسازد (OPEN_ITEMS ۱).
+- **[TODO]** ساختنِ دو روتین پس از دیپلوی؛ اولین اجرای واقعی (OPEN_ITEMS ۲).
+> **امضا:** `Claude Code` · 2026-11-02 · node ‏۱۸/۱۸ + vitest نظارت ۱۲/۱۲ + آزمونِ سرتاسریِ محلیِ ابزارها؛ ship.sh همهٔ تست‌ها را اجرا کرد

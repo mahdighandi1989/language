@@ -24,6 +24,7 @@ import { PORT } from './config/env.js';
 import { decrypt, redactSensitiveData as sharedRedact } from './utils/index.js';
 import { applySecurity, generalLimiter } from './middleware/index.js';
 import { apiRouter } from './routes/index.js';
+import { inspectionRouter } from './routes/inspection.js';
 import { mountFallbacks } from './controllers/index.js';
 import { attachLiveProxy, attachLiveWsObserver, attachTelegram } from './services/index.js';
 
@@ -92,6 +93,8 @@ attachTelegram(app, {
     uptimeSec: (Date.now() - serverStartedAt) / 1000,
   }),
 });
+// «نظارت و سرکشی» has its own limiters (the supervisor reads files in many slices).
+app.use(inspectionRouter);
 app.use('/api', generalLimiter); // Rate-limit /api/* (the WS path is not under /api).
 app.use(express.static(join(__dirname, '../frontend/dist'))); // SPA static assets,
 // AI-response validation (anti-pattern fix justification): the Gemini routes

@@ -32,8 +32,9 @@ is a production change.
   WORKLOG; deletion only with the owner's explicit approval.
 - **Never delete or blindly overwrite existing user data** (Firestore, localStorage, the owner's Drive).
 - **No secrets in the repo** (Gemini key, `ENCRYPTION_KEY`, `SUPERVISOR_PASSWORD`, Firebase service
-  account) — only Render environment variables. The owner's admin e-mail already lives in
-  `firestore.rules` (it must, to bootstrap) and is the single allowed exception.
+  account) — only Render environment variables. The owner's admin e-mail is the single allowed exception: it
+  lives in `firestore.rules` (it must, to bootstrap) and is mirrored as the fallback in
+  `backend/services/inspection/auth.js` so the server and the rules can never disagree.
 - **`prompt/` and `TO-DO/` belong to the owner's external tooling — never modify them.**
 - **Verification — what `scripts/ship.sh` runs, and what each one protects:**
 

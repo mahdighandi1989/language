@@ -54,5 +54,12 @@ services:
         sync: false
       - key: TELEGRAM_ADMIN_IDS
         sync: false
+      # «نظارت و سرکشی» (docs/supervisor/README.md). Secrets — set on Render only.
+      - key: SUPERVISOR_PASSWORD
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
       - key: NODE_ENV
         value: production

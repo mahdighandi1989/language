@@ -52,6 +52,7 @@
 | فرانت: ذخیره‌سازی (Firestore + localStorage) | `frontend/src/components/App.jsx` (بخشِ Firebase State)، `frontend/src/contexts/ExecutionFlowContext.jsx` |
 | قوانینِ امنیتیِ Firestore (دستی در کنسول منتشر می‌شود) | `firestore.rules` |
 | Inspector Bridge (ردیابیِ خطا + نگهبانِ فرمانِ AI؛ **غیر از «نظارت و سرکشی»**) | `frontend/src/inspectorBridge.js`، `frontend/src/components/InspectorBridge.jsx`، `docs/inspector-bridge-audit.md` |
+| «نظارت و سرکشی» + ناظرِ خودکار (روتین‌ها، پرامپت‌های نسخه‌دار، بایگانی) | `docs/supervisor/`، `scripts/supervisor/`، `backend/routes/inspection.js`، `backend/services/inspection/`، `frontend/src/inspection/` |
 | استقرار | `render.yaml` (نامِ سرویس و تفاوت‌ها با داشبورد: HANDBOOK §۴) |
 | تست‌ها | `tests/` (pytest، سرور را بالا می‌آورد)، `backend/tests/` (node --test + pytest)، `frontend/src/**/*.test.*` (vitest) |
 | دفتر کار، جزوه، روند | `docs/WORKLOG.md`، `docs/handbook/HANDBOOK.md`، `docs/handbook/PROGRESS.md` |
