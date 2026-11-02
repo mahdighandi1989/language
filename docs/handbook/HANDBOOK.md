@@ -85,7 +85,7 @@
 ## ۹. موارد باز
 | # | مورد | منتظرِ |
 |---|---|---|
-| 1 | ثبتِ hook ِ Stop در `.claude/settings.json` (محتوا: `docs/claude/settings.example.json`) | اجازهٔ مالک |
+| 1 | ~~ثبتِ hook ِ Stop در `.claude/settings.json`~~ — انجام شد 2026-11-02 | — |
 | 2 | `FIREBASE_PROJECT_ID` روی Render (تا آن موقع پراکسیِ Gemini باز است) | مالک |
 | 6 | انتشارِ `firestore.rules` ِ تازه در کنسول | مالک |
 | 7 | تصمیم: رسانه در سندِ ۱MiB؛ پشتیبانِ localStorage ِ بی‌uid | مالک |

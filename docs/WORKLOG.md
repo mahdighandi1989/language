@@ -191,3 +191,11 @@
   (۳) انتشارِ `firestore.rules` در کنسول؛ (۴) یک بار ورود و تستِ ادمین/ذخیره در production؛ (۵) تصمیم دربارهٔ رسانه در سندِ ۱MiB
   و پشتیبانِ بی‌uid؛ (۶) وصلِ مخزن به دو روتین و روشن‌کردنِ روتینِ ساعتی.
 > **امضا:** `Claude Code` · 2026-11-02 · node ‏۱۶۳/۱۶۳ + vitest + pytest + build در ship.sh؛ جریانِ ورود با App ِ واقعی و Firebase ِ ماک
+
+## 2026-11-02 (۴) — ثبتِ hook ِ Stop در `.claude/settings.json`
+
+- **[OWNER]** مالک صریحاً اجازه داد `.claude/settings.json` با همان محتوای `docs/claude/settings.example.json` (hook ِ Stop و
+  مجوزهای ship) فقط در همین ریپو ساخته و ارسال شود.
+- **[CHANGE]** `.claude/settings.json` = کپیِ عینیِ `docs/claude/settings.example.json`. هشدارِ docs_gate دربارهٔ hook برطرف شد.
+- **[VERIFY]** JSON معتبر؛ `python3 scripts/docs_gate.py` بی‌هشدار؛ ship.sh همهٔ تست‌ها را اجرا کرد.
+> **امضا:** `Claude Code` · 2026-11-02 · docs_gate OK بدونِ هشدار + ship.sh
