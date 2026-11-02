@@ -29,8 +29,15 @@ source:
 created_at: "2026-06-05T10:00:00Z"
 updated_at: "2026-06-05T10:00:00Z"
 merged_from: []
+resolution_status: "resolved" | "mitigated" | "open"
+recurrence_count: 1          # چند بار این خطا رخ داد (با هر تکرار +۱)
+user_confirmed: false        # مالک درستیِ درس را تأیید کرده؟
+agents: ["Claude Code"]      # چه کسی نوشت/ادغام کرد؛ هنگام ادغام اضافه کن، پاک نکن
 ---
 ```
+
+> فیلدهای `resolution_status`، `recurrence_count`، `user_confirmed` و `agents` الزامی‌اند و
+> `scripts/docs_gate.py` نبودشان (و آمدنِ نامِ پروژه در متن) را رد می‌کند.
 
 سپس بخش‌های markdown به این ترتیب:
 
