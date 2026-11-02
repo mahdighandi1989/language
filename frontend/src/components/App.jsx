@@ -475,7 +475,13 @@ const liveAuthRef = { current: null };
 export default function App() {
   // The view lives in the URL hash (#/lessons, #/lesson/<id>) so a page can be
   // reopened from a link — the inspection sheets and the supervisor rely on it.
-  const initialRoute = typeof window !== 'undefined' ? routeFromHash(window.location.hash) : null;
+  // A typed path (/inspection, /lesson/12) is accepted too and rewritten to the hash form.
+  const initialRoute = typeof window !== 'undefined'
+    ? (routeFromHash(window.location.hash) || (window.location.pathname.length > 1 ? routeFromHash(`#${window.location.pathname}`) : null))
+    : null;
+  if (initialRoute && typeof window !== 'undefined' && !window.location.hash) {
+    try { window.history.replaceState(null, '', `/${hashFor(initialRoute.view, initialRoute.id)}`); } catch { /* ignore */ }
+  }
   const [activeView, setActiveView] = useState(initialRoute?.view || 'dashboard');
   const [data, setData] = useState(initialData);
   const [selectedLessonId, setSelectedLessonId] = useState(

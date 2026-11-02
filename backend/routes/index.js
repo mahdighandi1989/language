@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
-import { requireAuth, optionalAuth, requireAuthIfConfigured } from '../middleware/firebaseAuth.js';
+import { requireAuth, requireAuthIfConfigured } from '../middleware/firebaseAuth.js';
 import { requireGeminiKey } from '../middleware/requireGeminiKey.js';
 import { analysisLimiter } from '../middleware/rateLimiter.js';
 import { upload, handleMulterError, MAX_FILES } from '../middleware/upload.js';
@@ -83,7 +83,9 @@ apiRouter.post(
 
 // Product analytics: the frontend tracker posts session summaries here so the
 // backend can compute and expose the product KPIs / outcome_rate.
-apiRouter.post('/api/analytics', validate(analyticsSchema), optionalAuth, ingestAnalytics);
-apiRouter.get('/api/analytics', optionalAuth, getAnalytics);
+// Analytics: signed-in (approved) users only once auth is configured — the KPIs
+// were readable and poisonable by anyone.
+apiRouter.post('/api/analytics', validate(analyticsSchema), requireAuthIfConfigured, ingestAnalytics);
+apiRouter.get('/api/analytics', requireAuthIfConfigured, getAnalytics);
 
 export default apiRouter;

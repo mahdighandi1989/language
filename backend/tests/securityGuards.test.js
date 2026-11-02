@@ -47,3 +47,31 @@ test('telegram link codes expire', () => {
   const fresh = store.createLinkCode('c1', 't1');
   assert.equal(store.confirmLinkCode(fresh, 'u1').userId, 'u1');
 });
+
+import { setTokenVerifier, setApprovalLookup, approvalOf } from '../middleware/firebaseAuth.js';
+test('with auth configured: approved user passes, pending is 403, owner always passes, lookup failure is 503', async () => {
+  process.env.FIREBASE_PROJECT_ID = 'demo-project';
+  setTokenVerifier(async (t) => {
+    if (t === 'owner') return { uid: 'o', email: 'mohamad.mahdi1988@gmail.com', email_verified: true };
+    if (t === 'ok') return { uid: 'u-ok', email: 'a@b.c' };
+    if (t === 'pending') return { uid: 'u-pending', email: 'p@b.c' };
+    if (t === 'boom') return { uid: 'u-boom', email: 'x@b.c' };
+    throw new Error('bad');
+  });
+  setApprovalLookup(async (uid) => {
+    if (uid === 'u-boom') throw new Error('firestore down');
+    return { 'u-ok': { status: 'approved', role: 'user' }, 'u-pending': { status: 'pending', role: 'user' } }[uid] || null;
+  });
+  const auth = (t) => ({ authorization: `Bearer ${t}` });
+  assert.deepEqual(await run(requireAuthIfConfigured, auth('ok')), { next: true });
+  assert.deepEqual(await run(requireAuthIfConfigured, auth('owner')), { next: true });
+  assert.equal((await run(requireAuthIfConfigured, auth('pending'))).code, 403);
+  assert.equal((await run(requireAuthIfConfigured, auth('boom'))).code, 503);
+  assert.equal((await run(requireAuthIfConfigured, auth('forged'))).code, 401);
+  assert.equal(await approvalOf({ uid: 'nobody', email: 'n@b.c' }), 'denied');
+  const ws = (q) => new Promise((r) => verifyWsClient({ req: { url: `/ws/live${q}` } }, (ok, code) => r(ok ? 200 : code)));
+  assert.equal(await ws('?token=ok'), 200);
+  assert.equal(await ws('?token=pending'), 403);
+  assert.equal(await ws('?token=forged'), 401);
+  delete process.env.FIREBASE_PROJECT_ID;
+});

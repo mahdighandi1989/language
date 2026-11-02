@@ -199,3 +199,30 @@
 - **[CHANGE]** `.claude/settings.json` = کپیِ عینیِ `docs/claude/settings.example.json`. هشدارِ docs_gate دربارهٔ hook برطرف شد.
 - **[VERIFY]** JSON معتبر؛ `python3 scripts/docs_gate.py` بی‌هشدار؛ ship.sh همهٔ تست‌ها را اجرا کرد.
 > **امضا:** `Claude Code` · 2026-11-02 · docs_gate OK بدونِ هشدار + ship.sh
+
+## 2026-11-02 (۵) — راستی‌آزماییِ پس از تنظیمِ مالک، تأییدِ سمتِ سرور، بازبینیِ نهایی
+
+- **[OWNER]** قوانینِ Firestore منتشر شد؛ `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT`، `FIREBASE_PROJECT_ID` روی Render؛
+  روتینِ ساعتی روشن. خواست: پایداریِ ذخیرهٔ نظارت با برگهٔ آزمایشی، بررسیِ Gemini/Live پس از بستنِ پراکسی، بازبینیِ نهایی.
+- **[VERIFY]** Render: نام‌ِ متغیرها خوانده شد (نه مقدار)؛ دیپلویِ دستیِ 21:10 (`9cfef86`) live. `inspection.py whoami` ⇒
+  `store.kind=firestore, durable=true`. برگهٔ آزمایشیِ ۱ (ثبتِ هماهنگ‌کننده با اجازهٔ مالک، 21:33Z) با `pull` خوانده شد و ناظر
+  پاسخ داد: «دریافت شد»، نتیجهٔ `fixed` با تصویرِ بعد (داشبوردِ برنامهٔ واقعی) و `noChangeReason` (برگه صریحاً گفته بود کد عوض نشود).
+- **[VERIFY]** پراکسی در production: بی‌توکن ⇒ ۴۰۱ برای `gemini/chat`، `gemini/tts`، `list-models`، `test-gemini`، `live-model-check`،
+  `upload`، `audio/process`، `analyze-files`؛ توکنِ جعلی ⇒ ۴۰۱؛ `/ws/live` بی‌توکن و با توکنِ جعلی ⇒ ۴۰۱. لاگِ Render: مرورگرِ مالک
+  21:32:37 `POST /api/gemini/chat` ‏۲۰۰ (۱۰۸۱ms) و 21:32:39 `POST /api/gemini/tts` ‏۲۰۰ ⇒ کاربرِ واردشده کار می‌کند.
+  **سنجیده‌نشده:** Live با کاربرِ واقعی (اتصالِ مرورگری در لاگ نیست) — OPEN_ITEMS ۶.
+- **[FINDING][رفع]** سرور فقط «واردشده» را چک می‌کرد؛ کاربرِ pending/rejected هم می‌توانست Gemini را مصرف کند. اکنون که حسابِ سرویس
+  هست، `requireAuthIfConfigured` و `verifyWsClient` رکوردِ `artifacts/{appId}/accessControl/{uid}` را می‌خوانند (کش ۶۰ ثانیه):
+  تأییدشده/ادمین ⇒ عبور، دیگران ⇒ ۴۰۳، خطای Firestore ⇒ ۵۰۳؛ ایمیلِ مالک همیشه عبور. بی‌حسابِ سرویس رفتارِ قبلی.
+- **[FINDING][رفع]** `/api/analytics` (GET/POST) بی‌احراز بود (KPIها خوانا و مسموم‌شدنی) ⇒ همان نگهبان.
+- **[FINDING][رفع]** rate limit ِ عمومی ۱۰۰/۱۵ دقیقه: هر پیامِ چت = چت + TTS + analytics ⇒ پس از ~۳۳ پیام ۴۲۹. اکنون ۳۰۰
+  (دسترسی را خودِ احراز کنترل می‌کند؛ سقف فقط ضدِ سیل است). [DECISION] ردشده: کلیدِ محدودکننده بر اساسِ uid (نیازمندِ احراز پیش از
+  limiter و تغییرِ ترتیبِ middlewareها برای همهٔ مسیرها).
+- **[FINDING][رفع]** لاگ نشان داد مالک `/inspection` را مستقیم باز کرده؛ برنامه فقط hash را می‌فهمید و به داشبورد می‌رفت. اکنون مسیرِ
+  مستقیم پذیرفته و به `#/…` بازنویسی می‌شود (Chromium: `/lessons` ⇒ `#/lessons`، «لیست دروس»، بی‌خطا).
+- **[FINDING]** `CORS_ORIGIN`/`FRONTEND_URL` = دامنهٔ واقعی؛ منطقِ CORS یک‌جا (`buildAllowedOrigins`). `ENCRYPTION_KEY` تنظیم نیست و
+  کلید plaintext است (اختیاری؛ در `render.yaml` توضیح داده شد). `render.yaml` با نامِ `language` هم‌خوان است (از WORKLOG ۱).
+- **[CHANGE]** `backend/middleware/firebaseAuth.js`، `rateLimiter.js`، `routes/index.js`، `frontend/src/components/App.jsx`،
+  `render.yaml`، `docs/security.md`، `OPEN_ITEMS` (۱ و ۴ بسته، ۵ نیمه، ۶ و ۷ تازه)؛ تستِ تازه در `securityGuards.test.js`.
+- **[TODO]** پس از این دیپلوی: برگهٔ ۱ و پاسخش باید هنوز در Firestore باشند (RUNLOG).
+> **امضا:** `Claude Code` · 2026-11-02 · node ‏۱۶۴/۱۶۴، vitest ‏۹۵، pytest ‏۸۰، build؛ production با curl/WS/لاگِ Render

@@ -11,10 +11,13 @@ const baseOptions = {
   legacyHeaders: true,
 };
 
-// General limiter applied to all /api/* routes: 100 requests / 15 min per IP.
+// General limiter applied to all /api/* routes: 300 requests / 15 min per IP.
+// (Was 100: one chat turn costs chat + TTS + analytics = 3 requests, so a real
+// lesson hit 429 after ~33 messages. The costly routes now also require an
+// approved sign-in, so the ceiling is a flood guard, not the access control.)
 export const generalLimiter = rateLimit({
   ...baseOptions,
-  max: 100,
+  max: 300,
   message: { error: 'تعداد درخواست‌ها بیش از حد مجاز است. لطفاً بعداً دوباره تلاش کنید.' },
 });
 

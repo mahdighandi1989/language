@@ -46,9 +46,10 @@
 | `GEMINI_API_KEY` | ✅ | کلیدِ Gemini (plaintext یا رمزشده با `ENCRYPTION_KEY`) |
 | `ENCRYPTION_KEY` | ❌ | فقط اگر کلید رمزشده باشد لازم است |
 | `CORS_ORIGIN`, `FRONTEND_URL` | ✅ | فهرستِ مجازِ CORS |
-| `FIREBASE_PROJECT_ID` | ❌ | **لازم** برای احرازِ هویتِ سمتِ سرور |
+| `FIREBASE_PROJECT_ID` | ✅ (از 2026-11-02) | احرازِ هویتِ سمتِ سرور |
 | `VITE_*` (۶ پیکربندیِ Firebase + `VITE_ADMIN_EMAILS`) | ✅ | زمانِ build در SPA جاسازی می‌شوند |
 | `TELEGRAM_*` | ❌ | ربات خاموش (اختیاری) |
+| `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT` | ✅ (از 2026-11-02) | ناظر؛ ذخیرهٔ ماندگارِ نظارت؛ تأییدِ سمتِ سرور |
 
 **هشدار:** کامیتی که `[skip render]` دارد دیپلوی نمی‌شود؛ `scripts/ship.sh` آن را رد می‌کند.
 

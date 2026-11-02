@@ -61,7 +61,7 @@ hard-code نمی‌شود و فقط از `process.env.ENCRYPTION_KEY` خواند
   `Authorization`، و `credentials: true`. درخواست از origin غیرمجاز با
   پاسخ `403` رد می‌شود و preflight (`OPTIONS`) پاسخ `204` می‌گیرد.
 - **Rate limiting:** `backend/middleware/rateLimiter.js` محدودکننده‌ی
-  عمومی (۱۰۰ درخواست / ۱۵ دقیقه) روی همه‌ی `/api/*` و محدودکننده‌ی
+  عمومی (۳۰۰ درخواست / ۱۵ دقیقه؛ از 2026-11-02) روی همه‌ی `/api/*` و محدودکننده‌ی
   ۱۰ درخواست / ۱۵ دقیقه برای `/api/analyze-files` را export می‌کند؛
   هدرهای `X-RateLimit-Limit/Remaining/Reset` در پاسخ حاضرند و پس از
   عبور از سقف، پاسخ `429` برمی‌گردد. اتصال WebSocket روی `/ws/live`
@@ -118,3 +118,8 @@ Firebase Console به دامنه‌ی مجاز** است.
 - **تلگرام:** کدِ اتصال پس از ۱۵ دقیقه منقضی می‌شود. باز (فقط گزارش): با `TELEGRAM_ALLOWED_USER_IDS` ِ خالی، دستورهای
   نوشتنی برای هر چتی باز است (ربات اکنون خاموش است).
 - **لاگِ Firestore** در production دیگر در حالتِ `debug` نیست.
+
+## ۸. به‌روزرسانی 2026-11-02 (پس از تنظیمِ متغیرها)
+- `FIREBASE_PROJECT_ID` تنظیم شد: مسیرهای پرهزینه و `/ws/live` بی‌توکن ۴۰۱ می‌دهند (در production سنجیده شد).
+- با `FIREBASE_SERVICE_ACCOUNT` سرور «تأییدشده‌بودن» را هم از `accessControl` می‌خواند: کاربرِ تأییدنشده ۴۰۳.
+- `/api/analytics` هم پشتِ همین نگهبان است. سقفِ عمومیِ نرخ ۳۰۰/۱۵ دقیقه.
