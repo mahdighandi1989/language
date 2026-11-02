@@ -34,7 +34,7 @@ is a production change.
 - **No secrets in the repo** (Gemini key, `ENCRYPTION_KEY`, `SUPERVISOR_PASSWORD`, Firebase service
   account) — only Render environment variables. The owner's admin e-mail is the single allowed exception: it
   lives in `firestore.rules` (it must, to bootstrap) and is mirrored as the fallback in
-  `backend/services/inspection/auth.js` so the server and the rules can never disagree.
+  `frontend/src/auth/access.js` and `backend/services/inspection/auth.js` so the three can never disagree.
 - **`prompt/` and `TO-DO/` belong to the owner's external tooling — never modify them.**
 - **Verification — what `scripts/ship.sh` runs, and what each one protects:**
 

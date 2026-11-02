@@ -27,8 +27,11 @@ service cloud.firestore {
       return ['mohamad.mahdi1988@gmail.com'];
     }
 
+    // email_verified: only a verified address (Google sign-in always is) can
+    // claim the admin e-mail — an unverified e-mail/password account cannot.
     function isAdminByEmail() {
-      return isSignedIn() && request.auth.token.email in adminEmails();
+      return isSignedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in adminEmails();
     }
 
     // True if the *caller* is an admin: either bootstrapped by email, or their
@@ -73,6 +76,10 @@ service cloud.firestore {
     match /artifacts/{ownerUid}/flowState/{doc} {
       allow read, write: if isSignedIn() && request.auth.uid == ownerUid;
     }
+
+    // «نظارت و سرکشی» (artifacts/{appId}/inspection*) is written ONLY by the
+    // server with the Admin SDK (which bypasses these rules); browsers never
+    // touch it directly — the default deny below covers it on purpose.
 
     // Everything else is denied by default.
   }

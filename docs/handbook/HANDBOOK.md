@@ -34,7 +34,8 @@
 | دسترسی‌ها | Firestore: `artifacts/{appId}/accessControl/{uid}` | قوانین در `firestore.rules` |
 | جریانِ اجرا (نمودار) | Firestore: `artifacts/{uid}/flowState/current` | |
 | دادهٔ ربات تلگرام | فایل JSON در `backend/data/` | روی Render با هر دیپلوی پاک می‌شود |
-یافته‌های مرحلهٔ ۳ در WORKLOG.
+**نگهبان‌های همگام‌سازی (2026-11-02):** ذخیره فقط پس از بارگذاریِ سندِ همان کاربر، بی‌ذخیرهٔ تکراری، نوشتنِ کامل (نه merge)،
+بنرِ خطای ذخیره. **ریسکِ باز:** سقفِ ۱MiB با رسانهٔ base64 در سند؛ پشتیبانِ localStorage ِ بی‌uid. جزئیات: WORKLOG (۳).
 
 ## ۴. استقرار و متغیرهای محیطی
 سرویسِ Render: **`language`** — `https://language-k4q9.onrender.com` (frankfurt، starter، autoDeploy از `main`).
@@ -54,7 +55,9 @@
 ## ۵. ورود و نقش‌ها
 ورود با گوگل (popup). مالک = ایمیل‌های `VITE_ADMIN_EMAILS` (زمانِ build) و باید با `adminEmails()` در
 `firestore.rules` یکی باشد. کاربرِ تازه رکوردِ `pending` می‌سازد؛ ادمین در «مدیریتِ کاربران» تأیید و دسترسیِ هر بخش
-را می‌دهد. جزئیات و رفع‌ها: WORKLOG مرحلهٔ ۳.
+را می‌دهد. ایمیلِ مالک همیشه ادمین است (`OWNER_EMAIL` در `access.js` = `firestore.rules` = سرور)، حتی اگر
+`VITE_ADMIN_EMAILS` غلط باشد. خطای Firestore صفحهٔ «بررسیِ دسترسی ناموفق بود» با علت نشان می‌دهد. popup ِ مسدود ⇒ redirect.
+سرور با `FIREBASE_PROJECT_ID` توکن را روی Gemini/آپلود/WS اجباری می‌کند. جزئیات: WORKLOG (۳).
 
 ## ۶. تصمیم‌های کلیدی
 | تاریخ | تصمیم | ریشه | گزینه‌های ردشده |
@@ -64,6 +67,8 @@
 | 2026-11-02 | «نظارت» = API ِ Express + ذخیره‌سازِ دوگانه (Firestore با حسابِ سرویس، وگرنه فایل با هشدارِ «موقت») | بک‌اند اعتبارنامهٔ نوشتن در Firestore نداشت | نوشتن از مرورگر با قوانینِ Firestore (حسابِ ناظر Firebase Auth می‌خواست و نگهبان‌ها در rules ناقص می‌ماند)؛ JSON روی دیسکِ Render بی‌هشدار (پاک‌شدنِ بی‌صدا)؛ مسدودکردنِ کامل تا حسابِ سرویس (مالک امشب نمی‌توانست بیازماید) |
 | 2026-11-02 | ناظر = حسابِ ماشینی با `SUPERVISOR_PASSWORD` و توکنِ HMAC ِ ۱۲ ساعته | رمز فقط روی Render | حسابِ گوگلِ جدا (ورودِ تعاملی لازم)؛ کلیدِ ثابتِ API در ریپو |
 | 2026-11-02 | مسیرِ صفحه در hash (`#/lessons`) | «بازگشت» به جای کادر و عکسِ ناظر بدونِ URL ممکن نبود | react-router (وابستگیِ تازه و تغییرِ بزرگ در App.jsx) |
+| 2026-11-02 | احرازِ «مشروط به پیکربندی» برای Gemini/WS | بستنِ فوری بی‌`FIREBASE_PROJECT_ID` مالک را هم قفل می‌کرد | requireAuth ِ فوری؛ کلیدِ اشتراکیِ ثابت در فرانت |
+| 2026-11-02 | نوشتنِ کاملِ سندِ کاربر به‌جای merge، پشتِ نگهبانِ بارگذاری | merge کلید حذف نمی‌کرد | `deleteField` در هر حذف (پراکنده و شکننده) |
 | 2026-11-02 | `render.yaml` آینهٔ دستیِ سرویسِ `language` | Blueprint ِ متصل وجود ندارد | ساختنِ Blueprint (سرویسِ تکراری می‌ساخت) |
 
 ## ۷. نظارت و سرکشی
@@ -81,7 +86,10 @@
 | # | مورد | منتظرِ |
 |---|---|---|
 | 1 | ثبتِ hook ِ Stop در `.claude/settings.json` (محتوا: `docs/claude/settings.example.json`) | اجازهٔ مالک |
-| 2 | `FIREBASE_PROJECT_ID` روی Render | مرحلهٔ ۳ |
+| 2 | `FIREBASE_PROJECT_ID` روی Render (تا آن موقع پراکسیِ Gemini باز است) | مالک |
+| 6 | انتشارِ `firestore.rules` ِ تازه در کنسول | مالک |
+| 7 | تصمیم: رسانه در سندِ ۱MiB؛ پشتیبانِ localStorage ِ بی‌uid | مالک |
+| 8 | وصلِ مخزن به دو روتین؛ روشن‌کردنِ روتینِ ساعتی | مالک |
 | 3 | هشدارِ «Payment failed» ِ Render از API دیده نمی‌شود | بررسیِ مالک در داشبورد |
 | 5 | `FIREBASE_PROJECT_ID`، `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT` روی Render (نظارت) | مالک — تنظیم از نشست رد شد |
 | 4 | محدودکردنِ کلیدِ وبِ Firebase به دامنه (`docs/security.md` §۶، TO-DO مالک) | مالک |

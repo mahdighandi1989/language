@@ -10,7 +10,7 @@
  */
 import { Router } from 'express';
 import { validate } from '../middleware/validate.js';
-import { requireAuth, optionalAuth } from '../middleware/firebaseAuth.js';
+import { requireAuth, optionalAuth, requireAuthIfConfigured } from '../middleware/firebaseAuth.js';
 import { requireGeminiKey } from '../middleware/requireGeminiKey.js';
 import { analysisLimiter } from '../middleware/rateLimiter.js';
 import { upload, handleMulterError, MAX_FILES } from '../middleware/upload.js';
@@ -34,17 +34,17 @@ import { uploadFile } from '../controllers/uploadController.js';
 export const apiRouter = Router();
 
 // Gemini chat & TTS
-apiRouter.post('/api/gemini/chat', validate(chatSchema), optionalAuth, requireGeminiKey, chat);
-apiRouter.post('/api/gemini/tts', validate(ttsSchema), optionalAuth, requireGeminiKey, tts);
+apiRouter.post('/api/gemini/chat', validate(chatSchema), requireAuthIfConfigured, requireGeminiKey, chat);
+apiRouter.post('/api/gemini/tts', validate(ttsSchema), requireAuthIfConfigured, requireGeminiKey, tts);
 
 // Health & status
 apiRouter.get('/api/health', health);
 apiRouter.get('/api/gemini/status', requireAuth, status);
 
 // Model utilities
-apiRouter.get('/api/list-models', requireGeminiKey, listModels);
-apiRouter.get('/api/live-model-check', requireGeminiKey, liveModelCheck);
-apiRouter.get('/api/test-gemini', requireGeminiKey, testGemini);
+apiRouter.get('/api/list-models', requireAuthIfConfigured, requireGeminiKey, listModels);
+apiRouter.get('/api/live-model-check', requireAuthIfConfigured, requireGeminiKey, liveModelCheck);
+apiRouter.get('/api/test-gemini', requireAuthIfConfigured, requireGeminiKey, testGemini);
 
 // File analysis
 apiRouter.post(
@@ -53,7 +53,7 @@ apiRouter.post(
   upload.array('files', MAX_FILES),
   handleMulterError,
   validate(analyzeFilesSchema),
-  optionalAuth,
+  requireAuthIfConfigured,
   requireGeminiKey,
   analyzeFiles
 );
@@ -66,7 +66,7 @@ apiRouter.post(
   '/api/upload',
   upload.single('file'),
   handleMulterError,
-  optionalAuth,
+  requireAuthIfConfigured,
   uploadFile
 );
 
@@ -77,7 +77,7 @@ apiRouter.post(
   '/api/audio/process',
   upload.single('file'),
   handleMulterError,
-  optionalAuth,
+  requireAuthIfConfigured,
   processAudio
 );
 

@@ -22,7 +22,7 @@ import { PORT } from './config/env.js';
 //   import * from './middleware'
 //   import * from './utils'
 import { decrypt, redactSensitiveData as sharedRedact } from './utils/index.js';
-import { applySecurity, generalLimiter } from './middleware/index.js';
+import { applySecurity, generalLimiter, buildAllowedOrigins, verifyWsClient } from './middleware/index.js';
 import { apiRouter } from './routes/index.js';
 import { inspectionRouter } from './routes/inspection.js';
 import { mountFallbacks } from './controllers/index.js';
@@ -40,19 +40,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.set('trust proxy', 1); // req.ip / rate limiting use the real client address.
 const server = createServer(app); // HTTP + WS server (Live API proxy on /ws/live).
-const wss = new WebSocketServer({ server, path: '/ws/live' });
+// verifyClient: once FIREBASE_PROJECT_ID is set, the Live socket needs a valid ID token.
+const wss = new WebSocketServer({ server, path: '/ws/live', verifyClient: verifyWsClient });
 attachLiveWsObserver(wss); // Live-socket lifecycle + metrics (proxy attached later).
 // Security stack (order matters): helmet headers, then a strict no-wildcard CORS
 // allow-list, then applySecurity() (relaxed CSP + CORS-rejection -> 403).
-const DEV_ORIGIN = 'http://localhost:5173';
-const allowedOrigins = Array.from(
-  new Set(
-    `${process.env.CORS_ORIGIN || ''},${process.env.FRONTEND_URL || ''},${DEV_ORIGIN}`
-      .split(',')
-      .map((o) => o.trim())
-      .filter(Boolean)
-  )
-);
+// Single source of truth for the allow-list lives in middleware/security.js.
+const allowedOrigins = buildAllowedOrigins();
 // helmet() first. COOP is relaxed to 'same-origin-allow-popups' so Firebase
 // Google sign-in (signInWithPopup) can communicate the result back from its
 // popup; the strict default ('same-origin') severs window.opener and surfaces

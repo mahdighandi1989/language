@@ -35,6 +35,9 @@ const EMPTY = () => ({
   seq: { course: 0, content: 0, session: 0 },
 });
 
+// A /login code is valid for 15 minutes.
+export const LINK_CODE_TTL_MS = 15 * 60 * 1000;
+
 // Default per-chat notification settings. Every event category defaults to on.
 export const DEFAULT_SETTINGS = {
   notifications: {
@@ -104,9 +107,15 @@ export class TelegramStore {
   }
 
   // Confirm a code (called from the website side) -> establishes the link.
-  confirmLinkCode(code, userId) {
+  confirmLinkCode(code, userId, now = Date.now()) {
     const pending = this.data.pending[String(code).toUpperCase()];
     if (!pending) return null;
+    // One-time codes expire (the API already promised «نامعتبر یا منقضی»).
+    if (now - (pending.createdAt || 0) > LINK_CODE_TTL_MS) {
+      delete this.data.pending[String(code).toUpperCase()];
+      this._save();
+      return null;
+    }
     delete this.data.pending[String(code).toUpperCase()];
     this.data.links[pending.chatId] = { userId: String(userId), linkedAt: Date.now() };
     this._save();

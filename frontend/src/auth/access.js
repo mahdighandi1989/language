@@ -9,11 +9,19 @@
 // address(es) must be listed in firestore.rules so the admin can bootstrap
 // their own record.
 
-// Parsed, lower-cased admin allow-list from the build environment.
-export const ADMIN_EMAILS = String(import.meta.env.VITE_ADMIN_EMAILS || '')
-  .split(',')
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+// The owner's address, identical to adminEmails() in firestore.rules and to the
+// server fallback (backend/services/inspection/auth.js). Always included so a
+// missing/mistyped VITE_ADMIN_EMAILS at build time can no longer demote the
+// owner to «waiting for approval» with nobody able to approve.
+export const OWNER_EMAIL = 'mohamad.mahdi1988@gmail.com';
+
+// Parsed, lower-cased admin allow-list: build-time VITE_ADMIN_EMAILS ∪ owner.
+export function parseAdminEmails(raw) {
+  return Array.from(new Set(
+    `${raw || ''},${OWNER_EMAIL}`.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  ));
+}
+export const ADMIN_EMAILS = parseAdminEmails(import.meta.env.VITE_ADMIN_EMAILS);
 
 export function isAdminEmail(email) {
   return Boolean(email) && ADMIN_EMAILS.includes(String(email).toLowerCase());
@@ -66,4 +74,26 @@ export function canAccess(record, viewKey) {
   const key = viewKey === 'lesson' ? 'lessons' : viewKey;
   if (key === 'admin') return false; // admin-only area
   return Boolean(normalizePermissions(record.permissions)[key]);
+}
+
+// Gate state for an access record: admins and approved users enter; a rejected
+// record is final until an admin changes it; anything else waits.
+export function accessStateOf(record) {
+  if (!record) return 'pending';
+  if (record.role === 'admin' || record.status === 'approved') return 'approved';
+  if (record.status === 'rejected') return 'rejected';
+  return 'pending';
+}
+
+// Human explanation of a Firestore/Auth error on the sign-in path, so the owner
+// sees WHY instead of an endless «waiting for approval».
+export function describeAuthError(error) {
+  const code = String(error?.code || '');
+  if (code.includes('permission-denied')) {
+    return 'Firestore اجازهٔ خواندن/نوشتنِ رکوردِ دسترسی را نداد. قوانینِ firestore.rules (با ایمیلِ مدیر) باید در کنسولِ Firebase منتشر شده باشد.';
+  }
+  if (code.includes('unavailable') || code.includes('network')) return 'اتصال به Firebase برقرار نشد (شبکه). دوباره تلاش کنید.';
+  if (code.includes('unauthorized-domain')) return 'این دامنه در Firebase › Authentication › Authorized domains ثبت نشده است.';
+  if (code.includes('popup-blocked')) return 'مرورگر پنجرهٔ ورود را مسدود کرد.';
+  return `خطا: ${code || error?.message || 'نامشخص'}`;
 }

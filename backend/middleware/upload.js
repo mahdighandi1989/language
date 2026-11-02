@@ -13,8 +13,15 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  // Never trust the client's name as a path: keep only a safe basename so a
+  // crafted «../../x» cannot write outside uploadDir.
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${safeUploadName(file.originalname)}`),
 });
+
+export function safeUploadName(name) {
+  const base = String(name || 'file').split(/[\\/]/).pop().replace(/[^\p{L}\p{N}._-]+/gu, '_').replace(/^\.+/, '');
+  return (base || 'file').slice(0, 120);
+}
 
 // Restrict uploads to the file types the analysis endpoint actually handles,
 // so arbitrary/unsupported files are rejected before being written to disk.

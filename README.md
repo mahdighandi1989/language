@@ -38,7 +38,7 @@ its upstream/downstream dependencies.
 | --- | --- |
 | `frontend/index.html` | HTML entry document (Vite app shell). Defines the RTL Persian page chrome, injects Firebase config from `VITE_*` vars at build time, and loads `src/main.jsx`. |
 | `frontend/src/main.jsx` | Mounts the React tree: renders `<App/>` into `#root`. |
-| `frontend/src/App.jsx` | Root React component. Owns the top-level UI (lessons, chat, live voice call, settings) and client state, and talks to the backend API. |
+| `frontend/src/components/App.jsx` | Root React component (`frontend/src/App.jsx` is only a re-export shim). Owns the top-level UI (lessons, chat, live voice call, settings), sign-in gate and client state, and talks to the backend API. |
 | `frontend/src/firebaseConfig.js` | Builds the Firebase config object from `VITE_*` env vars and reports whether Firebase is configured. |
 | `backend/server.js` | HTTP + WebSocket entry point. Wires Express security, rate limiting, the `/api` router, the Gemini Live WebSocket proxy, and serves the SPA. |
 | `backend/config/env.js` | Loads `.env` and validates required environment variables on startup. |
@@ -150,9 +150,14 @@ rather than as "keep dependencies tidy":
 The Python test suite (pytest) exercises the Node backend and the build:
 
 ```bash
-pytest            # repo-level suite in tests/
-cd backend && python -m pytest   # backend-scoped suite
+python3 -m pytest -q                        # repo-level suite in tests/ (boots the real server)
+cd backend && python3 -m pytest -q          # backend-scoped suite
+cd backend && npm run test:node             # Node unit tests (domain, Telegram, inspection, security guards)
+cd frontend && npm test                     # vitest (sign-in flow, sync guards, inspection UI, …)
 ```
+
+`scripts/ship.sh` runs all of them plus the build and `scripts/docs_gate.py`
+before committing and merging into `main` (see `AGENTS.md`).
 
 ## Documentation coverage as a measurable outcome
 

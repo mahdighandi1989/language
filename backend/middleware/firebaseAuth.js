@@ -79,4 +79,37 @@ export async function optionalAuth(req, res, next) {
   next();
 }
 
-export default { requireAuth, optionalAuth };
+// Guard for endpoints that spend the Gemini key, CPU or disk: once server-side
+// auth is configured (FIREBASE_PROJECT_ID), a valid Firebase ID token is
+// REQUIRED; until then the request passes and a one-time warning is logged (so
+// a missing env var never locks the owner out, but is visible in the logs).
+let warnedOpen = false;
+export async function requireAuthIfConfigured(req, res, next) {
+  if (!process.env.FIREBASE_PROJECT_ID) {
+    if (!warnedOpen) {
+      warnedOpen = true;
+      console.warn('SECURITY: FIREBASE_PROJECT_ID is not set — Gemini/upload endpoints and /ws/live are open to anonymous callers.');
+    }
+    return next();
+  }
+  return requireAuth(req, res, next);
+}
+
+// WebSocket upgrade check for /ws/live (ws `verifyClient`, async form). The
+// browser cannot set headers on a WebSocket, so the ID token travels as the
+// `token` query parameter. Same policy as requireAuthIfConfigured.
+export function verifyWsClient(info, done) {
+  if (!process.env.FIREBASE_PROJECT_ID) return done(true);
+  let token = null;
+  try {
+    token = new URL(info.req.url, 'http://x').searchParams.get('token');
+  } catch {
+    token = null;
+  }
+  if (!token || !ensureAdmin()) return done(false, 401, 'Unauthorized');
+  admin.auth().verifyIdToken(token)
+    .then(() => done(true))
+    .catch(() => done(false, 401, 'Unauthorized'));
+}
+
+export default { requireAuth, optionalAuth, requireAuthIfConfigured, verifyWsClient };

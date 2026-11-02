@@ -14,9 +14,10 @@ import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Tras
 // --- Firebase Imports ---
 // Auth + Firestore primitives used directly by the root component. App/auth/db
 // bootstrapping lives in ../hooks/useFirebase.
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot, setDoc, getDoc, updateDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { isAdminEmail, fullPermissions, emptyPermissions, normalizePermissions, canAccess, PERMISSION_SECTIONS } from '../auth/access';
+import { isAdminEmail, fullPermissions, emptyPermissions, normalizePermissions, canAccess, PERMISSION_SECTIONS, accessStateOf, describeAuthError } from '../auth/access';
+import { serializeForSync, shouldSaveToCloud } from '../storage/sync.js';
 
 // --- Extracted modules (contexts, hooks, command guard, utilities) ---
 import { ExecutionFlowProvider, useExecutionFlow, FLOW_NODES } from '../contexts/ExecutionFlowContext';
@@ -25,6 +26,7 @@ import InspectorBridge, { handleCommand } from './InspectorBridge';
 import { playBeepSound, getWavUrl } from '../utils/audio';
 import { initFirebase } from '../hooks/useFirebase';
 import { resolveLiveWsUrl } from '../utils/wsUrl';
+import { installApiAuth, refreshLiveToken, withLiveToken } from '../utils/apiAuth.js';
 import { nextReconnectDelay, shouldReconnect } from '../utils/wsReconnect';
 import { installGlobalErrorTracking, reportError } from '../inspectorBridge.js';
 // «نظارت و سرکشی» (owner's inspection sheets) — NOT the Inspector Bridge above.
@@ -465,6 +467,10 @@ async function callGeminiTTS(fullPrompt, voiceName = "Kore", signal = null) {
   }
 }
 
+// Firebase auth handle for code outside the App component (the Live socket
+// refreshes its token from it before connecting).
+const liveAuthRef = { current: null };
+
 // --- Main App Component ---
 export default function App() {
   // The view lives in the URL hash (#/lessons, #/lesson/<id>) so a page can be
@@ -496,6 +502,13 @@ export default function App() {
   const [authUser, setAuthUser] = useState(null);
   const [accessRecord, setAccessRecord] = useState(null);
   const [accessStatus, setAccessStatus] = useState('loading');
+  const [accessError, setAccessError] = useState(null);
+  // Cloud-sync guards (see ../storage/sync.js): never save before THIS user's
+  // document has been loaded, never re-save what was just loaded/saved, and show
+  // a failed save instead of only logging it.
+  const loadedUidRef = useRef(null);
+  const lastSyncedJsonRef = useRef(null);
+  const [syncError, setSyncError] = useState(null);
 
   // localStorage helper functions
   const STORAGE_KEY = 'lebanese_dialect_app_data';
@@ -590,13 +603,20 @@ export default function App() {
       return;
     }
 
-    const { auth, db } = initFirebase(firebaseConfig, { debug: true });
+    const { auth, db } = initFirebase(firebaseConfig, { debug: import.meta.env.DEV });
     setFirebaseServices({ auth, db });
+    // Every /api/* call now carries the user's ID token (server: requireAuthIfConfigured).
+    installApiAuth(auth);
+    liveAuthRef.current = auth;
 
     let unsubData = null;     // listener on the user's own data document
     let unsubAccess = null;   // listener on the user's accessControl record
 
-    const stopData = () => { if (unsubData) { unsubData(); unsubData = null; } };
+    const stopData = () => {
+      if (unsubData) { unsubData(); unsubData = null; }
+      loadedUidRef.current = null;
+      lastSyncedJsonRef.current = null;
+    };
     const stopAccess = () => { if (unsubAccess) { unsubAccess(); unsubAccess = null; } };
 
     // Stream the approved user's own data document (load or initialize).
@@ -605,12 +625,18 @@ export default function App() {
       setUserId(uid);
       const userDocRef = doc(db, `/artifacts/${appId}/users/${uid}/data/main`);
       unsubData = onSnapshot(userDocRef, (snap) => {
+        // Our own write echoing back: local state is already newer — ignore it.
+        if (snap.metadata?.hasPendingWrites) return;
         if (snap.exists()) {
           const merged = { ...initialData, ...snap.data() };
+          lastSyncedJsonRef.current = serializeForSync(merged);
+          loadedUidRef.current = uid;
           setData(merged);
           saveBackup(merged);
         } else {
           setDoc(userDocRef, initialData).catch((e) => console.error('init data doc:', e));
+          lastSyncedJsonRef.current = serializeForSync(initialData);
+          loadedUidRef.current = uid;
           setData(initialData);
         }
         setIsAuthReady(true);
@@ -640,6 +666,7 @@ export default function App() {
 
     const handleSignedIn = async (user) => {
       setAuthUser(user);
+      refreshLiveToken(auth); // the Live socket carries a fresh ID token
       const email = user.email || '';
       const accessRef = doc(db, `/artifacts/${appId}/accessControl/${user.uid}`);
 
@@ -672,6 +699,7 @@ export default function App() {
         }
       } catch (e) {
         console.error('accessControl bootstrap error:', e);
+        setAccessError(describeAuthError(e));
       }
 
       // Live-subscribe so approvals / permission changes apply without reload.
@@ -680,8 +708,10 @@ export default function App() {
           ? snap.data()
           : { status: 'pending', role: 'user', permissions: emptyPermissions(), email };
         setAccessRecord(rec);
-        const approved = rec.role === 'admin' || rec.status === 'approved';
-        setAccessStatus(approved ? 'approved' : (rec.status === 'rejected' ? 'rejected' : 'pending'));
+        setAccessError(null);
+        const state = accessStateOf(rec);
+        const approved = state === 'approved';
+        setAccessStatus(state);
         if (approved) {
           if (rec.role === 'admin') await migrateSharedDataForAdmin(user.uid);
           startDataSync(user.uid);
@@ -691,8 +721,10 @@ export default function App() {
           setIsAuthReady(true);
         }
       }, (error) => {
+        // Not «pending»: the owner must see WHY (rules not published, network…).
         console.error('Access listener error:', error);
-        setAccessStatus('pending');
+        setAccessError(describeAuthError(error));
+        setAccessStatus('error');
         setIsAuthReady(true);
       });
     };
@@ -713,7 +745,11 @@ export default function App() {
       handleSignedIn(user);
     });
 
+    // ID tokens live one hour; keep the Live socket's copy fresh.
+    const tokenTimer = setInterval(() => refreshLiveToken(auth), 40 * 60 * 1000);
+
     return () => {
+      clearInterval(tokenTimer);
       stopData();
       stopAccess();
       if (unsubAuth) unsubAuth();
@@ -741,12 +777,22 @@ export default function App() {
     const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/data/main`);
 
     const handler = setTimeout(() => {
-        setDoc(userDocRef, dataRef.current, { merge: true })
+        const snapshot = dataRef.current;
+        const json = serializeForSync(snapshot);
+        if (!shouldSaveToCloud({ loadedUid: loadedUidRef.current, userId, json, lastSyncedJson: lastSyncedJsonRef.current })) return;
+        // Full write (not merge): the state IS the whole document, and a merge
+        // would never delete a removed map key (e.g. a reset custom prompt).
+        setDoc(userDocRef, snapshot)
             .then(() => {
-              // Save backup to localStorage after successful Firestore save
-              saveBackup(dataRef.current);
+              lastSyncedJsonRef.current = json;
+              setSyncError(null);
+              saveBackup(snapshot);
             })
-            .catch(err => console.error("Error saving data to Firestore:", err));
+            .catch(err => {
+              console.error("Error saving data to Firestore:", err);
+              reportError(err, { source: 'firebase' });
+              setSyncError(describeSyncError(err, json));
+            });
     }, 1000);
 
     return () => clearTimeout(handler);
@@ -975,13 +1021,21 @@ export default function App() {
   };
 
   const handleGoogleSignIn = async () => {
+    const { auth } = firebaseServices;
+    if (!auth) return;
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      const { auth } = firebaseServices;
-      if (!auth) return;
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await signInWithPopup(auth, provider);
     } catch (e) {
+      const code = String(e?.code || '');
+      if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return;
+      // Mobile browsers / in-app webviews block popups: fall back to a redirect.
+      if (code.includes('popup-blocked') || code.includes('operation-not-supported')) {
+        try { await signInWithRedirect(auth, provider); return; } catch (e2) { e = e2; }
+      }
       console.error('Google sign-in failed:', e);
-      setModalConfig({ title: 'خطای ورود', message: 'ورود با گوگل ناموفق بود. دوباره تلاش کنید.' });
+      setAccessError(describeAuthError(e));
     }
   };
 
@@ -997,7 +1051,10 @@ export default function App() {
     return <AuthGateScreen variant="loading" />;
   }
   if (accessStatus === 'signedOut') {
-    return <AuthGateScreen variant="login" onSignIn={handleGoogleSignIn} />;
+    return <AuthGateScreen variant="login" onSignIn={handleGoogleSignIn} error={accessError} />;
+  }
+  if (accessStatus === 'error') {
+    return <AuthGateScreen variant="error" user={authUser} onSignOut={handleSignOut} error={accessError} />;
   }
   if (accessStatus === 'pending' || accessStatus === 'rejected') {
     return <AuthGateScreen variant={accessStatus} user={authUser} onSignOut={handleSignOut} />;
@@ -1018,7 +1075,15 @@ export default function App() {
         <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
             <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} showInspection={inspectionEnabled} />
-            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">{renderContent()}</main>
+            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">
+              {syncError && (
+                <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-sm flex justify-between gap-3">
+                  <span>⚠️ ذخیره در فضای ابری ناموفق بود: {syncError} (نسخهٔ پشتیبان در همین مرورگر هست.)</span>
+                  <button onClick={() => setSyncError(null)} className="text-red-600">✕</button>
+                </div>
+              )}
+              {renderContent()}
+            </main>
             <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
             {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
             {canAccess(accessRecord, 'assistant') && (
@@ -1147,7 +1212,17 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
 }
 
 // Full-screen auth gate: login, pending-approval, rejected, and loading states.
-function AuthGateScreen({ variant, user, onSignIn, onSignOut }) {
+// Explain a failed cloud save in plain Persian (the common real cause: the
+// single user document grew past Firestore's 1 MiB limit with embedded media).
+function describeSyncError(err, json) {
+    const size = json ? new Blob([json]).size : 0;
+    if (size > 1000000 || /exceeds the maximum|too large|INVALID_ARGUMENT/i.test(String(err?.message))) {
+        return `حجمِ داده‌ها (${(size / 1048576).toFixed(2)}MB) از سقفِ ۱MB ِ یک سندِ Firestore گذشته — احتمالاً صوت/ویدیو/تصویرِ جاسازی‌شده در درس‌ها یا مکالمه‌ها. تا رفعِ آن، تغییرهای تازه فقط در همین مرورگر می‌ماند.`;
+    }
+    return describeAuthError(err);
+}
+
+function AuthGateScreen({ variant, user, onSignIn, onSignOut, error }) {
     const Wrapper = ({ children }) => (
         <div dir="rtl" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-teal-900 p-4">
             <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
@@ -1167,6 +1242,19 @@ function AuthGateScreen({ variant, user, onSignIn, onSignOut }) {
                 <button onClick={onSignIn} className="w-full flex items-center justify-center gap-3 bg-teal-500 text-white py-3 rounded-xl hover:bg-teal-600 font-bold transition-colors">
                     ورود با گوگل
                 </button>
+                {error && <p role="alert" className="text-sm text-red-600 mt-4">{error}</p>}
+            </Wrapper>
+        );
+    }
+    if (variant === 'error') {
+        return (
+            <Wrapper>
+                <div className="text-4xl mb-3">⚠️</div>
+                <h2 className="text-lg font-bold text-slate-800 mb-2">بررسیِ دسترسی ناموفق بود</h2>
+                <p className="text-slate-600 mb-2 text-sm">{error || 'خطای نامشخص'}</p>
+                {user?.email && <p className="text-xs text-slate-400 mb-6">{user.email}</p>}
+                <button onClick={() => window.location.reload()} className="w-full bg-teal-500 text-white py-2 rounded-xl hover:bg-teal-600 mb-2">تلاشِ دوباره</button>
+                <button onClick={onSignOut} className="w-full bg-slate-200 text-slate-700 py-2 rounded-xl hover:bg-slate-300 transition-colors">خروج از حساب</button>
             </Wrapper>
         );
     }
@@ -1488,7 +1576,9 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
 
         try {
             const { doc, setDoc } = await import('firebase/firestore');
-            const currentPath = `/artifacts/${currentAppId}/users/${SHARED_USER_ID}/data/main`;
+            // Into the signed-in user's OWN document (the legacy shared document is
+            // read-only history; writing there was invisible to the app).
+            const currentPath = `/artifacts/${currentAppId}/users/${userId}/data/main`;
             const currentDocRef = doc(firebaseServices.db, currentPath);
 
             // Merge old data with current data (old data takes priority for non-empty arrays)
@@ -6757,7 +6847,8 @@ function LiveVoiceChat({
 
     // Resolve the Live Voice endpoint: honours VITE_WS_URL when set, otherwise
     // falls back to this origin's /ws/live (see ../utils/wsUrl.js).
-    const wsUrl = resolveLiveWsUrl();
+    // With the user's ID token (the server requires it once auth is configured).
+    const wsUrl = withLiveToken(resolveLiveWsUrl());
 
     try {
       wsRef.current = new WebSocket(wsUrl);

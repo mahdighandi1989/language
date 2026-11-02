@@ -109,6 +109,12 @@ export function startPostMessageBridge(actions = defaultCommandActions, target) 
   const view = target ?? (typeof window !== 'undefined' ? window : undefined);
   if (!view || typeof view.addEventListener !== 'function') return () => {};
   const onMessage = (event) => {
+    // Only this very window may command itself: a message from another window
+    // (an opener, a parent frame, any origin) could otherwise click buttons —
+    // e.g. «approve» in the admin panel — or navigate the user away.
+    if (!event || event.source !== view) return;
+    const ownOrigin = view.location && view.location.origin;
+    if (ownOrigin && event.origin !== ownOrigin) return;
     const data = event && event.data;
     // Ignore anything that is not one of our tagged command envelopes.
     if (!data || typeof data !== 'object' || data.source !== BRIDGE_COMMAND_SOURCE) return;

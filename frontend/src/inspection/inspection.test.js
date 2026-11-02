@@ -75,3 +75,19 @@ describe('inspection api client', () => {
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({ text: 'x' });
   });
 });
+
+import { parseAdminEmails, accessStateOf, describeAuthError } from '../auth/access.js';
+describe('admin identity and gate state', () => {
+  it('always includes the owner, whatever VITE_ADMIN_EMAILS says', () => {
+    expect(parseAdminEmails('')).toContain('mohamad.mahdi1988@gmail.com');
+    expect(parseAdminEmails(' X@Y.Z ')).toEqual(expect.arrayContaining(['x@y.z', 'mohamad.mahdi1988@gmail.com']));
+  });
+  it('maps records to gate states', () => {
+    expect(accessStateOf({ role: 'admin', status: 'pending' })).toBe('approved');
+    expect(accessStateOf({ role: 'user', status: 'rejected' })).toBe('rejected');
+    expect(accessStateOf(null)).toBe('pending');
+  });
+  it('explains permission errors', () => {
+    expect(describeAuthError({ code: 'permission-denied' })).toMatch(/firestore\.rules/);
+  });
+});

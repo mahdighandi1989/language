@@ -132,9 +132,25 @@ describe('startPostMessageBridge', () => {
     startPostMessageBridge({ click }, target);
 
     target.emit('message', {
+      source: target,
       data: { source: BRIDGE_COMMAND_SOURCE, command: 'click', selector: '.go' },
     });
     expect(click).toHaveBeenCalledWith('.go');
+  });
+
+  it('rejects envelopes from another window or another origin', () => {
+    const target = { ...makeTarget(), location: { origin: 'https://app.example' } };
+    const fresh = makeTarget();
+    target.addEventListener = fresh.addEventListener;
+    target.emit = fresh.emit;
+    const click = vi.fn();
+    startPostMessageBridge({ click }, target);
+    const data = { source: BRIDGE_COMMAND_SOURCE, command: 'click', selector: '.approve' };
+    target.emit('message', { source: {}, origin: 'https://app.example', data });
+    target.emit('message', { source: target, origin: 'https://evil.example', data });
+    expect(click).not.toHaveBeenCalled();
+    target.emit('message', { source: target, origin: 'https://app.example', data });
+    expect(click).toHaveBeenCalledTimes(1);
   });
 
   it('ignores messages that are not tagged for the bridge', () => {
@@ -157,6 +173,7 @@ describe('startPostMessageBridge', () => {
 
     // A javascript: URL must be rejected even when it arrives via postMessage.
     target.emit('message', {
+      source: target,
       data: { source: BRIDGE_COMMAND_SOURCE, command: 'navigate', url: 'javascript:1' },
     });
     expect(navigate).not.toHaveBeenCalled();
@@ -171,6 +188,7 @@ describe('startPostMessageBridge', () => {
     stop();
     expect(target.count('message')).toBe(0);
     target.emit('message', {
+      source: target,
       data: { source: BRIDGE_COMMAND_SOURCE, command: 'click', selector: '.go' },
     });
     expect(click).not.toHaveBeenCalled();
