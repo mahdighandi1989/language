@@ -28,6 +28,7 @@ import { analyzeFiles } from '../controllers/analysisController.js';
 import { ingestAnalytics, getAnalytics } from '../controllers/analyticsController.js';
 import { processAudio } from '../controllers/audioController.js';
 import { uploadFile } from '../controllers/uploadController.js';
+import { lessonFilesRouter } from './lessonFiles.js';
 
 // Aggregates every /api route. Mounted at the app root so the absolute paths
 // below match the original API contract exactly.
@@ -80,6 +81,9 @@ apiRouter.post(
   requireAuthIfConfigured,
   processAudio
 );
+
+// «آپلودِ هوشمند»: original files kept + exact/verified extraction (routes/lessonFiles.js).
+apiRouter.use(lessonFilesRouter);
 
 // Product analytics: the frontend tracker posts session summaries here so the
 // backend can compute and expose the product KPIs / outcome_rate.

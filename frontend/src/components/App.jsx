@@ -23,6 +23,7 @@ import { toCloudDoc, bodiesToWrite, mergeCachedBodies, createBodyStore, writeClo
 import { MarkdownRenderer as LessonMarkdown } from '../lessons/markdown.jsx';
 import { compareLessons, courseOf, courseList, naturalCompare, searchKey } from '../lessons/sortLessons.js';
 import LessonImportPanel from '../lessons/LessonImportPanel.jsx';
+import SmartUpload, { CorrectionsPanel } from '../lessons/SmartUpload.jsx';
 
 // --- Extracted modules (contexts, hooks, command guard, utilities) ---
 import { ExecutionFlowProvider, useExecutionFlow, FLOW_NODES } from '../contexts/ExecutionFlowContext';
@@ -3445,8 +3446,9 @@ ${analyzedContent}
     <div className="space-y-8">
       <h2 className="text-4xl font-bold mb-2 text-slate-800">{lesson.title}</h2>
       <div className="flex items-center gap-2 text-slate-600 mb-6"><p className="text-lg">{lesson.summary}</p><TTSButton textToSpeak={lesson.summary} /></div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 xl:gap-8">
+        <div className="xl:col-span-3 space-y-8 min-w-0">
+           <SmartUpload lesson={lesson} updateLesson={updateLesson} />
            <Card title="افزودن و تحلیل محتوا">
                <div className="p-6 border-dashed border-2 border-slate-300 rounded-xl text-center mb-4 hover:border-teal-500 transition-colors">
                    <input type="file" multiple onChange={handleFileChange} id="file-upload" className="hidden" accept="audio/*,video/*,image/*,.pdf,.txt,.json" />
@@ -3486,6 +3488,7 @@ ${analyzedContent}
                     </div>
                 </Card>
             )}
+            <CorrectionsPanel corrections={lesson.corrections} />
             <Card
                 title="📝 نکات ذخیره شده درس"
                 actionButton={
@@ -3570,7 +3573,7 @@ ${analyzedContent}
             {flashcards.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 gap-4">{flashcards.map((card, index) => <Flashcard key={index} term={card.term} definition={card.definition} />)}</div>) : <p className="text-slate-500 text-center py-4">برای ایجاد فلش‌کارت، ابتدا باید نکاتی به درس اضافه کنید.</p>}
           </Card>
         </div>
-        <div><Card title="✨ تمرین مکالمه"><ChatInterface data={data} setData={setData} context={`lesson-${lesson.id}`} lessonTitle={lesson.title} lessonNotes={lesson.archivedNotes} addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories[`lesson-${lesson.id}`] || []} setModalConfig={setModalConfig} addPronunciationCorrection={addPronunciationCorrection} /></Card></div>
+        <div className="xl:col-span-2 min-w-0 xl:sticky xl:top-4 self-start"><Card title="✨ تمرین مکالمه"><ChatInterface data={data} setData={setData} context={`lesson-${lesson.id}`} lessonTitle={lesson.title} lessonNotes={lesson.archivedNotes} addJournalEntry={addJournalEntry} updateKnowledgeBase={updateKnowledgeBase} knowledgeBase={knowledgeBase} saveChatHistory={saveChatHistory} initialHistory={chatHistories[`lesson-${lesson.id}`] || []} setModalConfig={setModalConfig} addPronunciationCorrection={addPronunciationCorrection} /></Card></div>
       </div>
     </div>
   );

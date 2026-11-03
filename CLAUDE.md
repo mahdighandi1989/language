@@ -53,6 +53,7 @@
 | قوانینِ امنیتیِ Firestore (دستی در کنسول منتشر می‌شود) | `firestore.rules` |
 | Inspector Bridge (ردیابیِ خطا + نگهبانِ فرمانِ AI؛ **غیر از «نظارت و سرکشی»**) | `frontend/src/inspectorBridge.js`، `frontend/src/components/InspectorBridge.jsx`، `docs/inspector-bridge-audit.md` |
 | «نظارت و سرکشی» + ناظرِ خودکار (روتین‌ها، پرامپت‌های نسخه‌دار، بایگانی) | `docs/supervisor/`، `scripts/supervisor/`، `backend/routes/inspection.js`، `backend/services/inspection/`، `frontend/src/inspection/` |
+| درس‌ها در مقیاس: ایمپورت، بدنه‌های جدا، آپلودِ هوشمند (اصلِ فایل + استخراجِ دقیق/دوبار‌سنجیده + اصلاحات) | `frontend/src/lessons/`، `backend/routes/lessonFiles.js`، `backend/services/lessonFiles/`، `docs/lessons-import.md`، `docs/drive-plan.md` |
 | استقرار | `render.yaml` (نامِ سرویس و تفاوت‌ها با داشبورد: HANDBOOK §۴) |
 | تست‌ها | `tests/` (pytest، سرور را بالا می‌آورد)، `backend/tests/` (node --test + pytest)، `frontend/src/**/*.test.*` (vitest) |
 | دفتر کار، جزوه، روند | `docs/WORKLOG.md`، `docs/handbook/HANDBOOK.md`، `docs/handbook/PROGRESS.md` |

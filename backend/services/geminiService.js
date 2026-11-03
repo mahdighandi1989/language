@@ -4,12 +4,15 @@ import { GEMINI_API_KEY } from '../config/env.js';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
 
 // Analyze content with Gemini (text, audio, image, video) using inline parts.
-export async function analyzeWithGemini(parts, systemPrompt) {
+// `options.generationConfig` (optional) is passed through, e.g. temperature 0
+// for verbatim transcription or a JSON response schema.
+export async function analyzeWithGemini(parts, systemPrompt, options = {}) {
   const apiUrl = `${GEMINI_BASE}/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   const payload = {
     contents: [{ role: 'user', parts }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
+    ...(options.generationConfig ? { generationConfig: options.generationConfig } : {}),
   };
 
   const response = await fetch(apiUrl, {
