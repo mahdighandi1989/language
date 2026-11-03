@@ -15,9 +15,14 @@ import { Plus, BookOpen, MessageSquare, BarChart2, Edit3, Download, Upload, Tras
 // Auth + Firestore primitives used directly by the root component. App/auth/db
 // bootstrapping lives in ../hooks/useFirebase.
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, getDoc, updateDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, updateDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { isAdminEmail, fullPermissions, emptyPermissions, normalizePermissions, canAccess, PERMISSION_SECTIONS, accessStateOf, describeAuthError } from '../auth/access';
 import { serializeForSync, shouldSaveToCloud } from '../storage/sync.js';
+// Lessons at scale: separate body store (1 MiB cap), list helpers, markdown, admin import.
+import { toCloudDoc, bodiesToWrite, mergeCachedBodies, createBodyStore } from '../lessons/lessonBodies.js';
+import { MarkdownRenderer as LessonMarkdown } from '../lessons/markdown.jsx';
+import { compareLessons, courseOf, courseList, naturalCompare, searchKey } from '../lessons/sortLessons.js';
+import LessonImportPanel from '../lessons/LessonImportPanel.jsx';
 
 // --- Extracted modules (contexts, hooks, command guard, utilities) ---
 import { ExecutionFlowProvider, useExecutionFlow, FLOW_NODES } from '../contexts/ExecutionFlowContext';
@@ -515,6 +520,10 @@ export default function App() {
   const loadedUidRef = useRef(null);
   const lastSyncedJsonRef = useRef(null);
   const [syncError, setSyncError] = useState(null);
+  // Lesson bodies stored outside the main document (../lessons/lessonBodies.js):
+  // cache key → { text, hash } and the hash last known to be stored per key.
+  const bodyCacheRef = useRef(new Map());
+  const bodyHashesRef = useRef(new Map());
 
   // localStorage helper functions
   const STORAGE_KEY = 'lebanese_dialect_app_data';
@@ -622,6 +631,8 @@ export default function App() {
       if (unsubData) { unsubData(); unsubData = null; }
       loadedUidRef.current = null;
       lastSyncedJsonRef.current = null;
+      bodyCacheRef.current = new Map();
+      bodyHashesRef.current = new Map();
     };
     const stopAccess = () => { if (unsubAccess) { unsubAccess(); unsubAccess = null; } };
 
@@ -634,11 +645,16 @@ export default function App() {
         // Our own write echoing back: local state is already newer — ignore it.
         if (snap.metadata?.hasPendingWrites) return;
         if (snap.exists()) {
-          const merged = { ...initialData, ...snap.data() };
-          lastSyncedJsonRef.current = serializeForSync(merged);
+          const raw = { ...initialData, ...snap.data() };
+          // Long lesson texts live in their own documents: put back what is
+          // cached, fetch the rest (never written until loaded — see toCloudDoc).
+          const merged = { ...raw, lessons: mergeCachedBodies(raw.lessons, bodyCacheRef.current) };
+          for (const l of raw.lessons || []) if (l.bodyRef?.hash) bodyHashesRef.current.set(l.bodyRef.key, l.bodyRef.hash);
+          lastSyncedJsonRef.current = serializeForSync(toCloudDoc(merged));
           loadedUidRef.current = uid;
           setData(merged);
-          saveBackup(merged);
+          if (!merged.lessons.some((l) => l._bodyPending)) saveBackup(merged);
+          hydrateBodies(uid, merged.lessons);
         } else {
           setDoc(userDocRef, initialData).catch((e) => console.error('init data doc:', e));
           lastSyncedJsonRef.current = serializeForSync(initialData);
@@ -651,6 +667,35 @@ export default function App() {
         reportError(error, { source: 'firebase' });
         setIsAuthReady(true);
       });
+    };
+
+    // Fetch the bodies of lessons marked _bodyPending, one by one.
+    const hydrateBodies = async (uid, lessons) => {
+      const pending = (lessons || []).filter((l) => l._bodyPending);
+      if (!pending.length) return;
+      const store = createBodyStore({ doc, getDoc, writeBatch }, db, `/artifacts/${appId}/users/${uid}`);
+      for (const l of pending) {
+        const key = l.bodyRef.key;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const { text, hash } = await store.read(key);
+          bodyCacheRef.current.set(key, { text, hash });
+          bodyHashesRef.current.set(key, hash);
+          setData((prev) => ({ ...prev, lessons: prev.lessons.map((x) => {
+            if (x.bodyRef?.key !== key || !x._bodyPending) return x;
+            const { _bodyPending, _bodyError, ...rest } = x;
+            return { ...rest, archivedNotes: text };
+          }) }));
+        } catch (e) {
+          console.error('lesson body load failed:', key, e);
+          reportError(e, { source: 'firebase' });
+          setData((prev) => ({ ...prev, lessons: prev.lessons.map((x) => {
+            if (x.bodyRef?.key !== key || !x._bodyPending) return x;
+            const { _bodyPending, ...rest } = x;
+            return { ...rest, _bodyError: String(e?.message || e) };
+          }) }));
+        }
+      }
     };
 
     // One-time migration: copy the legacy shared document into the owner's own
@@ -784,11 +829,24 @@ export default function App() {
 
     const handler = setTimeout(() => {
         const snapshot = dataRef.current;
-        const json = serializeForSync(snapshot);
+        // The CLOUD form: long lesson bodies replaced by refs (lessons/lessonBodies.js).
+        const cloud = toCloudDoc(snapshot);
+        const json = serializeForSync(cloud);
         if (!shouldSaveToCloud({ loadedUid: loadedUidRef.current, userId, json, lastSyncedJson: lastSyncedJsonRef.current })) return;
-        // Full write (not merge): the state IS the whole document, and a merge
-        // would never delete a removed map key (e.g. a reset custom prompt).
-        setDoc(userDocRef, snapshot)
+        const bodyStore = createBodyStore({ doc, getDoc, writeBatch }, db, `/artifacts/${appId}/users/${userId}`);
+        const changedBodies = bodiesToWrite(snapshot, bodyHashesRef.current);
+        // Bodies first (each one atomic), then the main document that points at them.
+        (async () => {
+          for (const l of changedBodies) {
+            // eslint-disable-next-line no-await-in-loop
+            const hash = await bodyStore.write(l.bodyRef.key, l.archivedNotes);
+            bodyHashesRef.current.set(l.bodyRef.key, hash);
+            bodyCacheRef.current.set(l.bodyRef.key, { text: l.archivedNotes, hash });
+          }
+          // Full write (not merge): the state IS the whole document, and a merge
+          // would never delete a removed map key (e.g. a reset custom prompt).
+          return setDoc(userDocRef, cloud);
+        })()
             .then(() => {
               lastSyncedJsonRef.current = json;
               setSyncError(null);
@@ -855,6 +913,13 @@ export default function App() {
   };
 
   const updateLesson = (lessonId, updatedLessonData) => {
+    // A lesson whose long text is still loading (or failed to load) must not get
+    // a new text: it would be built on an empty body and the stored one lost.
+    const target = data.lessons.find(l => l.id === lessonId);
+    if (target && (target._bodyPending || target._bodyError) && 'archivedNotes' in (updatedLessonData || {})) {
+      setModalConfig({ title: 'صبر کنید', message: 'متنِ کاملِ این درس هنوز از فضای ابری بارگذاری نشده است؛ پس از بارگذاری دوباره تلاش کنید.' });
+      return;
+    }
     setData(prev => ({ ...prev, lessons: prev.lessons.map(l => l.id === lessonId ? { ...l, ...updatedLessonData } : l) }));
   };
 
@@ -1003,7 +1068,7 @@ export default function App() {
     // Admin-only management panel.
     if (activeView === 'admin') {
       return accessRecord?.role === 'admin'
-        ? <AdminPanel db={firebaseServices.db} appId={appId} currentUid={authUser?.uid} />
+        ? <AdminPanel db={firebaseServices.db} appId={appId} currentUid={authUser?.uid} data={data} setData={setData} externalize={Boolean(firebaseServices.db)} />
         : <AccessNotice title="دسترسی محدود" message="این بخش فقط برای مدیر است." />;
     }
     // Per-section access gate (admins bypass via canAccess). Applies only when a
@@ -1300,7 +1365,7 @@ function AccessNotice({ title, message }) {
 
 // Admin-only panel: review access requests, approve/reject, and grant per-section
 // permissions. All writes are guarded by Firestore rules (admin-only).
-function AdminPanel({ db, appId, currentUid }) {
+function AdminPanel({ db, appId, currentUid, data, setData, externalize = true }) {
     const [users, setUsers] = useState([]);
     const [error, setError] = useState(null);
     useEffect(() => {
@@ -1374,6 +1439,7 @@ function AdminPanel({ db, appId, currentUid }) {
     return (
         <div dir="rtl" className="max-w-4xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold text-slate-800">مدیریت کاربران</h1>
+            {data && setData && <LessonImportPanel data={data} setData={setData} externalize={externalize} />}
             {error && <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
             <section className="space-y-3">
                 <h2 className="font-bold text-slate-700">درخواست‌های در انتظار ({pending.length})</h2>
@@ -2732,8 +2798,10 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
 
 function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortOrder, setSortOrder] = useState('newest');
+    const [sortOrder, setSortOrder] = useState('course');
     const [filterBy, setFilterBy] = useState('all'); // all, withContent, empty
+    const [courseFilter, setCourseFilter] = useState('all');
+    const courses = useMemo(() => courseList(lessons), [lessons]);
     const [newLessonTitle, setNewLessonTitle] = useState('');
     const [showAddForm, setShowAddForm] = useState(false);
 
@@ -2746,13 +2814,15 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
     };
 
     const filteredAndSortedLessons = useMemo(() => {
+        const q = searchKey(searchTerm.trim());
         return lessons
             .filter(lesson => {
-                // Text search
-                const matchesSearch =
-                    lesson.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    lesson.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (lesson.archivedNotes || '').toLowerCase().includes(searchTerm.toLowerCase());
+                // Text search (digit-, diacritic- and ی/ي-insensitive)
+                const matchesSearch = !q ||
+                    searchKey(lesson.title).includes(q) ||
+                    searchKey(lesson.summary).includes(q) ||
+                    searchKey(lesson.archivedNotes || '').includes(q);
+                if (courseFilter !== 'all' && courseOf(lesson) !== courseFilter) return false;
 
                 // Filter by content status
                 const hasContent = lesson.archivedNotes && lesson.archivedNotes.trim().length > 50;
@@ -2766,7 +2836,8 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
             .sort((a, b) => {
                 if (sortOrder === 'newest') return b.id - a.id;
                 if (sortOrder === 'oldest') return a.id - b.id;
-                if (sortOrder === 'title') return a.title.localeCompare(b.title);
+                if (sortOrder === 'title') return naturalCompare(a.title, b.title);
+                if (sortOrder === 'course') return compareLessons(a, b);
                 if (sortOrder === 'progress') {
                     const pA = (a.progress?.learnedItems || 0) + (a.progress?.quizzesTaken || 0);
                     const pB = (b.progress?.learnedItems || 0) + (b.progress?.quizzesTaken || 0);
@@ -2774,7 +2845,7 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
                 }
                 return 0;
             });
-    }, [lessons, searchTerm, sortOrder, filterBy]);
+    }, [lessons, searchTerm, sortOrder, filterBy, courseFilter]);
 
     return (
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -2824,7 +2895,7 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
                 )}
 
                 {/* Search and Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div className="relative">
                         <Search size={18} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-200"/>
                         <input
@@ -2840,6 +2911,7 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
                         onChange={e => setSortOrder(e.target.value)}
                         className="p-2 rounded-lg bg-white/20 text-white border border-teal-400 focus:outline-none"
                     >
+                        <option value="course" className="text-slate-800">دوره و شماره (۲ قبل از ۱۰)</option>
                         <option value="newest" className="text-slate-800">جدیدترین</option>
                         <option value="oldest" className="text-slate-800">قدیمی‌ترین</option>
                         <option value="title" className="text-slate-800">بر اساس عنوان</option>
@@ -2853,6 +2925,15 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
                         <option value="all" className="text-slate-800">همه دروس</option>
                         <option value="withContent" className="text-slate-800">دارای محتوا</option>
                         <option value="empty" className="text-slate-800">بدون محتوا</option>
+                    </select>
+                    <select
+                        value={courseFilter}
+                        onChange={e => setCourseFilter(e.target.value)}
+                        aria-label="فیلترِ دوره"
+                        className="p-2 rounded-lg bg-white/20 text-white border border-teal-400 focus:outline-none"
+                    >
+                        <option value="all" className="text-slate-800">همهٔ دوره‌ها</option>
+                        {courses.map(c => <option key={c} value={c} className="text-slate-800">{c}</option>)}
                     </select>
                 </div>
             </div>
@@ -3374,6 +3455,7 @@ ${analyzedContent}
                     !isEditingNotes ? (
                         <button
                             onClick={() => setIsEditingNotes(true)}
+                            disabled={Boolean(lesson._bodyPending || lesson._bodyError)}
                             className="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600 flex items-center gap-2"
                         >
                             <Edit size={16}/> ویرایش
@@ -3410,7 +3492,11 @@ ${analyzedContent}
                     </div>
                 ) : (
                     <div className="max-h-96 overflow-y-auto p-4 border rounded-lg bg-slate-50">
-                        {lesson.archivedNotes && lesson.archivedNotes.trim() ? (
+                        {lesson._bodyPending ? (
+                            <p className="text-slate-500">در حالِ بارگذاریِ متنِ کاملِ درس از فضای ابری…</p>
+                        ) : lesson._bodyError ? (
+                            <p className="text-red-600">متنِ این درس بارگذاری نشد: {lesson._bodyError} — صفحه را تازه کنید. (تا آن موقع ویرایش غیرفعال است تا متنِ ذخیره‌شده بازنویسی نشود.)</p>
+                        ) : lesson.archivedNotes && lesson.archivedNotes.trim() ? (
                             <MarkdownRenderer text={lesson.archivedNotes} />
                         ) : (
                             <p className="text-slate-500 text-center py-4">هنوز نکته‌ای به این درس اضافه نشده است.</p>
@@ -4097,25 +4183,9 @@ ${lesson.archivedNotes}`;
     );
 }
 
+// Lesson notes renderer: tables, lists, code, RTL/LTR per block — see ../lessons/markdown.jsx.
 export function MarkdownRenderer({ text }) {
-    const sections = text.split('---');
-    return (
-        <div className="prose max-w-none prose-p:my-2 prose-headings:my-3 prose-ul:my-2">
-            {sections.map((section, index) => (
-                <div key={index} className="mb-4 border-b border-slate-200 pb-2 last:border-b-0">
-                    {section.split('\n').map((line, lineIndex) => {
-                        if (line.startsWith('### ')) return <h3 key={lineIndex} className="font-bold text-lg">{line.substring(4)}</h3>;
-                        if (line.startsWith('## ')) return <h2 key={lineIndex} className="font-bold text-xl">{line.substring(3)}</h2>;
-                        if (line.startsWith('# ')) return <h1 key={lineIndex} className="font-bold text-2xl">{line.substring(2)}</h1>;
-                        if (line.startsWith('* ')) return <li key={lineIndex} className="mr-4">{line.substring(2)}</li>;
-                        if (line.includes('**')) { const parts = line.split('**'); return <p key={lineIndex}>{parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part)}</p>; }
-                        if (line.includes('~~')) { const parts = line.split(/~~/g); return <p key={lineIndex}>{parts.map((part, i) => i % 2 === 1 ? <del key={i} className="text-red-500">{part}</del> : part)}</p>; }
-                        return line.trim() ? <p key={lineIndex}>{line}</p> : null;
-                    })}
-                </div>
-            ))}
-        </div>
-    );
+    return <LessonMarkdown text={text} />;
 }
 
 function ProgressCenter({ lessons, journal, knowledgeBase, addJournalEntry, setModalConfig, data }) {

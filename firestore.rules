@@ -66,6 +66,8 @@ service cloud.firestore {
 
     // Per-user application data. Readable/writable only by the owning, APPROVED
     // user — or by an admin (for support / one-time data migration).
+    // (also covers users/{uid}/lessonBodies/{key}/chunks/{i} — long lesson texts
+    // kept outside the 1 MiB main document; see docs/lessons-import.md)
     match /artifacts/{appId}/users/{uid}/{document=**} {
       allow read, write: if callerIsAdmin(appId) ||
         (callerIsApproved(appId) && request.auth.uid == uid);

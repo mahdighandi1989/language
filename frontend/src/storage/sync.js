@@ -6,9 +6,22 @@
 //    to produce a new state object → a new save → a new snapshot (a write loop).
 // Upstream: none (pure). Downstream: components/App.jsx.
 
+// Stable (key-sorted) JSON: Firestore returns map fields in its own order, so
+// the same content must serialise identically whatever the key order.
+function stable(value, seen = new Set()) {
+  if (value === null || typeof value !== 'object') return value;
+  if (seen.has(value)) throw new TypeError('circular');
+  seen.add(value);
+  const out = Array.isArray(value)
+    ? value.map((v) => stable(v, seen))
+    : Object.fromEntries(Object.keys(value).sort().filter((k) => value[k] !== undefined).map((k) => [k, stable(value[k], seen)]));
+  seen.delete(value);
+  return out;
+}
+
 export function serializeForSync(data) {
   try {
-    return JSON.stringify(data);
+    return JSON.stringify(stable(data));
   } catch {
     return null;
   }

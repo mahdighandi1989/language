@@ -31,6 +31,7 @@
 | همهٔ دادهٔ کاربر (درس‌ها، دانش، ژورنال، چت‌ها، تنظیمات، پرامپت‌ها) | Firestore: یک سند `artifacts/{appId}/users/{uid}/data/main` | سقفِ ۱MiB ِ سند؛ ذخیرهٔ debounce ِ ۱ ثانیه |
 | پشتیبانِ محلی | localStorage (`lebanese_dialect_app_backup`) | پس از هر ذخیرهٔ موفق |
 | حالتِ بی‌Firebase | localStorage (`lebanese_dialect_app_data`) | فقط توسعهٔ محلی |
+| متنِ بلندِ درس‌های ایمپورتی | Firestore: `users/{uid}/lessonBodies/{key}` + `chunks/{i}` | بیرون از سقفِ ۱MiB؛ قالب: `docs/lessons-import.md` |
 | دسترسی‌ها | Firestore: `artifacts/{appId}/accessControl/{uid}` | قوانین در `firestore.rules` |
 | جریانِ اجرا (نمودار) | Firestore: `artifacts/{uid}/flowState/current` | |
 | دادهٔ ربات تلگرام | فایل JSON در `backend/data/` | روی Render با هر دیپلوی پاک می‌شود |
@@ -71,6 +72,7 @@
 | 2026-11-02 | احرازِ «مشروط به پیکربندی» برای Gemini/WS | بستنِ فوری بی‌`FIREBASE_PROJECT_ID` مالک را هم قفل می‌کرد | requireAuth ِ فوری؛ کلیدِ اشتراکیِ ثابت در فرانت |
 | 2026-11-02 | نوشتنِ کاملِ سندِ کاربر به‌جای merge، پشتِ نگهبانِ بارگذاری | merge کلید حذف نمی‌کرد | `deleteField` در هر حذف (پراکنده و شکننده) |
 | 2026-11-03 | «برداشتنِ پیوست» = جداکردن نه حذف؛ ایمیل با SMTP ِ اختیاری؛ دورهای ناظر اندازه‌گیری‌شده | هم‌سطحی با Detective-1 بی‌شکستنِ قاعدهٔ «هیچ حذفی» | حذفِ واقعی؛ Gmail API؛ زمان‌بندیِ ثابت در کد |
+| 2026-11-03 | متنِ درسِ ایمپورتی در زیرمجموعهٔ جدا، کامل در حافظه؛ ایمپورت ادغامی با sourceKey | سقفِ ۱MiB و ده‌ها خوانندهٔ archivedNotes | فشرده‌سازی؛ بارگذاریِ هنگامِ باز کردن؛ مهاجرتِ درس‌های فعلی؛ Storage |
 | 2026-11-02 | `render.yaml` آینهٔ دستیِ سرویسِ `language` | Blueprint ِ متصل وجود ندارد | ساختنِ Blueprint (سرویسِ تکراری می‌ساخت) |
 
 ## ۷. نظارت و سرکشی
