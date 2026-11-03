@@ -65,7 +65,7 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
       download(data, `lessons-backup-before-import-${stamp}.json`);
       const out = applyImport(data, plan, { externalize, bodyKey: bodyKeyFor });
       setData(out.data);
-      setResult({ added: out.added, knowledgeAdded: out.knowledgeAdded, skipped: plan.already.length, conflicts: plan.conflicts.length });
+      setResult({ added: out.added, appended: out.appended, knowledgeAdded: out.knowledgeAdded, skipped: plan.already.length, conflicts: plan.conflicts.length });
       setPlan(null);
     } catch (err) {
       setError(err.message);
@@ -91,7 +91,7 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
       {plan?.valid && (
         <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1" data-testid="import-preview">
           <b>پیش‌نمایشِ «{fileName}»</b>
-          <p>درس در فایل: {fa(plan.total)} · <span className="text-emerald-700">افزوده می‌شود: {fa(plan.toAdd.length)}</span> · قبلاً ایمپورت‌شده (رد): {fa(plan.already.length)} · تداخلِ عنوان (رد): {fa(plan.conflicts.length)}</p>
+          <p>درس در فایل: {fa(plan.total)} · <span className="text-emerald-700">درسِ تازه: {fa(plan.toAdd.length)}</span> · <span className="text-sky-700">جزوه به درسِ موجود افزوده می‌شود: {fa(plan.appends.length)}</span> · قبلاً ایمپورت‌شده (رد): {fa(plan.already.length)} · درسِ موجودِ بارگذاری‌نشده (رد): {fa(plan.conflicts.length)}</p>
           <p>نویسه‌های متنِ درس‌های تازه: {fa(plan.chars)} · آیتمِ دانشِ تازه: {fa(plan.knowledgeNew)} · تکراری (رد): {fa(plan.knowledgeDup)}</p>
           {mainBytes != null && (
             <p className={tooBig ? 'text-red-700' : 'text-slate-600'}>
@@ -99,8 +99,13 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
               {externalize ? ' (متنِ درس‌های تازه جدا ذخیره می‌شود)' : ''}{tooBig ? ' — بیش از حدِ امن؛ اعمال نمی‌شود' : ''}
             </p>
           )}
+          {plan.appends.length > 0 && (
+            <details open><summary className="text-sky-700 cursor-pointer">افزودن به درس‌های موجود ({fa(plan.appends.length)}) — متنِ قبلی، چت و دانششان دست نمی‌خورد؛ جزوه زیرِ «📥 جزوهٔ واردشده» به انتها اضافه می‌شود</summary>
+              <ul className="list-disc ps-5">{plan.appends.map((c) => <li key={c.sourceKey}>{c.title} <span className="text-slate-400">({c.sourceKey} · {fa(c.archivedNotes.length)} نویسه)</span></li>)}</ul>
+            </details>
+          )}
           {plan.conflicts.length > 0 && (
-            <details><summary className="text-amber-700 cursor-pointer">تداخل‌ها ({fa(plan.conflicts.length)}) — درسی با همین عنوان هست؛ دست نمی‌خورد</summary>
+            <details><summary className="text-amber-700 cursor-pointer">رد ({fa(plan.conflicts.length)}) — درسِ هم‌نامِ موجود هنوز از فضای ابری بارگذاری نشده؛ بعداً دوباره ایمپورت کنید</summary>
               <ul className="list-disc ps-5">{plan.conflicts.map((c) => <li key={c.sourceKey}>{c.title} <span className="text-slate-400">({c.sourceKey})</span></li>)}</ul>
             </details>
           )}
@@ -109,14 +114,14 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
               <ul className="list-disc ps-5">{plan.already.map((c) => <li key={c.sourceKey}>{c.title}</li>)}</ul>
             </details>
           )}
-          <button disabled={!plan.toAdd.length || tooBig} onClick={apply} className="mt-2 px-4 py-2 rounded-lg bg-teal-600 text-white disabled:bg-slate-300">
-            پشتیبان‌گیری و اعمال ({fa(plan.toAdd.length)} درس)
+          <button disabled={!(plan.toAdd.length + plan.appends.length) || tooBig} onClick={apply} className="mt-2 px-4 py-2 rounded-lg bg-teal-600 text-white disabled:bg-slate-300">
+            پشتیبان‌گیری و اعمال ({fa(plan.toAdd.length + plan.appends.length)} درس)
           </button>
         </div>
       )}
       {result && (
         <div role="status" className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-900">
-          ✅ {fa(result.added)} درس و {fa(result.knowledgeAdded)} آیتمِ دانش افزوده شد · رد: {fa(result.skipped)} تکراری، {fa(result.conflicts)} تداخل.
+          ✅ {fa(result.added)} درسِ تازه، جزوه به {fa(result.appended)} درسِ موجود افزوده شد، {fa(result.knowledgeAdded)} آیتمِ دانش · رد: {fa(result.skipped)} تکراری، {fa(result.conflicts)} بارگذاری‌نشده.
           پشتیبان دانلود شد. ذخیره در فضای ابری چند ثانیه طول می‌کشد (اگر خطایی رخ دهد، بنرِ قرمز بالای صفحه می‌گوید).
         </div>
       )}

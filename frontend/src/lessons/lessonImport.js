@@ -3,8 +3,11 @@
 //   * idempotent: a lesson is identified by `sourceKey`; one already imported is
 //     skipped, never duplicated, never overwritten;
 //   * existing lessons (with their chats and knowledge) are never rewritten or
-//     removed; a title that already exists without the same sourceKey is a
-//     CONFLICT and is skipped (reported), not merged into;
+//     removed. A title that already exists (e.g. «1 - ریتا») gets the imported
+//     notes APPENDED under a marked heading — the old text stays byte-for-byte
+//     as its prefix — and the sourceKey is recorded on it (importedSourceKeys)
+//     so a second run appends nothing. A lesson whose text is still loading is
+//     reported as blocked, never touched;
 //   * archivedNotes is stored exactly as given (no trimming, no Gemini);
 //   * knowledge items merge into the knowledge centre, de-duplicated by term
 //     within a category (the same rule as updateKnowledgeBase).
@@ -15,6 +18,18 @@ export const IMPORT_VERSION = 1;
 export const KNOWLEDGE_CATEGORIES = ['vocabulary', 'phrases', 'grammar', 'verbs', 'pronouns', 'adjectives'];
 export const MAX_LESSONS = 2000;
 export const MAIN_DOC_SOFT_LIMIT = 900 * 1024; // bytes; Firestore hard cap is 1 MiB
+// An existing inline lesson that grows past this after an append moves its text
+// to the separate body store (the whole text, old + new — nothing is dropped).
+export const EXTERNALIZE_CHARS = 20000;
+
+export function appendHeading(sourceKey) {
+  return `\n\n---\n## 📥 جزوهٔ واردشده (${sourceKey})\n\n`;
+}
+
+function validSources(v) {
+  return Array.isArray(v) && v.every((x) => isStr(x) || (x && typeof x === 'object' && !Array.isArray(x)
+    && Object.values(x).every((y) => isStr(y) || typeof y === 'number')));
+}
 
 const isStr = (v) => typeof v === 'string';
 const normTerm = (t) => String(t ?? '').trim().toLowerCase();
@@ -39,6 +54,7 @@ export function validateImport(file) {
     if (l.summary !== undefined && !isStr(l.summary)) errors.push(`${where}: summary باید رشته باشد`);
     if (l.course !== undefined && !isStr(l.course)) errors.push(`${where}: course باید رشته باشد`);
     if (l.order !== undefined && !Number.isFinite(l.order)) errors.push(`${where}: order باید عدد باشد`);
+    if (l.sources !== undefined && !validSources(l.sources)) errors.push(`${where}: sources باید آرایه‌ای از رشته یا شیءِ ساده باشد`);
     const knowledge = {};
     if (l.knowledge !== undefined) {
       if (!l.knowledge || typeof l.knowledge !== 'object' || Array.isArray(l.knowledge)) errors.push(`${where}: knowledge باید شیء باشد`);
@@ -61,6 +77,7 @@ export function validateImport(file) {
       archivedNotes: isStr(l.archivedNotes) ? l.archivedNotes : '',
       course: isStr(l.course) ? l.course.trim() : '',
       order: Number.isFinite(l.order) ? l.order : null,
+      sources: validSources(l.sources) ? l.sources : [],
       knowledge,
     });
   });
@@ -72,23 +89,33 @@ export function validateImport(file) {
 export function planImport(data, file) {
   const v = validateImport(file);
   const existing = data.lessons || [];
-  const byKey = new Map(existing.filter((l) => l.sourceKey).map((l) => [l.sourceKey, l]));
+  const byKey = new Map();
+  for (const l of existing) {
+    if (l.sourceKey) byKey.set(l.sourceKey, l);
+    for (const k of l.importedSourceKeys || []) byKey.set(k, l);
+  }
   const byTitle = new Map(existing.map((l) => [String(l.title).trim(), l]));
   const toAdd = [];
   const already = [];
-  const conflicts = [];
+  const appends = [];   // notes appended to an existing lesson with the same title
+  const blocked = [];   // same title, but that lesson's text is not loaded yet
   for (const l of v.lessons) {
     if (byKey.has(l.sourceKey)) { already.push({ sourceKey: l.sourceKey, title: l.title }); continue; }
     const same = byTitle.get(l.title);
-    if (same) { conflicts.push({ sourceKey: l.sourceKey, title: l.title, existingId: same.id }); continue; }
+    if (same) {
+      if (same._bodyPending || same._bodyError) blocked.push({ sourceKey: l.sourceKey, title: l.title, existingId: same.id });
+      else appends.push({ ...l, existingId: same.id });
+      continue;
+    }
     toAdd.push(l);
   }
+  const conflicts = blocked; // kept name for callers: what is NOT applied because of a title clash
   // Knowledge: count what is genuinely new (after de-dup against the centre and within the file).
   const kb = data.knowledgeBase || {};
   const known = Object.fromEntries(KNOWLEDGE_CATEGORIES.map((c) => [c, new Set((kb[c] || []).map((i) => normTerm(i.term)))]));
   let knowledgeNew = 0;
   let knowledgeDup = 0;
-  for (const l of toAdd) {
+  for (const l of [...toAdd, ...appends]) {
     for (const [cat, items] of Object.entries(l.knowledge)) {
       for (const it of items) {
         const t = normTerm(it.term);
@@ -97,12 +124,13 @@ export function planImport(data, file) {
       }
     }
   }
-  const chars = toAdd.reduce((n, l) => n + l.archivedNotes.length, 0);
+  const chars = [...toAdd, ...appends].reduce((n, l) => n + l.archivedNotes.length, 0);
   return {
     valid: v.ok,
     errors: v.errors,
     total: v.lessons.length,
     toAdd,
+    appends,
     already,
     conflicts,
     chars,
@@ -133,6 +161,7 @@ export function applyImport(data, plan, { externalize = true, now = Date.now(), 
       files: [],
       archivedNotes: l.archivedNotes,
       sourceKey: l.sourceKey,
+      sources: l.sources?.length ? l.sources : undefined,
       course: l.course || undefined,
       order: l.order ?? undefined,
       importedAt: new Date(now).toISOString(),
@@ -140,16 +169,38 @@ export function applyImport(data, plan, { externalize = true, now = Date.now(), 
     };
     if (lesson.course === undefined) delete lesson.course;
     if (lesson.order === undefined) delete lesson.order;
+    if (lesson.sources === undefined) delete lesson.sources;
     if (externalize) lesson.bodyRef = { key: bodyKey ? bodyKey(lesson) : `L${nextId}` };
     newLessons.push(lesson);
     existingKeys.add(l.sourceKey);
+  }
+  // Appends into existing lessons: old text kept as the exact prefix.
+  let appended = 0;
+  const byId = new Map((data.lessons || []).map((l) => [l.id, l]));
+  const replaced = new Map();
+  for (const a of plan.appends || []) {
+    const cur = replaced.get(a.existingId) || byId.get(a.existingId);
+    if (!cur || cur._bodyPending || cur._bodyError) continue;
+    if (cur.sourceKey === a.sourceKey || (cur.importedSourceKeys || []).includes(a.sourceKey)) continue; // idempotent
+    const next = {
+      ...cur,
+      importedSourceKeys: [...(cur.importedSourceKeys || []), a.sourceKey],
+      sources: [...(cur.sources || []), ...(a.sources || [])],
+    };
+    if (a.archivedNotes) next.archivedNotes = `${cur.archivedNotes || ''}${appendHeading(a.sourceKey)}${a.archivedNotes}`;
+    if (externalize && !next.bodyRef && String(next.archivedNotes || '').length > EXTERNALIZE_CHARS) {
+      next.bodyRef = { key: bodyKey ? bodyKey(next) : `L${next.id}` };
+    }
+    if (!next.sources.length) delete next.sources;
+    replaced.set(cur.id, next);
+    appended += 1;
   }
   const kb = { ...(data.knowledgeBase || {}) };
   let k = 0;
   for (const cat of KNOWLEDGE_CATEGORIES) {
     const list = [...(kb[cat] || [])];
     const terms = new Set(list.map((i) => normTerm(i.term)));
-    for (const l of plan.toAdd) {
+    for (const l of [...plan.toAdd, ...(plan.appends || [])]) {
       for (const it of l.knowledge[cat] || []) {
         const t = normTerm(it.term);
         if (terms.has(t)) continue;
@@ -160,8 +211,9 @@ export function applyImport(data, plan, { externalize = true, now = Date.now(), 
     }
     kb[cat] = list;
   }
-  const journal = [{ id: now, date: new Date(now).toISOString(), entry: `ایمپورتِ دسته‌ای: ${newLessons.length} درس و ${k} آیتمِ دانش افزوده شد.` }, ...(data.journal || [])];
-  return { data: { ...data, lessons: [...(data.lessons || []), ...newLessons], knowledgeBase: kb, journal }, added: newLessons.length, knowledgeAdded: k };
+  const journal = [{ id: now, date: new Date(now).toISOString(), entry: `ایمپورتِ دسته‌ای: ${newLessons.length} درسِ تازه، جزوه به ${appended} درسِ موجود افزوده شد، ${k} آیتمِ دانش.` }, ...(data.journal || [])];
+  const lessons = (data.lessons || []).map((l) => replaced.get(l.id) || l);
+  return { data: { ...data, lessons: [...lessons, ...newLessons], knowledgeBase: kb, journal }, added: newLessons.length, appended, knowledgeAdded: k };
 }
 
 /** Bytes of the main document as it would be written (UTF-8). */

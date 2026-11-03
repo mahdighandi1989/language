@@ -63,15 +63,41 @@ describe('import', () => {
     expect(validateImport({ ...file([L(3)]), version: 2 }).ok).toBe(false);
   });
 
-  it('preview: new, already-imported and title conflicts (existing «1 - ریتا» is never touched)', () => {
+  it('preview: new, already-imported, and appends into an existing same-title lesson («1 - ریتا»)', () => {
     const data = existing();
     const p = planImport(data, file([L(1), L(3), L(4, { knowledge: { vocabulary: [{ term: 'كيفك', definition: 'x' }, { term: 'شو', definition: 'چه' }] } })]));
     expect(p.valid).toBe(true);
     expect(p.toAdd.map((l) => l.title)).toEqual(['3 - ریتا', '4 - ریتا']);
-    expect(p.conflicts.map((c) => c.title)).toEqual(['1 - ریتا']);
+    expect(p.appends.map((c) => c.title)).toEqual(['1 - ریتا']);
+    expect(p.conflicts).toEqual([]);
     expect(p.knowledgeNew).toBe(1);
     expect(p.knowledgeDup).toBe(1);
-    expect(p.chars).toBe(L(3).archivedNotes.length + L(4).archivedNotes.length);
+    expect(p.chars).toBe(L(1).archivedNotes.length + L(3).archivedNotes.length + L(4).archivedNotes.length);
+    const pending = existing();
+    pending.lessons[0]._bodyPending = true;
+    expect(planImport(pending, file([L(1)])).conflicts.map((c) => c.title)).toEqual(['1 - ریتا']); // not loaded ⇒ never touched
+  });
+
+  it('append keeps the old text as the exact prefix, records the key, keeps chat, and is idempotent', async () => {
+    const { appendHeading } = await import('./lessonImport.js');
+    const data = existing();
+    const before = JSON.parse(JSON.stringify(data));
+    const f = file([L(1, { sources: ['D:/درس‌ها/ریتا/1.docx', { name: '1.pdf', page: 3 }] })]);
+    const once = applyImport(data, planImport(data, f), { now: 5000 });
+    expect(once.appended).toBe(1);
+    const l1 = once.data.lessons[0];
+    expect(l1.archivedNotes).toBe(before.lessons[0].archivedNotes + appendHeading('rita/1') + L(1).archivedNotes);
+    expect(l1.archivedNotes.startsWith(before.lessons[0].archivedNotes)).toBe(true);
+    expect(l1).toMatchObject({ id: 1, title: '1 - ریتا', summary: 's', importedSourceKeys: ['rita/1'], sources: ['D:/درس‌ها/ریتا/1.docx', { name: '1.pdf', page: 3 }] });
+    expect(l1.bodyRef).toBeUndefined(); // small: stays inline
+    expect(once.data.chatHistories).toEqual(before.chatHistories);
+    expect(once.data.lessons[1]).toEqual(before.lessons[1]);
+    const again = applyImport(once.data, planImport(once.data, f), { now: 6000 });
+    expect(again.appended).toBe(0);
+    expect(again.data.lessons[0].archivedNotes).toBe(l1.archivedNotes);
+    const big = applyImport(data, planImport(data, file([L(1, { archivedNotes: 'ک'.repeat(30000) })])), { now: 7000 });
+    expect(big.data.lessons[0].bodyRef).toEqual({ key: 'L1' }); // grows past 20k ⇒ whole text moves to the body store
+    expect(big.data.lessons[0].archivedNotes.startsWith('یادداشتِ موجود')).toBe(true);
   });
 
   it('apply is additive, keeps text byte-for-byte, and is idempotent', () => {
@@ -141,14 +167,15 @@ describe('import panel', () => {
     const f = new File([JSON.stringify(file([L(1), L(3)]))], 'rita.json', { type: 'application/json' });
     fireEvent.change(screen.getByLabelText('فایلِ ایمپورت'), { target: { files: [f] } });
     expect(await screen.findByTestId('import-preview')).toBeTruthy();
-    expect(screen.getByText(/افزوده می‌شود: ۱/)).toBeTruthy();
-    expect(screen.getByText(/تداخلِ عنوان \(رد\): ۱/)).toBeTruthy();
+    expect(screen.getByText(/درسِ تازه: ۱/)).toBeTruthy();
+    expect(screen.getByText(/جزوه به درسِ موجود افزوده می‌شود: ۱/)).toBeTruthy();
     fireEvent.click(screen.getByText(/پشتیبان‌گیری و اعمال/));
     expect(download).toHaveBeenCalledWith(data, expect.stringMatching(/^lessons-backup-before-import-.*\.json$/));
     const next = setData.mock.calls[0][0];
     expect(next.lessons).toHaveLength(3);
-    expect(next.lessons[0]).toBe(data.lessons[0]);
-    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/۱ درس/));
+    expect(next.lessons[0].archivedNotes.startsWith(data.lessons[0].archivedNotes)).toBe(true);
+    expect(next.lessons[1]).toBe(data.lessons[1]);
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/۱ درسِ تازه، جزوه به ۱ درسِ موجود/));
   });
   it('shows validation errors and never applies an invalid file', async () => {
     const setData = vi.fn();

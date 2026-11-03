@@ -152,7 +152,9 @@ describe('lesson bodies outside the 1 MiB document', () => {
     expect(paths.filter((p) => p.includes('/lessonBodies/') && p.includes('/chunks/'))).toHaveLength(2);
     expect(h.batches[0].map((o) => o.data.text || '').join('')).toBe(longText);
     const saved = h.setDocCalls.filter((c) => c.path === DATA).pop().data;
-    expect(saved.lessons[0]).toEqual(old);
+    // «1 - ریتا» keeps every field and its text as the exact prefix; only the imported notes are appended.
+    expect(saved.lessons[0]).toMatchObject({ ...old, archivedNotes: expect.stringMatching(/^یادداشتِ قدیمی/), importedSourceKeys: ['rita/1'] });
+    expect(saved.lessons[0].archivedNotes.endsWith('x')).toBe(true);
     expect(saved.chatHistories['lesson-1']).toHaveLength(1);
     expect(saved.lessons[1]).toMatchObject({ title: '3 - ریتا', archivedNotes: '', sourceKey: 'rita/3' });
     expect(saved.lessons[1].bodyRef.chars).toBe(longText.length);
