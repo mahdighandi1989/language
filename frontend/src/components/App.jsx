@@ -19,7 +19,7 @@ import { doc, onSnapshot, setDoc, getDoc, updateDoc, collection, serverTimestamp
 import { isAdminEmail, fullPermissions, emptyPermissions, normalizePermissions, canAccess, PERMISSION_SECTIONS, accessStateOf, describeAuthError } from '../auth/access';
 import { serializeForSync, shouldSaveToCloud } from '../storage/sync.js';
 // Lessons at scale: separate body store (1 MiB cap), list helpers, markdown, admin import.
-import { toCloudDoc, bodiesToWrite, mergeCachedBodies, createBodyStore } from '../lessons/lessonBodies.js';
+import { toCloudDoc, bodiesToWrite, mergeCachedBodies, createBodyStore, writeCloudDoc } from '../lessons/lessonBodies.js';
 import { MarkdownRenderer as LessonMarkdown } from '../lessons/markdown.jsx';
 import { compareLessons, courseOf, courseList, naturalCompare, searchKey } from '../lessons/sortLessons.js';
 import LessonImportPanel from '../lessons/LessonImportPanel.jsx';
@@ -524,6 +524,11 @@ export default function App() {
   // cache key → { text, hash } and the hash last known to be stored per key.
   const bodyCacheRef = useRef(new Map());
   const bodyHashesRef = useRef(new Map());
+  // One cloud write at a time (auto-save and the import share it), and a flag
+  // the unload guard reads: unsaved or in-flight changes ⇒ the browser warns.
+  const cloudLockRef = useRef(Promise.resolve());
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
 
   // localStorage helper functions
   const STORAGE_KEY = 'lebanese_dialect_app_data';
@@ -807,6 +812,66 @@ export default function App() {
     };
   }, []);
 
+  // Write the current data to Firestore and resolve ONLY when the backend has
+  // acknowledged it (bodies + main document, atomically when it fits one batch).
+  // Shared by the debounced auto-save and the bulk import; serialised by a lock.
+  // Rejects (and shows the red banner) on failure. Resolves false when there is
+  // nothing to save or saving is not allowed (document not loaded yet).
+  const persistCloud = (snapshot, onProgress) => {
+    const run = async () => {
+      const { db } = firebaseServices;
+      if (!db || !userId || userId === 'local-user') return false;
+      const cloud = toCloudDoc(snapshot);
+      const json = serializeForSync(cloud);
+      if (onProgress && loadedUidRef.current !== userId) {
+        // An explicit save (import) must not silently do nothing.
+        const e = new Error('سندِ شما هنوز از فضای ابری بارگذاری نشده است — صفحه را تازه کنید و دوباره تلاش کنید');
+        setSyncError(e.message);
+        throw e;
+      }
+      if (!shouldSaveToCloud({ loadedUid: loadedUidRef.current, userId, json, lastSyncedJson: lastSyncedJsonRef.current })) return false;
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+      const base = `/artifacts/${appId}/users/${userId}`;
+      const changedBodies = bodiesToWrite(snapshot, bodyHashesRef.current);
+      savingRef.current = true;
+      try {
+        const hashes = await writeCloudDoc({ doc, writeBatch }, db, base, `${base}/data/main`, cloud, changedBodies, onProgress);
+        for (const l of changedBodies) {
+          const hash = hashes.get(l.bodyRef.key);
+          bodyHashesRef.current.set(l.bodyRef.key, hash);
+          bodyCacheRef.current.set(l.bodyRef.key, { text: l.archivedNotes, hash });
+        }
+        lastSyncedJsonRef.current = json;
+        dirtyRef.current = serializeForSync(toCloudDoc(dataRef.current)) !== json;
+        setSyncError(null);
+        saveBackup(snapshot);
+        return true;
+      } catch (err) {
+        console.error("Error saving data to Firestore:", err);
+        reportError(err, { source: 'firebase' });
+        setSyncError(describeSyncError(err, json));
+        throw err;
+      } finally {
+        savingRef.current = false;
+      }
+    };
+    const next = cloudLockRef.current.then(run, run);
+    cloudLockRef.current = next.catch(() => {});
+    return next;
+  };
+
+  // Unsaved or in-flight cloud changes ⇒ the browser asks before reload/close.
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (!savingRef.current && !dirtyRef.current) return undefined;
+      e.preventDefault();
+      e.returnValue = 'تغییرها هنوز در فضای ابری ذخیره نشده‌اند.';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   useEffect(() => {
     if (!isAuthReady || !userId) return;
 
@@ -824,39 +889,11 @@ export default function App() {
     const { db } = firebaseServices;
     if (!db) return;
 
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/data/main`);
-
+    dirtyRef.current = shouldSaveToCloud({
+      loadedUid: loadedUidRef.current, userId, json: serializeForSync(toCloudDoc(data)), lastSyncedJson: lastSyncedJsonRef.current,
+    });
     const handler = setTimeout(() => {
-        const snapshot = dataRef.current;
-        // The CLOUD form: long lesson bodies replaced by refs (lessons/lessonBodies.js).
-        const cloud = toCloudDoc(snapshot);
-        const json = serializeForSync(cloud);
-        if (!shouldSaveToCloud({ loadedUid: loadedUidRef.current, userId, json, lastSyncedJson: lastSyncedJsonRef.current })) return;
-        const bodyStore = createBodyStore({ doc, getDoc, writeBatch }, db, `/artifacts/${appId}/users/${userId}`);
-        const changedBodies = bodiesToWrite(snapshot, bodyHashesRef.current);
-        // Bodies first (each one atomic), then the main document that points at them.
-        (async () => {
-          for (const l of changedBodies) {
-            // eslint-disable-next-line no-await-in-loop
-            const hash = await bodyStore.write(l.bodyRef.key, l.archivedNotes);
-            bodyHashesRef.current.set(l.bodyRef.key, hash);
-            bodyCacheRef.current.set(l.bodyRef.key, { text: l.archivedNotes, hash });
-          }
-          // Full write (not merge): the state IS the whole document, and a merge
-          // would never delete a removed map key (e.g. a reset custom prompt).
-          return setDoc(userDocRef, cloud);
-        })()
-            .then(() => {
-              lastSyncedJsonRef.current = json;
-              setSyncError(null);
-              saveBackup(snapshot);
-            })
-            .catch(err => {
-              console.error("Error saving data to Firestore:", err);
-              reportError(err, { source: 'firebase' });
-              setSyncError(describeSyncError(err, json));
-            });
+        persistCloud(dataRef.current).catch(() => { /* shown in the banner by persistCloud */ });
     }, 1000);
 
     return () => clearTimeout(handler);
@@ -1068,7 +1105,7 @@ export default function App() {
     // Admin-only management panel.
     if (activeView === 'admin') {
       return accessRecord?.role === 'admin'
-        ? <AdminPanel db={firebaseServices.db} appId={appId} currentUid={authUser?.uid} data={data} setData={setData} externalize={Boolean(firebaseServices.db)} />
+        ? <AdminPanel db={firebaseServices.db} appId={appId} currentUid={authUser?.uid} data={data} setData={setData} externalize={Boolean(firebaseServices.db)} persist={firebaseServices.db && userId !== 'local-user' ? persistCloud : null} />
         : <AccessNotice title="دسترسی محدود" message="این بخش فقط برای مدیر است." />;
     }
     // Per-section access gate (admins bypass via canAccess). Applies only when a
@@ -1365,7 +1402,7 @@ function AccessNotice({ title, message }) {
 
 // Admin-only panel: review access requests, approve/reject, and grant per-section
 // permissions. All writes are guarded by Firestore rules (admin-only).
-function AdminPanel({ db, appId, currentUid, data, setData, externalize = true }) {
+function AdminPanel({ db, appId, currentUid, data, setData, externalize = true, persist = null }) {
     const [users, setUsers] = useState([]);
     const [error, setError] = useState(null);
     useEffect(() => {
@@ -1439,7 +1476,7 @@ function AdminPanel({ db, appId, currentUid, data, setData, externalize = true }
     return (
         <div dir="rtl" className="max-w-4xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold text-slate-800">مدیریت کاربران</h1>
-            {data && setData && <LessonImportPanel data={data} setData={setData} externalize={externalize} />}
+            {data && setData && <LessonImportPanel data={data} setData={setData} externalize={externalize} persist={persist} />}
             {error && <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
             <section className="space-y-3">
                 <h2 className="font-bold text-slate-700">درخواست‌های در انتظار ({pending.length})</h2>

@@ -186,3 +186,31 @@ describe('import panel', () => {
     expect(setData).not.toHaveBeenCalled();
   });
 });
+
+import { writeCloudDoc, BATCH_MAX_BYTES } from './lessonBodies.js';
+describe('writeCloudDoc', () => {
+  const fakeFs = (commits) => ({
+    doc: (db, path) => ({ path }),
+    writeBatch: () => { const ops = []; return { set: (r) => ops.push(r.path), commit: async () => { commits.push(ops); } }; },
+  });
+  it('one atomic commit when it fits (bodies + main)', async () => {
+    const commits = [];
+    const bodies = [{ archivedNotes: 'a'.repeat(10), bodyRef: { key: 'L1' } }, { archivedNotes: 'b', bodyRef: { key: 'L2' } }];
+    const hashes = await writeCloudDoc(fakeFs(commits), {}, '/u', '/u/data/main', { lessons: [] }, bodies);
+    expect(commits).toHaveLength(1);
+    expect(commits[0]).toContain('/u/data/main');
+    expect(commits[0]).toContain('/u/lessonBodies/L1');
+    expect(hashes.size).toBe(2);
+  });
+  it('too big for one commit: packed body batches, main document strictly LAST', async () => {
+    const commits = [];
+    const big = 'ن'.repeat(Math.ceil(BATCH_MAX_BYTES / 2)); // ~8MB+ in UTF-8 across 2 lessons
+    const bodies = [{ archivedNotes: big, bodyRef: { key: 'L1' } }, { archivedNotes: big, bodyRef: { key: 'L2' } }];
+    const progress = [];
+    await writeCloudDoc(fakeFs(commits), {}, '/u', '/u/data/main', { lessons: [] }, bodies, (p) => progress.push(p));
+    expect(commits.length).toBeGreaterThan(1);
+    expect(commits.slice(0, -1).flat()).not.toContain('/u/data/main');
+    expect(commits[commits.length - 1]).toEqual(['/u/data/main']);
+    expect(progress[progress.length - 1].done).toBe(progress[progress.length - 1].total);
+  });
+});

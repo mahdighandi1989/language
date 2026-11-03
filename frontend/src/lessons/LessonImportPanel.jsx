@@ -33,12 +33,34 @@ export function downloadJson(obj, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-export default function LessonImportPanel({ data, setData, externalize = true, download = downloadJson }) {
+// `persist(data, onProgress)` (Firestore mode) resolves only after the backend
+// acknowledged the write; the success report waits for it. Without it (local
+// mode) the data is saved to this browser's storage by the app as before.
+export default function LessonImportPanel({ data, setData, externalize = true, download = downloadJson, persist = null }) {
   const [plan, setPlan] = useState(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [mainBytes, setMainBytes] = useState(null);
+  const [saving, setSaving] = useState(null); // { done, total } while writing to Firestore
+  const [saveError, setSaveError] = useState(null);
+  const [pendingResult, setPendingResult] = useState(null);
+
+  const save = async (snapshot, summary) => {
+    if (!persist) { setResult({ ...summary, where: 'local' }); return; }
+    setSaving({ done: 0, total: 1 });
+    setSaveError(null);
+    setPendingResult(summary);
+    try {
+      await persist(snapshot, (p) => setSaving(p));
+      setResult({ ...summary, where: 'cloud' });
+      setPendingResult(null);
+    } catch (err) {
+      setSaveError(err?.message || String(err));
+    } finally {
+      setSaving(null);
+    }
+  };
 
   const onFile = async (e) => {
     const f = e.target.files?.[0];
@@ -65,8 +87,8 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
       download(data, `lessons-backup-before-import-${stamp}.json`);
       const out = applyImport(data, plan, { externalize, bodyKey: bodyKeyFor });
       setData(out.data);
-      setResult({ added: out.added, appended: out.appended, knowledgeAdded: out.knowledgeAdded, skipped: plan.already.length, conflicts: plan.conflicts.length });
       setPlan(null);
+      save(out.data, { added: out.added, appended: out.appended, knowledgeAdded: out.knowledgeAdded, skipped: plan.already.length, conflicts: plan.conflicts.length });
     } catch (err) {
       setError(err.message);
     }
@@ -119,10 +141,22 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
           </button>
         </div>
       )}
+      {saving && (
+        <div role="status" className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-900">
+          ⏳ در حالِ ذخیره در فضای ابری… {saving.total > 1 ? `(${fa(saving.done)} از ${fa(saving.total)})` : ''} — صفحه را نبندید و رفرش نکنید.
+        </div>
+      )}
+      {saveError && (
+        <div role="alert" className="bg-red-50 border border-red-300 rounded-xl p-3 text-sm text-red-800 space-y-2">
+          <p>❌ ذخیره در فضای ابری ناموفق بود: {saveError}</p>
+          <p>درس‌ها فعلاً فقط در همین صفحه‌اند (پشتیبانِ JSON هم دانلود شده). صفحه را نبندید و دوباره تلاش کنید.</p>
+          <button onClick={() => save(data, pendingResult || {})} className="px-3 py-1.5 rounded-lg bg-red-600 text-white">تلاشِ دوباره برای ذخیره</button>
+        </div>
+      )}
       {result && (
         <div role="status" className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-900">
           ✅ {fa(result.added)} درسِ تازه، جزوه به {fa(result.appended)} درسِ موجود افزوده شد، {fa(result.knowledgeAdded)} آیتمِ دانش · رد: {fa(result.skipped)} تکراری، {fa(result.conflicts)} بارگذاری‌نشده.
-          پشتیبان دانلود شد. ذخیره در فضای ابری چند ثانیه طول می‌کشد (اگر خطایی رخ دهد، بنرِ قرمز بالای صفحه می‌گوید).
+          پشتیبان دانلود شد. {result.where === 'cloud' ? 'ذخیره در فضای ابری تأیید شد ✔ (Firestore پذیرفت).' : 'در حالتِ محلی در همین مرورگر ذخیره می‌شود.'}
         </div>
       )}
     </section>

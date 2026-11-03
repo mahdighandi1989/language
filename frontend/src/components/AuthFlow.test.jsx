@@ -130,7 +130,7 @@ describe('lesson bodies outside the 1 MiB document', () => {
     expect(h.batches).toHaveLength(0);
   });
 
-  it('admin import: bodies written first (one batch each), main document gets refs only; existing lesson untouched', async () => {
+  const importSetup = async () => {
     URL.createObjectURL = URL.createObjectURL || (() => 'blob:x');
     URL.revokeObjectURL = URL.revokeObjectURL || (() => {});
     window.location.hash = '#/admin';
@@ -145,20 +145,45 @@ describe('lesson bodies outside the 1 MiB document', () => {
       { sourceKey: 'rita/3', title: '3 - ریتا', course: 'ریتا', order: 3, archivedNotes: longText },
     ] })], 'rita.json', { type: 'application/json' });
     fireEvent.change(await screen.findByLabelText('فایلِ ایمپورت'), { target: { files: [file] } });
+    return { old, longText };
+  };
+
+  it('admin import: ONE atomic batch (bodies + main), success shown only after Firestore acknowledged', async () => {
+    const { writeBatch } = await import('firebase/firestore');
+    let release;
+    writeBatch.mockImplementationOnce(() => { const ops = []; return { set: (r, d) => ops.push({ path: r.path, data: d }), commit: () => new Promise((res) => { release = () => { h.batches.push(ops); res(); }; }) }; });
+    const { old, longText } = await importSetup();
     fireEvent.click(await screen.findByText(/پشتیبان‌گیری و اعمال/));
-    await waitFor(() => expect(h.setDocCalls.filter((c) => c.path === DATA).length).toBeGreaterThan(0), { timeout: 3000 });
+    expect(await screen.findByText(/در حالِ ذخیره در فضای ابری/)).toBeTruthy();
+    expect(screen.queryByText(/ذخیره در فضای ابری تأیید شد/)).toBeNull(); // no success before the backend says so
+    await waitFor(() => expect(typeof release).toBe('function'));
+    await act(async () => { release(); });
+    expect(await screen.findByText(/ذخیره در فضای ابری تأیید شد/)).toBeTruthy();
     expect(h.batches).toHaveLength(1);
-    const paths = h.batches[0].map((o) => o.path);
-    expect(paths.filter((p) => p.includes('/lessonBodies/') && p.includes('/chunks/'))).toHaveLength(2);
-    expect(h.batches[0].map((o) => o.data.text || '').join('')).toBe(longText);
-    const saved = h.setDocCalls.filter((c) => c.path === DATA).pop().data;
-    // «1 - ریتا» keeps every field and its text as the exact prefix; only the imported notes are appended.
-    expect(saved.lessons[0]).toMatchObject({ ...old, archivedNotes: expect.stringMatching(/^یادداشتِ قدیمی/), importedSourceKeys: ['rita/1'] });
-    expect(saved.lessons[0].archivedNotes.endsWith('x')).toBe(true);
-    expect(saved.chatHistories['lesson-1']).toHaveLength(1);
-    expect(saved.lessons[1]).toMatchObject({ title: '3 - ریتا', archivedNotes: '', sourceKey: 'rita/3' });
-    expect(saved.lessons[1].bodyRef.chars).toBe(longText.length);
-    expect(JSON.stringify(saved).length).toBeLessThan(20000);
+    const ops = h.batches[0];
+    expect(ops.filter((o) => o.path.includes('/lessonBodies/') && o.path.includes('/chunks/'))).toHaveLength(2);
+    expect(ops.filter((o) => o.path.includes('/chunks/')).map((o) => o.data.text).join('')).toBe(longText);
+    const main = ops.find((o) => o.path === DATA).data;
+    expect(main.lessons[0]).toMatchObject({ ...old, archivedNotes: expect.stringMatching(/^یادداشتِ قدیمی/), importedSourceKeys: ['rita/1'] });
+    expect(main.lessons[1]).toMatchObject({ title: '3 - ریتا', archivedNotes: '', sourceKey: 'rita/3' });
+    expect(main.lessons[1].bodyRef.chars).toBe(longText.length);
+    expect(main.chatHistories['lesson-1']).toHaveLength(1);
+    expect(JSON.stringify(main).length).toBeLessThan(20000);
+    expect(h.setDocCalls.filter((c) => c.path === DATA)).toHaveLength(0); // the main doc went in the batch
+    window.location.hash = '';
+  });
+
+  it('admin import: a rejected write shows a red error and a retry, never a success', async () => {
+    const { writeBatch } = await import('firebase/firestore');
+    writeBatch.mockImplementation(() => ({ set: () => {}, commit: () => Promise.reject(Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' })) }));
+    await importSetup();
+    fireEvent.click(await screen.findByText(/پشتیبان‌گیری و اعمال/));
+    expect(await screen.findByText(/ذخیره در فضای ابری ناموفق بود/)).toBeTruthy();
+    expect(screen.getByText('تلاشِ دوباره برای ذخیره')).toBeTruthy();
+    expect(screen.queryByText(/ذخیره در فضای ابری تأیید شد/)).toBeNull();
+    expect(screen.getAllByText(/firestore\.rules/).length).toBeGreaterThan(0); // the explanation names the rules
+    writeBatch.mockReset();
+    writeBatch.mockImplementation(() => { const o = []; return { set: (r, d) => o.push({ path: r.path, data: d }), commit: () => { h.batches.push(o); return Promise.resolve(); } }; });
     window.location.hash = '';
   });
 });
