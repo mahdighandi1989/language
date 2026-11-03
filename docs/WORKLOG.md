@@ -226,3 +226,32 @@
   `render.yaml`، `docs/security.md`، `OPEN_ITEMS` (۱ و ۴ بسته، ۵ نیمه، ۶ و ۷ تازه)؛ تستِ تازه در `securityGuards.test.js`.
 - **[TODO]** پس از این دیپلوی: برگهٔ ۱ و پاسخش باید هنوز در Firestore باشند (RUNLOG).
 > **امضا:** `Claude Code` · 2026-11-02 · node ‏۱۶۴/۱۶۴، vitest ‏۹۵، pytest ‏۸۰، build؛ production با curl/WS/لاگِ Render
+
+## 2026-11-03 (۶) — هم‌سطح‌سازیِ «نظارت و سرکشی» با Detective-1
+
+- **[OWNER]** (از هماهنگ‌کننده) مقایسه با Detective-1 (`InspectionBoard.tsx`، `InspectionGroup.tsx`، `routers/inspection.py`) کمبودها را
+  نشان داد: (۱) درخواستِ عمومی، (۲) ویرایشِ متن با حفظِ متنِ اولیه، (۳) رد با دلیل + ایمیل در پذیرش/رد، (۴) پیوستِ هر نوع با دانلود،
+  برداشتن و درصدِ خواندنِ ناظر، (۵) نوارِ وضعیتِ ناظر و زمانِ تخمینیِ برگهٔ فوری، (۶) رفتن به همان‌جا، (۷) جستجو، (۸) تازه‌سازیِ خودکار
+  و پیامِ «ناظر روی موردهای فوری کار کرد»، (۹) `inspection_view.py` و `requirements.txt`.
+- **[FINDING]** مرجع کامل خوانده شد: `InspectionBoard.tsx` (۹۰۷ خط)، `InspectionGroup.tsx`، `lib/nextRound.ts`، `services/supervisor_rounds.py`،
+  و در `routers/inspection.py` مسیرهای rounds، edit_note، triage + `notify_submitter`، delete_file، mark_urgent.
+- **[DECISION]** «برداشتنِ پیوست» = جداکردن از برگه (`detachedAt`)، نه حذف — بایت و متن می‌مانند و دانلود‌شدنی‌اند؛ برداشته‌ها بدهیِ خواندن
+  ندارند. ردشده: حذفِ واقعی مثلِ مرجع (قاعدهٔ مالک در این پروژه: هیچ داده‌ای حذف نمی‌شود)، و «نه» گفتن به خواسته.
+- **[DECISION]** ایمیل با `nodemailer` و SMTP فقط از متغیرهای Render؛ بی‌SMTP نتیجه روی برگه ثبت می‌شود («ایمیل نشد — SMTP تنظیم نیست»)
+  و هیچ‌چیز نمی‌شکند. ردشده: Gmail API ِ مرجع (OAuth و توکن‌های تازه)، ارسال از مرورگر (افشای اعتبار).
+- **[DECISION]** دورهای ناظر **اندازه‌گیری** می‌شوند (پورتِ `supervisor_rounds`): هر `urgent/claim` ِ ناظر = سرزدنِ فوری، هر `queue` ِ ناظر = سرزدنِ
+  کامل؛ observed/assumed/stale. پیش‌فرض‌ها هم‌خوان با روتین‌ها (`:37` ساعتی، `23 2 * * 1,4`). ردشده: نوشتنِ زمان‌بندی در کد بی‌اندازه‌گیری.
+- **[DECISION]** «دستهٔ منتخب و اشراف» (`InspectionGroup.tsx`) پورت نشد: مدلِ مجوزِ مرجع (permission override + امتیازِ اشراف) در این
+  برنامه وجود ندارد؛ دروازهٔ معادل = تأییدِ کاربر در «مدیریتِ کاربران» + پذیرش/ردِ هر برگه. اگر مالک بخواهد، کارِ جدا.
+- **[CHANGE]** بک‌اند: `services/inspection/rounds.js` (تازه)، `mailer.js` (تازه)، `model.js` (`editNote`، `detachFile`، `readProgress`،
+  `general`)، `store.js` (`knock`/`getKnocks` در هر دو ذخیره‌ساز)، `routes/inspection.js` (`GET /rounds`، `PATCH …/notes/:noteId`،
+  `POST /files/:id/detach`، triage با ایمیل و ثبتِ `mail`، ⚡ با `position` و `nextRound`، `general` در ساخت)؛ وابستگیِ `nodemailer`.
+- **[CHANGE]** فرانت: `InspectionBoard.jsx` بازنویسی (همهٔ ۸ قابلیت، بی‌دکمهٔ حذف)، `nextRound.js`، `focus.js`، `api.js`، و چشمک‌زدنِ کادر
+  در `InspectionLayer.jsx`. ناظر: `scripts/supervisor/inspection_view.py` (از Detective-1)، `requirements.txt`، `inspection.py pull` خطِ `👁`.
+- **[CHANGE]** `docs/supervisor/PROMPT.md` نسخهٔ ۲ (نسخهٔ ۱ در `archive/PROMPT-v1-2026-11-02.md`)، `docs/supervisor/README.md`، `render.yaml`،
+  `backend/.env.example`.
+- **[VERIFY]** node ‏۱۶۹/۱۶۹ (۵ تستِ تازه: rounds، ویرایش، درصدِ خواندن، ایمیل، و چرخهٔ API: عمومی → ویرایش → درصد → برداشتن (۴۰۳ برای ناظر،
+  بایت هنوز ۲۰۰) → ⚡ با نوبت → سرزدن‌ها → رد با دلیل + ثبتِ ایمیل → پذیرش)؛ vitest با ۱۱ تستِ تازه (`InspectionParity.test.jsx`)؛
+  آزمونِ سرتاسریِ محلی: درخواستِ عمومی + ZIP ⇒ `pull` خطِ «👁 همهٔ محتوای آرشیو باز شد»؛ `/rounds` ⇒ assumed/scheduled با lastSeen.
+- **[TODO][OWNER]** برای ایمیل: `SMTP_HOST`، `SMTP_USER`، `SMTP_PASSWORD` (و `SMTP_PORT`، `MAIL_FROM`) روی Render — OPEN_ITEMS ۸.
+> **امضا:** `Claude Code` · 2026-11-03 · node ‏۱۶۹ + vitest + pytest + build در ship.sh؛ آزمونِ سرتاسریِ محلیِ ابزارِ ناظر

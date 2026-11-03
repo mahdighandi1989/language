@@ -63,5 +63,21 @@ services:
         sync: false
       - key: ADMIN_EMAILS
         sync: false
+      # Optional: e-mail to a user when their inspection sheet is accepted/declined.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      # Optional: the routines' schedule, used until their visits are measured.
+      - key: SUPERVISOR_URGENT_MINUTE
+        value: "37"
+      - key: SUPERVISOR_FULL_CRON
+        value: "23 2 * * 1,4"
       - key: NODE_ENV
         value: production

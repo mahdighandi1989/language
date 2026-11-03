@@ -99,6 +99,7 @@ export function cleanText(value, max = MAX_TEXT) {
 export function fileReadDebt(files = []) {
   const debt = [];
   for (const f of files) {
+    if (f.detachedAt) continue; // taken off the sheet by the owner: nothing left to read
     const name = f.filename || '?';
     if (f.extractStatus === EXTRACT.OK) {
       const total = Number(f.textChars || 0);
@@ -341,6 +342,60 @@ export function present(sheet, files = []) {
     statusLabel: STATUS_LABEL[sheet.status] || sheet.status,
     needsSupervisor: needsSupervisor(sheet),
     readDebt: fileReadDebt(files),
-    files: files.map((f) => ({ ...f, extractLabel: EXTRACT_LABEL[f.extractStatus] || f.extractStatus })),
+    general: Boolean(sheet.general),
+    files: files.filter((f) => !f.detachedAt).map((f) => ({ ...f, ...readProgress(f), extractLabel: EXTRACT_LABEL[f.extractStatus] || f.extractStatus })),
+    detachedFiles: files.filter((f) => f.detachedAt).length,
   };
+}
+
+/** How much of a file the supervisor has read: { readPercent, fullyRead }. */
+export function readProgress(f) {
+  if (f.extractStatus === EXTRACT.OK) {
+    const total = Number(f.textChars || 0);
+    const got = Math.min(Number(f.readChars || 0), total);
+    const pct = total ? Math.floor((got / total) * 100) : 100;
+    return { readPercent: pct, fullyRead: total > 0 && got >= total && (!f.textTruncated || Boolean(f.viewedAt)) };
+  }
+  if (f.extractStatus === EXTRACT.EMPTY) return { readPercent: 100, fullyRead: true };
+  const seen = Boolean(f.viewedAt) && f.extractStatus !== EXTRACT.PENDING;
+  return { readPercent: seen ? 100 : 0, fullyRead: seen };
+}
+
+/**
+ * Edit the TEXT of a note in place. The original text is kept the first time
+ * (originalText); only your own side; never on a filed/declined sheet. A normal
+ * user may edit only notes they wrote; the owner may edit any owner/user note.
+ */
+export function editNote(actor, sheet, noteId, text, now = new Date()) {
+  if ([STATUS.FILED, STATUS.DECLINED].includes(sheet.status)) {
+    throw err(422, 'برگهٔ بسته ویرایش نمی‌شود — تاریخچه باید دست‌نخورده بماند');
+  }
+  const clean = cleanText(text);
+  if (!clean) throw err(422, 'متنِ یادداشت خالی است');
+  const note = (sheet.notes || []).find((n) => n.id === noteId);
+  if (!note) throw err(404, 'یادداشت پیدا نشد');
+  const reviewerSide = note.by === 'reviewer';
+  if ((actor.role === 'supervisor') !== reviewerSide) {
+    throw err(403, 'یادداشتِ طرفِ مقابل ویرایش نمی‌شود — اگر نظری داری، یادداشتِ تازه بنویس');
+  }
+  if (actor.role === 'user' && (note.author || '') !== (actor.email || '')) {
+    throw err(403, 'فقط یادداشتِ خودت را می‌توانی ویرایش کنی');
+  }
+  if (note.originalText === undefined) note.originalText = note.text;
+  note.text = clean;
+  note.editedAt = now.toISOString();
+  note.editedBy = actor.email || '';
+  if (sheet.notes[0]?.id === noteId) sheet.title = clean.split('\n')[0].slice(0, 200);
+  sheet.updatedAt = now.toISOString();
+  return sheet;
+}
+
+/** Take an attachment OFF a sheet without deleting it (bytes and text are kept). */
+export function detachFile(actor, sheet, file, now = new Date()) {
+  assertOwner(actor, 'برداشتنِ پیوست');
+  if ([STATUS.FILED, STATUS.DECLINED].includes(sheet.status)) throw err(422, 'پیوستِ برگهٔ بسته برداشته نمی‌شود');
+  if (file.detachedAt) throw err(422, 'این پیوست قبلاً برداشته شده است');
+  file.detachedAt = now.toISOString();
+  file.detachedBy = actor.email || '';
+  return file;
 }

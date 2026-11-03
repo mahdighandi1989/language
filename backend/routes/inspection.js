@@ -17,8 +17,10 @@ import {
   STATUS, OUTCOMES, MAX_FILE_BYTES, MAX_SHOT_BYTES, TEXT_SLICE_MAX,
   InspectionError, cleanText, validateNote, applyNote, approve, triage, reopen,
   setUrgent, urgentQueue, claimUrgent, fileApproved, initialStatus, present, canSee,
-  needsSupervisor,
+  needsSupervisor, editNote, detachFile, urgentQueue as fastQueue,
 } from '../services/inspection/model.js';
+import { recordKnock, nextRound, nextFullRound } from '../services/inspection/rounds.js';
+import { notifySubmitter } from '../services/inspection/mailer.js';
 import { getInspectionStore } from '../services/inspection/store.js';
 import { resolveActor, supervisorLogin, supervisorConfigured } from '../services/inspection/auth.js';
 import { extractText, transcribeMedia } from '../services/inspection/extract.js';
@@ -42,6 +44,17 @@ const loginLimiter = rateLimit({
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: 10 } });
 
 inspectionRouter.use('/api/inspection', limiter);
+
+// When the supervisor comes next — measured from its own knocks (rounds.js).
+const URGENT_MINUTE = Number(process.env.SUPERVISOR_URGENT_MINUTE || 37);
+const FULL_CRON = process.env.SUPERVISOR_FULL_CRON || '23 2 * * 1,4';
+async function roundsOf(store, now = new Date()) {
+  const k = await store.getKnocks();
+  return { urgent: nextRound(now, k.urgent, URGENT_MINUTE), full: nextFullRound(now, k.full, FULL_CRON) };
+}
+async function knock(store, kind) {
+  try { await store.knock(kind, (list) => recordKnock(list)); } catch (e) { console.error('knock failed:', e?.message); }
+}
 
 const wrap = (fn) => async (req, res) => {
   try {
@@ -131,6 +144,7 @@ inspectionRouter.get('/api/inspection/queue', authed(async (req, res) => {
     return res.status(403).json({ error: 'صفِ ناظر فقط برای مالک و ناظر است' });
   }
   const store = await getInspectionStore();
+  if (req.actor.role === 'supervisor') await knock(store, 'full');
   const sheets = (await store.listSheets()).filter(needsSupervisor);
   const out = [];
   for (const s of sheets) out.push(await presentFull(store, s)); // eslint-disable-line no-await-in-loop
@@ -147,6 +161,7 @@ inspectionRouter.get('/api/inspection/urgent', authed(async (req, res) => {
 
 inspectionRouter.post('/api/inspection/urgent/claim', authed(async (req, res) => {
   const store = await getInspectionStore();
+  if (req.actor.role === 'supervisor') await knock(store, 'urgent');
   const claimed = await store.updateAll(async (sheets) => {
     const s = claimUrgent(req.actor, sheets, req.body?.runId || '');
     return { result: s, changed: s ? [s] : [] };
@@ -162,6 +177,11 @@ inspectionRouter.post('/api/inspection/file-approved', authed(async (req, res) =
     return { result: done, changed: done };
   });
   res.json({ filed: filed.map((s) => ({ id: s.id, number: s.number, binder: s.binderNumber, page: s.binderPage })) });
+}));
+
+inspectionRouter.get('/api/inspection/rounds', authed(async (req, res) => {
+  const store = await getInspectionStore();
+  res.json(await roundsOf(store));
 }));
 
 inspectionRouter.get('/api/inspection/binders', authed(async (req, res) => {
@@ -336,7 +356,10 @@ inspectionRouter.post('/api/inspection', authed(async (req, res) => {
     reopen: cleanText(req.body?.reopen, 240),
     domPath: cleanText(req.body?.domPath, 400),
     coveredText: cleanText(req.body?.coveredText, 4000),
-    geometry: geometryOf(req.body),
+    // «درخواستِ عمومی»: a request tied to no place on any page — same queue,
+    // colours, ⚡ and binder; it simply has no box/highlight.
+    general: Boolean(req.body?.general),
+    geometry: req.body?.general ? null : geometryOf(req.body),
     notes: [{ id: noteId, by: req.actor.role === 'supervisor' ? 'reviewer' : req.actor.role, author: req.actor.email, at: now, text, shotId: null }],
     deps: [],
     urgentAt: null,
@@ -398,8 +421,41 @@ const ownerAction = (fn) => authed(async (req, res) => {
 
 inspectionRouter.post('/api/inspection/:id/approve', ownerAction((req, s) => { approve(req.actor, s); }));
 inspectionRouter.post('/api/inspection/:id/reopen', ownerAction((req, s) => { reopen(req.actor, s); }));
-inspectionRouter.post('/api/inspection/:id/triage', ownerAction((req, s) => { triage(req.actor, s, req.body?.decision, req.body?.note); }));
-inspectionRouter.post('/api/inspection/:id/urgent', ownerAction((req, s) => { setUrgent(req.actor, s, true); }));
+// Accept/decline a user's sheet; the submitter is e-mailed (with the reason on a
+// decline — an empty reason is allowed). The mail result is stored on the sheet.
+inspectionRouter.post('/api/inspection/:id/triage', authed(async (req, res) => {
+  const store = await getInspectionStore();
+  await loadVisible(store, req.actor, req.params.id);
+  const updated = await store.updateSheet(String(req.params.id), (s) => { triage(req.actor, s, req.body?.decision, req.body?.note); });
+  const mail = await notifySubmitter(updated);
+  const final = await store.updateSheet(updated.id, (s) => { s.mail = [...(s.mail || []), mail]; });
+  res.json({ sheet: await presentFull(store, final), mail });
+}));
+// ⚡: the answer also says WHERE in the fast queue and WHEN the round comes.
+inspectionRouter.post('/api/inspection/:id/urgent', authed(async (req, res) => {
+  const store = await getInspectionStore();
+  await loadVisible(store, req.actor, req.params.id);
+  const updated = await store.updateSheet(String(req.params.id), (s) => { setUrgent(req.actor, s, true); });
+  const queue = fastQueue(await store.listSheets());
+  const position = Math.max(1, queue.findIndex((x) => x.id === updated.id) + 1);
+  res.json({ sheet: await presentFull(store, updated), position, nextRound: (await roundsOf(store)).urgent });
+}));
+// Edit the text of a note; the first text is kept as originalText.
+inspectionRouter.patch('/api/inspection/:id/notes/:noteId', authed(async (req, res) => {
+  const store = await getInspectionStore();
+  await loadVisible(store, req.actor, req.params.id);
+  const updated = await store.updateSheet(String(req.params.id), (s) => { editNote(req.actor, s, String(req.params.noteId), req.body?.text); });
+  res.json({ sheet: await presentFull(store, updated) });
+}));
+// Take an attachment off a sheet (owner only). NOT a delete: bytes and text stay.
+inspectionRouter.post('/api/inspection/files/:fileId/detach', authed(async (req, res) => {
+  const store = await getInspectionStore();
+  const file = await store.getFile(String(req.params.fileId));
+  if (!file) throw new InspectionError(404, 'فایل پیدا نشد');
+  const sheet = await loadVisible(store, req.actor, file.sheetId);
+  const updated = await store.updateFile(file.id, (f) => { detachFile(req.actor, sheet, f); });
+  res.json({ file: updated, sheet: await presentFull(store, await store.getSheet(sheet.id)) });
+}));
 inspectionRouter.delete('/api/inspection/:id/urgent', ownerAction((req, s) => { setUrgent(req.actor, s, false); }));
 
 // Deleting a sheet or a file is not a capability of this system (rule 6).

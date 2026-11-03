@@ -8,6 +8,7 @@
 // Upstream: ./api.js, ./geometry.js. Downstream: mounted by components/App.jsx.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { captureGeometry, coveredText, rectFromPoints, resolveRect, buildSelector } from './geometry.js';
+import { takeFocus } from './focus.js';
 
 export const TONE_COLOR = {
   open: '#f97316', pending: '#f59e0b', stale: '#f97316',
@@ -85,7 +86,9 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
   const [sheets, setSheets] = useState([]);
   const [showHighlights, setShowHighlights] = useState(true);
   const [, setTick] = useState(0);
+  const [flashId, setFlashId] = useState(null);
   const overlayRef = useRef(null);
+  const focusRef = useRef(takeFocus()); // «رفتن به همان‌جا» from the board
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +100,21 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
   }, [api, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Bring the requested sheet's box into view and flash it for a few seconds.
+  useEffect(() => {
+    const id = focusRef.current;
+    if (!id || !sheets.length) return undefined;
+    const s = sheets.find((x) => String(x.id) === String(id));
+    if (!s) return undefined;
+    focusRef.current = null;
+    setShowHighlights(true);
+    const r = resolveRect(s.geometry, window);
+    if (r) window.scrollBy({ top: r.y - window.innerHeight / 3, behavior: 'smooth' });
+    setFlashId(s.id);
+    const t = setTimeout(() => setFlashId(null), 4000);
+    return () => clearTimeout(t);
+  }, [sheets]);
 
   // Re-place highlights on scroll/resize.
   useEffect(() => {
@@ -155,7 +173,8 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
         return (
           <div key={s.id} data-inspection-ui="1" title={`برگهٔ ${s.number}: ${s.title} — ${s.glow?.label || ''}`}
             onClick={onOpenBoard}
-            style={{ position: 'fixed', left: r.x, top: r.y, width: r.w, height: r.h, border: `2px solid ${color}`, background: `${color}14`, borderRadius: 6, zIndex: 9990, cursor: 'pointer' }}>
+            data-flash={flashId === s.id ? '1' : undefined}
+            style={{ position: 'fixed', left: r.x, top: r.y, width: r.w, height: r.h, border: `${flashId === s.id ? 4 : 2}px solid ${color}`, background: `${color}${flashId === s.id ? '40' : '14'}`, borderRadius: 6, zIndex: 9990, cursor: 'pointer', boxShadow: flashId === s.id ? `0 0 0 6px ${color}55` : 'none', transition: 'all .3s' }}>
             <span style={{ position: 'absolute', top: -10, right: -10, background: color, color: '#fff', fontSize: 11, borderRadius: 9999, padding: '0 6px' }}>{s.number}</span>
           </div>
         );

@@ -41,6 +41,18 @@ export function createInspectionApi(getToken, fetchImpl = (...a) => fetch(...a))
     reopen: (id) => request('POST', `/api/inspection/${id}/reopen`),
     triage: (id, decision, note = '') => request('POST', `/api/inspection/${id}/triage`, { decision, note }),
     urgent: (id, on) => request(on ? 'POST' : 'DELETE', `/api/inspection/${id}/urgent`),
+    rounds: () => request('GET', '/api/inspection/rounds'),
+    editNote: (id, noteId, text) => request('PATCH', `/api/inspection/${id}/notes/${noteId}`, { text }),
+    detachFile: (fileId) => request('POST', `/api/inspection/files/${fileId}/detach`),
+    download: async (fileId, filename) => {
+      const token = await getToken();
+      const res = await fetchImpl(`/api/inspection/files/${fileId}/raw`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new InspectionApiError(res.status, 'دانلود نشد');
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url; a.download = filename || 'file'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    },
     upload: (id, files, captions = [], noteId = '') => {
       const form = new FormData();
       files.forEach((f, i) => {

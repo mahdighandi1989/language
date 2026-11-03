@@ -308,3 +308,103 @@ test('API: urgent — owner presses, supervisor claims, answer discharges', asyn
   assert.ok(ans.body.sheet.urgentDoneAt);
   assert.equal(ans.body.sheet.needsSupervisor, true); // not-done comes back next round
 });
+
+// ---------------------------------------------------------------- v2 parity with the reference project
+import { recordKnock, nextRound, nextFullRound } from '../services/inspection/rounds.js';
+import { composeMail, notifySubmitter, setTransportFactory } from '../services/inspection/mailer.js';
+import { editNote, readProgress } from '../services/inspection/model.js';
+
+test('rounds: assumed → observed hourly minute → stale; full round from cron', () => {
+  const now = new Date('2026-11-03T10:05:00Z');
+  const a = nextRound(now, [], 37);
+  assert.equal(a.basis, 'assumed');
+  assert.equal(a.at, '2026-11-03T10:37:00.000Z');
+  let log = [];
+  for (const t of ['07:41', '08:41', '09:42']) log = recordKnock(log, new Date(`2026-11-03T${t}:00Z`));
+  const o = nextRound(now, log, 37);
+  assert.equal(o.basis, 'observed');
+  assert.equal(o.at, '2026-11-03T10:41:00.000Z');
+  assert.equal(nextRound(new Date('2026-11-03T15:00:00Z'), log).basis, 'stale');
+  const f = nextFullRound(new Date('2026-11-03T10:00:00Z'), [], '23 2 * * 1,4'); // Tuesday
+  assert.equal(f.at, '2026-11-05T02:23:00.000Z'); // Thursday (matches the routine's own next_run_at)
+  assert.equal(nextFullRound(new Date('2026-11-20T10:00:00Z'), ['2026-11-03T02:23:00Z'], '23 2 * * 1,4').basis, 'stale');
+  assert.equal(recordKnock(Array.from({ length: 20 }, (_, i) => new Date(Date.UTC(2026, 0, 1, i)).toISOString())).length, 12);
+});
+
+test('edit keeps the original text; sides and closed sheets are protected', () => {
+  const sheet = { status: STATUS.OPEN, title: 'old', notes: [{ id: 'n1', by: 'owner', author: OWNER.email, text: 'old' }, { id: 'n2', by: 'reviewer', text: 'r' }] };
+  editNote(OWNER, sheet, 'n1', 'new title\nmore');
+  editNote(OWNER, sheet, 'n1', 'newer');
+  assert.equal(sheet.notes[0].originalText, 'old');
+  assert.equal(sheet.notes[0].text, 'newer');
+  assert.equal(sheet.title, 'newer');
+  assert.throws(() => editNote(OWNER, sheet, 'n2', 'x'), /طرفِ مقابل/);
+  assert.throws(() => editNote(SUP, sheet, 'n1', 'x'), /طرفِ مقابل/);
+  assert.throws(() => editNote(USER, { status: STATUS.OPEN, notes: [{ id: 'u', by: 'user', author: 'other@x' }] }, 'u', 'x'), /خودت/);
+  assert.throws(() => editNote(OWNER, { ...sheet, status: STATUS.FILED }, 'n1', 'x'), /بسته/);
+});
+
+test('read progress per file', () => {
+  assert.deepEqual(readProgress({ extractStatus: 'ok', textChars: 200, readChars: 50 }), { readPercent: 25, fullyRead: false });
+  assert.deepEqual(readProgress({ extractStatus: 'ok', textChars: 200, readChars: 200 }), { readPercent: 100, fullyRead: true });
+  assert.deepEqual(readProgress({ extractStatus: 'image' }), { readPercent: 0, fullyRead: false });
+  assert.deepEqual(readProgress({ extractStatus: 'image', viewedAt: 'x' }), { readPercent: 100, fullyRead: true });
+});
+
+test('mail: decline carries the reason; no SMTP ⇒ not-configured; transport used when configured', async () => {
+  const sheet = { number: 7, title: 'عنوان', status: 'declined', triageNote: 'تکراری است', createdBy: 'u@example.com' };
+  assert.match(composeMail(sheet).text, /دلیلِ رد: تکراری است/);
+  assert.doesNotMatch(composeMail({ ...sheet, triageNote: '' }).text, /دلیلِ رد/);
+  assert.equal((await notifySubmitter(sheet, {})).status, 'not-configured');
+  const sent = [];
+  setTransportFactory(() => ({ sendMail: async (m) => { sent.push(m); } }));
+  const env = { SMTP_HOST: 'h', SMTP_USER: 'u', SMTP_PASSWORD: 'p', MAIL_FROM: 'f@x' };
+  assert.equal((await notifySubmitter({ ...sheet, status: 'open' }, env)).status, 'sent');
+  assert.equal(sent[0].to, 'u@example.com');
+  assert.match(sent[0].subject, /پذیرفته/);
+  setTransportFactory(() => ({ sendMail: async () => { throw new Error('smtp down'); } }));
+  assert.equal((await notifySubmitter(sheet, env)).status, 'failed');
+  setTransportFactory(null);
+});
+
+test('API: general request, edit, decline with reason + mail record, detach (not delete), read %, rounds, rush position', async () => {
+  const sup = (await call('POST', '/api/inspection/auth/supervisor', null, { password: 'p'.repeat(24) })).body.token;
+  const g = await call('POST', '/api/inspection', tokens.owner, { text: 'درخواستِ عمومی', general: true, page: 'general', geometry: { doc: { x: 1 } } });
+  assert.equal(g.body.sheet.general, true);
+  assert.equal(g.body.sheet.geometry, null);
+  const id = g.body.sheet.id;
+  const ed = await call('PATCH', `/api/inspection/${id}/notes/${g.body.sheet.notes[0].id}`, tokens.owner, { text: 'متنِ ویرایش‌شده' });
+  assert.equal(ed.body.sheet.notes[0].originalText, 'درخواستِ عمومی');
+  assert.equal(ed.body.sheet.title, 'متنِ ویرایش‌شده');
+
+  const form = new FormData();
+  form.append('files', new Blob(['x'.repeat(100)], { type: 'text/plain' }), 'a.txt');
+  const fid = (await call('POST', `/api/inspection/${id}/files`, tokens.owner, form)).body.files[0].id;
+  await call('GET', `/api/inspection/files/${fid}/text?offset=0&limit=40`, sup);
+  const seen = (await call('GET', `/api/inspection/${id}`, tokens.owner)).body.sheet.files[0];
+  assert.equal(seen.readPercent, 40);
+  assert.equal(seen.fullyRead, false);
+  assert.equal((await call('POST', `/api/inspection/files/${fid}/detach`, sup)).status, 403);
+  const det = await call('POST', `/api/inspection/files/${fid}/detach`, tokens.owner);
+  assert.equal(det.body.sheet.files.length, 0);
+  assert.equal(det.body.sheet.detachedFiles, 1);
+  assert.equal(det.body.sheet.readDebt.length, 0);
+  assert.equal((await call('GET', `/api/inspection/files/${fid}/raw`, tokens.owner, undefined, true)).status, 200); // bytes kept
+
+  const r1 = await call('POST', `/api/inspection/${id}/urgent`, tokens.owner);
+  assert.ok(r1.body.position >= 1);
+  assert.ok(['assumed', 'observed', 'stale'].includes(r1.body.nextRound.basis));
+  await call('POST', '/api/inspection/urgent/claim', sup, { runId: 't' });
+  await call('GET', '/api/inspection/queue', sup);
+  const rounds = (await call('GET', '/api/inspection/rounds', tokens.owner)).body;
+  assert.ok(rounds.urgent.lastSeen && rounds.full.lastSeen);
+
+  const u = (await call('POST', '/api/inspection', tokens.user, { text: 'پیشنهادِ کاربر' })).body.sheet.id;
+  const dec = await call('POST', `/api/inspection/${u}/triage`, tokens.owner, { decision: 'decline', note: 'تکراری' });
+  assert.equal(dec.body.sheet.status, 'declined');
+  assert.equal(dec.body.sheet.triageNote, 'تکراری');
+  assert.equal(dec.body.mail.status, 'not-configured');
+  const u2 = (await call('POST', '/api/inspection', tokens.user, { text: 'دومی' })).body.sheet.id;
+  const acc = await call('POST', `/api/inspection/${u2}/triage`, tokens.owner, { decision: 'accept', note: '' });
+  assert.equal(acc.body.sheet.mail[0].for, 'open');
+});

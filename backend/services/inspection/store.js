@@ -119,6 +119,20 @@ export class FileStore {
     return structuredClone(this.state.binders || []);
   }
 
+  /** Supervisor heartbeat log: kind = 'urgent' | 'full'. `update(list) → list`. */
+  async knock(kind, update) {
+    return this.lock(async () => {
+      this.state.knocks = this.state.knocks || {};
+      this.state.knocks[kind] = update(this.state.knocks[kind] || []);
+      this._save();
+      return this.state.knocks[kind];
+    });
+  }
+
+  async getKnocks() {
+    return structuredClone(this.state.knocks || {});
+  }
+
   async createFile(build) {
     return this.lock(async () => {
       this.state.fileSeq += 1;
@@ -225,6 +239,21 @@ export class FirestoreStore {
   async listBinders() {
     const meta = await this.meta.get();
     return meta.exists ? meta.data().binders || [] : [];
+  }
+
+  async knock(kind, update) {
+    const ref = this.base.collection('inspectionMeta').doc('rounds');
+    return this.db.runTransaction(async (tx) => {
+      const d = await tx.get(ref);
+      const list = update((d.exists ? d.data()[kind] : null) || []);
+      tx.set(ref, { [kind]: list }, { merge: true });
+      return list;
+    });
+  }
+
+  async getKnocks() {
+    const d = await this.base.collection('inspectionMeta').doc('rounds').get();
+    return d.exists ? d.data() : {};
   }
 
   async createFile(build) {

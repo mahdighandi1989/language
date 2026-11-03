@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from client import SupervisorError, api  # noqa: E402
+from inspection_view import look_notes, needs_bytes  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "docs" / "supervisor" / "inspection"
@@ -45,8 +46,18 @@ def read_all_files(sheet: dict) -> list[str]:
     fdir.mkdir(parents=True, exist_ok=True)
     for f in sheet.get("files", []):
         st, raw = api("GET", f"/api/inspection/files/{f['id']}/raw", raw=True)
+        saved = fdir / f"{f['id']}-{Path(f['filename']).name}"
+        look: list[str] = []
         if st == 200:
-            (fdir / f"{f['id']}-{Path(f['filename']).name}").write_bytes(raw)
+            saved.write_bytes(raw)
+            # What else there is to SEE (images → PNG, zip → unpacked, video → frames, PDF → every page).
+            try:
+                look, _better = look_notes(saved, f["filename"], f["extractStatus"],
+                                           lambda p: str(p.relative_to(WORK)) if str(p).startswith(str(WORK)) else str(p))
+            except Exception as exc:  # noqa: BLE001 — a viewer failure is reported, never silent
+                look = [f"آماده‌سازیِ دیدنی‌ها ناموفق بود: {type(exc).__name__}"]
+        elif needs_bytes(f["filename"]):
+            look = [f"⚠ بایت‌های فایل دریافت نشد (HTTP {st}) — این فایل باید دیده هم بشود"]
         if f["extractStatus"] == "ok":
             offset, chunks = 0, []
             while True:
@@ -65,6 +76,8 @@ def read_all_files(sheet: dict) -> list[str]:
                          f"→ خودِ فایل: files/{sheet['number']}/{f['id']}-{Path(f['filename']).name}")
         if f.get("caption"):
             lines.append(f"    توضیحِ مالک: {f['caption']}")
+        for note in look:
+            lines.append(f"    👁 {note}")
     return lines
 
 
