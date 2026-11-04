@@ -75,3 +75,19 @@ test('with auth configured: approved user passes, pending is 403, owner always p
   assert.equal(await ws('?token=forged'), 401);
   delete process.env.FIREBASE_PROJECT_ID;
 });
+
+test('CSP lets lesson media play: YouTube/Drive frames and https audio/video, nothing broader', async () => {
+  const express = (await import('express')).default;
+  const { applySecurity } = await import('../middleware/security.js');
+  const app = express();
+  applySecurity(app);
+  app.get('/x', (req, res) => res.send('ok'));
+  const server = app.listen(0);
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/x`);
+  const csp = res.headers.get('content-security-policy');
+  server.close();
+  assert.match(csp, /frame-src [^;]*https:\/\/www\.youtube-nocookie\.com/);
+  assert.match(csp, /frame-src [^;]*https:\/\/drive\.google\.com/);
+  assert.match(csp, /media-src 'self' data: blob: https:;/);
+  assert.match(csp, /script-src 'self' https:\/\/apis\.google\.com;/);
+});

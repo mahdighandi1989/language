@@ -40,11 +40,11 @@ export function applySecurity(app) {
       'Content-Security-Policy',
       "default-src 'self'; " +
         "script-src 'self' https://apis.google.com; " +
-        "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://apis.google.com; " +
+        "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://apis.google.com https://www.youtube-nocookie.com https://drive.google.com; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "font-src 'self' data: https://fonts.gstatic.com; " +
         "img-src 'self' data: blob: https://*.googleusercontent.com; " +
-        "media-src 'self' data: blob:; " +
+        "media-src 'self' data: blob: https:; " +
         "connect-src 'self' blob: data: https://*.googleapis.com wss://*.googleapis.com " +
         'https://*.firebaseio.com https://*.firebaseapp.com https://firestore.googleapis.com ' +
         'https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com;'
