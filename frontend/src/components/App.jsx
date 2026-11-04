@@ -50,6 +50,7 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import Shadowing from '../shadowing/Shadowing.jsx';
 import ExportMenu from '../exports/ExportMenu.jsx';
 import { download as downloadBlob } from '../exports/exports.js';
 import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
@@ -3636,6 +3637,7 @@ ${analyzedContent}
                     </div>
                 )}
             </Card>
+           <Shadowing lesson={lesson} data={data} setData={setData} callAI={callGeminiAPI} tts={callGeminiTTS} toWavUrl={getWavUrl} voice={data?.defaultChatSettings?.aiVoice || 'Charon'} setModalConfig={setModalConfig} />
            <SmartUpload lesson={lesson} updateLesson={updateLesson} />
            <Card title="افزودن و تحلیل محتوا">
                <div className="p-6 border-dashed border-2 border-slate-300 rounded-xl text-center mb-4 hover:border-teal-500 transition-colors">
