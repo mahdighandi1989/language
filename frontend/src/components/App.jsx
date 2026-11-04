@@ -60,6 +60,7 @@ import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
 import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
 import { normalizeQuiz, parseQuizResponse } from '../quiz/normalizeQuiz.js';
 import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET, QUIZ_MAX_QUESTIONS, pickQuizLessons, glossaryFor, LEBANESE_QUIZ_RULES } from '../quiz/quizSource.js';
+import { knowledgePool, planQuiz, knowledgeQuestions, mergeQuiz } from '../quiz/quizPlan.js';
 
 // Module-level singleton: one tracker for the app's chat activity. Analytics is
 // strictly best-effort and must never affect the chat UX.
@@ -3800,6 +3801,14 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
         }
         // A fixed budget (~24k characters) sampled from the lesson(s), different each time.
         const lessonContent = sampleLessonText(sources, QUIZ_CHAR_BUDGET);
+        // Plan (quiz/quizPlan.js): ~half straight from the knowledge center (built
+        // here, real options), the rest split over the chosen lessons.
+        const kbPool = knowledgePool(data?.knowledgeBase, sources);
+        const plan = planQuiz(questionCount, sources, kbPool);
+        const kbQuestions = knowledgeQuestions(kbPool, plan.kbCount);
+        // Two spare questions: contradictory ones are dropped without shrinking the quiz.
+        const modelCount = Math.min(QUIZ_MAX_QUESTIONS, Math.max(1, questionCount - kbQuestions.length) + 2);
+        const shareText = plan.slots.length > 1 ? `\nسهمِ هر درس (رعایت کن، همه از یک درس نباشند): ${plan.slots.map((x) => `${x.count} سؤال از «${x.lesson.title}»`).join('، ')}.` : '';
         // Verified vocabulary (knowledge center) to ground answers and distractors.
         const glossary = glossaryFor(sources, data?.knowledgeBase, 60);
         const glossaryBlock = glossary.length ? `\n\nواژه‌نامهٔ تأییدشده (از مرکزِ دانش):\n${glossary.join('\n')}` : '';
@@ -3819,7 +3828,7 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
         const quizSystemPrompt = getPrompt(customPrompts, 'quizSystem');
         const quizInstructions = getPrompt(customPrompts, 'quizInstructions');
 
-        const systemPrompt = `${quizSystemPrompt} بر اساس محتوای درس زیر، یک آزمون ${questionCount} سوالی بساز.
+        const systemPrompt = `${quizSystemPrompt} بر اساس محتوای درس زیر، یک آزمون ${modelCount} سوالی بساز.${shareText}
 
 سطح سختی: ${difficultyLabels[difficulty].label} (${difficultyLabels[difficulty].desc})
 
@@ -3888,7 +3897,8 @@ ${lessonContent}${glossaryBlock}`;
                     correctAnswer: { type: "STRING" },
                     words: { type: "ARRAY", items: { type: "STRING" } },
                     pairs: { type: "ARRAY", items: { type: "OBJECT", properties: { arabic: { type: "STRING" }, persian: { type: "STRING" } } } },
-                    explanation: { type: "STRING" }
+                    explanation: { type: "STRING" },
+                    lesson: { type: "STRING" }
                 }
             }
         };
@@ -3912,7 +3922,7 @@ ${lessonContent}${glossaryBlock}`;
             payload.generationConfig = { ...payload.generationConfig, ...fast, temperature: 0.4 };
             let validQuiz = parseQuizResponse(await callGeminiAPI(payload, 1, 1000, controller.signal));
             if (validQuiz.length === 0) {
-                const simple = Math.min(5, questionCount);
+                const simple = Math.min(5, modelCount);
                 const simplePrompt = `${quizSystemPrompt} بر اساسِ متنِ درسِ زیر دقیقاً ${simple} سؤالِ چهارگزینه‌ای بساز (هر سؤال یک پاسخِ درست که عیناً یکی از ۴ گزینه است). فقط آرایهٔ JSON.
 
 ${LEBANESE_QUIZ_RULES}
@@ -3931,6 +3941,10 @@ ${lessonContent.slice(0, 8000)}${glossaryBlock}`;
                     try { const a = JSON.parse(t); return JSON.stringify(Array.isArray(a) ? a.map((q) => ({ type: 'mcq', ...q })) : a); } catch { return t; }
                 }));
             }
+            // Knowledge questions interleaved; tense-contradictory model questions dropped.
+            const merged = mergeQuiz(validQuiz, kbQuestions, questionCount);
+            if (merged.dropped) console.warn(`quiz: ${merged.dropped} contradictory question(s) dropped`);
+            validQuiz = merged.quiz;
             if (validQuiz.length === 0) throw new Error('No valid questions');
 
             setQuiz(validQuiz);
