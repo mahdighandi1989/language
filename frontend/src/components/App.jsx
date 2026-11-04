@@ -50,6 +50,8 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import ProgressInsights from '../progress/ProgressInsights.jsx';
+import { CULTURE_GUIDE, cacheInsight } from '../culture/cultureGuide.js';
 import Shadowing from '../shadowing/Shadowing.jsx';
 import LessonMedia from '../media/LessonMedia.jsx';
 import ExportMenu from '../exports/ExportMenu.jsx';
@@ -4368,19 +4370,20 @@ export function MarkdownRenderer({ text }) {
     return <LessonMarkdown text={text} />;
 }
 
-function ProgressCenter({ lessons, journal, knowledgeBase, addJournalEntry, setModalConfig, data }) {
+function ProgressCenter({ lessons, journal, knowledgeBase, addJournalEntry, setModalConfig, data, setData, navigateTo }) {
     const [activeTab, setActiveTab] = useState('overview');
-    const [goal, setGoal] = useState('');
-    const [plan, setPlan] = useState('');
+    const [goal, setGoal] = useState(data?.studyPlan?.goal || '');
+    // The last plan is kept (data.studyPlan) — it used to vanish on leaving the page.
+    const [plan, setPlan] = useState(data?.studyPlan?.text || '');
     const [isLoading, setIsLoading] = useState(false);
     const [dailyChallenge, setDailyChallenge] = useState(null);
     const [isLoadingChallenge, setIsLoadingChallenge] = useState(false);
 
     // Calculate comprehensive stats
     const stats = useMemo(() => {
-        const totalVocab = knowledgeBase.vocabulary.length;
-        const totalGrammar = knowledgeBase.grammar.length;
-        const totalPhrases = knowledgeBase.phrases.length;
+        const totalVocab = knowledgeBase.vocabulary?.length || 0;
+        const totalGrammar = knowledgeBase.grammar?.length || 0;
+        const totalPhrases = knowledgeBase.phrases?.length || 0;
         const totalVerbs = knowledgeBase.verbs?.length || 0;
         const totalItems = totalVocab + totalGrammar + totalPhrases + totalVerbs;
 
@@ -4480,7 +4483,9 @@ ${lessonInfo}
 از Markdown استفاده کن.`;
 
         try {
-            setPlan(await callGeminiAPI({ contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } }));
+            const text = await callGeminiAPI({ contents: [{ parts: [{ text: " " }] }], systemInstruction: { parts: [{ text: systemPrompt }] } });
+            setPlan(text);
+            setData?.(prev => ({ ...prev, studyPlan: { goal, text, at: new Date().toISOString() } }));
         } catch (error) {
             setModalConfig({ title: "خطا", message: "خطا در ایجاد برنامه مطالعه." });
         } finally {
@@ -4567,6 +4572,7 @@ ${lessonInfo}
 
             {activeTab === 'overview' && (
                 <div className="space-y-6">
+                    <ProgressInsights data={data} navigateTo={navigateTo} />
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-5 rounded-2xl shadow-lg">
@@ -4778,7 +4784,7 @@ ${lessonInfo}
     );
 }
 
-function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, updateKnowledgeBase }) {
+function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, updateKnowledgeBase, data, setData }) {
     const [selectedCategory, setSelectedCategory] = useState('food');
     const [insight, setInsight] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -4795,7 +4801,10 @@ function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, upda
         language: { label: '🗣️ زبان و لهجه', icon: '💬', topics: ['تفاوت لهجه‌ها', 'کلمات فرانسوی', 'اصطلاحات خاص', 'شوخی و طنز'] }
     };
 
-    const getInsight = async (topic) => {
+    const getInsight = async (topic, { fresh = false } = {}) => {
+        // Already generated once: show the saved copy (no new Gemini call).
+        const cached = !fresh && data?.culturalInsights?.[topic];
+        if (cached) { setInsight(cached); setRelatedPhrases(cached.relatedPhrases || []); return; }
         setIsLoading(true);
         setInsight(null);
         setRelatedPhrases([]);
@@ -4825,9 +4834,11 @@ function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, upda
                 generationConfig: { responseMimeType: "application/json" }
             });
 
-            const data = JSON.parse(response);
-            setInsight(data);
-            setRelatedPhrases(data.relatedPhrases || []);
+            const parsed = JSON.parse(response);
+            const withTopic = { ...parsed, topic };
+            setInsight(withTopic);
+            setRelatedPhrases(parsed.relatedPhrases || []);
+            setData?.(prev => ({ ...prev, culturalInsights: cacheInsight(prev.culturalInsights, topic, withTopic) }));
         } catch (error) {
             console.error(error);
             setModalConfig({ title: "خطا", message: "خطا در دریافت اطلاعات فرهنگی. لطفاً دوباره تلاش کنید." });
@@ -4886,6 +4897,28 @@ function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, upda
                 </div>
             </Card>
 
+            {/* Ready guide: the page is never empty (culture/cultureGuide.js). */}
+            {CULTURE_GUIDE[selectedCategory] && (() => { const g = CULTURE_GUIDE[selectedCategory]; return (
+                <Card title={`🧭 راهنمای کوتاه: ${categories[selectedCategory].label}`}>
+                    <div className="space-y-4" data-testid="culture-guide">
+                        <p className="text-slate-700 leading-8">{g.overview}</p>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-4"><p className="font-bold text-green-700 mb-2">✅ انجام دهید</p><ul className="list-disc ps-5 space-y-1 text-sm">{g.do.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-4"><p className="font-bold text-red-700 mb-2">⛔ انجام ندهید</p><ul className="list-disc ps-5 space-y-1 text-sm">{g.dont.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            {g.phrases.map((ph, i) => (
+                                <div key={i} className="flex items-center justify-between gap-2 p-3 bg-slate-50 border rounded-xl">
+                                    <div className="min-w-0"><p className="text-lg" dir="rtl" lang="ar">{ph.arabic}</p><p className="text-sm text-slate-600">{ph.persian}</p></div>
+                                    <div className="flex items-center gap-1 shrink-0"><TTSButton textToSpeak={ph.arabic} /><button onClick={() => savePhraseToKnowledge({ arabic: ph.arabic, persian: ph.persian, usage: categories[selectedCategory].label })} className="p-1 text-slate-400 hover:text-teal-600" aria-label={`افزودنِ ${ph.arabic} به مرکزِ دانش`}><Plus size={16}/></button></div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-400">این راهنما آماده و بی‌اینترنت است؛ برای توضیحِ مفصل روی هر موضوعِ بالا بزنید (پاسخ ذخیره می‌شود). {Object.keys(data?.culturalInsights || {}).length > 0 && `${Object.keys(data.culturalInsights).length} موضوعِ ذخیره‌شده.`}</p>
+                    </div>
+                </Card>
+            ); })()}
+
             {/* Loading */}
             {isLoading && (
                 <div className="text-center p-10 bg-white rounded-2xl">
@@ -4897,7 +4930,7 @@ function CulturalInsights({ addJournalEntry, setModalConfig, knowledgeBase, upda
             {/* Insight Display */}
             {insight && (
                 <div className="space-y-6">
-                    <Card title={`📖 ${insight.title}`}>
+                    <Card title={`📖 ${insight.title}`} actionButton={insight.topic ? <button onClick={() => getInsight(insight.topic, { fresh: true })} disabled={isLoading} className="text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200">↻ توضیحِ تازه</button> : null}>
                         <div className="prose max-w-none">
                             <p className="text-slate-700 leading-relaxed text-lg">{insight.content}</p>
                         </div>
