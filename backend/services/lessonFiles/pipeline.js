@@ -35,17 +35,26 @@ export function geminiAi() {
     async transcribe(buffer, mime, filename, variant) {
       const g = await import('../geminiService.js');
       const prompt = variant === 'b' ? PROMPT_B : PROMPT_A;
-      const config = { generationConfig: { temperature: variant === 'b' ? 0.7 : 0 } };
+      // Verbatim transcription: no «thinking» (it spends the output budget) and
+      // the largest output budget, so a 30–60 minute class is not cut short.
+      let finish = null;
+      const options = {
+        generationConfig: { temperature: variant === 'b' ? 0.7 : 0, maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 } },
+        onFinish: (r) => { finish = r; },
+      };
+      const sys = 'You are an exact transcriber. Never summarise, never correct.';
+      let text;
       if (buffer.length <= INLINE_MAX) {
-        return g.analyzeWithGemini([{ text: `${prompt}\n(فایل: ${filename})` }, { inline_data: { mime_type: mime, data: buffer.toString('base64') } }],
-          'You are an exact transcriber. Never summarise, never correct.', config);
+        text = await g.analyzeWithGemini([{ text: `${prompt}\n(فایل: ${filename})` }, { inline_data: { mime_type: mime, data: buffer.toString('base64') } }], sys, options);
+      } else {
+        const uploaded = await g.uploadToGeminiFileAPI(buffer, mime, filename, buffer.length);
+        try {
+          text = await g.analyzeWithGeminiFileAPIWithModel(uploaded, `${prompt}\n(فایل: ${filename})`, sys, 'gemini-2.5-flash', options);
+        } finally {
+          await g.deleteGeminiFile(uploaded);
+        }
       }
-      const uploaded = await g.uploadToGeminiFileAPI(buffer, mime, filename, buffer.length);
-      try {
-        return await g.analyzeWithGeminiFileAPI(uploaded, `${prompt}\n(فایل: ${filename})`, 'You are an exact transcriber. Never summarise, never correct.');
-      } finally {
-        await g.deleteGeminiFile(uploaded);
-      }
+      return { text, finish };
     },
     async review(text) {
       const g = await import('../geminiService.js');
@@ -80,10 +89,17 @@ export async function extractLessonFile({ buffer, filename = '', mime = '' }, { 
   } else if (isMedia(mime, filename) || isPdf) {
     if (scanned) result.notes.push('PDF ِ اسکن‌شده (لایهٔ متن ندارد یا ناچیز است) — با دو رونویسیِ مستقل خوانده شد');
     try {
-      const [a, b] = await Promise.all([
+      let [a, b] = await Promise.all([
         ai.transcribe(buffer, mime || 'application/pdf', filename, 'a'),
         ai.transcribe(buffer, mime || 'application/pdf', filename, 'b'),
       ]);
+      // transcribe() may return a string (tests) or { text, finish }.
+      const finishA = typeof a === 'object' && a ? a.finish : null;
+      const finishB = typeof b === 'object' && b ? b.finish : null;
+      if (a && typeof a === 'object') a = a.text;
+      if (b && typeof b === 'object') b = b.text;
+      if (finishA === 'MAX_TOKENS' || finishB === 'MAX_TOKENS') result.notes.push('⚠️ رونویسی به سقفِ خروجیِ Gemini رسید و انتهایش ممکن است بریده باشد؛ فایل را به بخش‌های کوتاه‌تر (حدودِ ۲۰ دقیقه) تقسیم کنید');
+      if (finishA && !['STOP', 'MAX_TOKENS'].includes(finishA)) result.notes.push(`⚠️ Gemini رونویسی را با وضعیتِ «${finishA}» تمام کرد`);
       const cmp = compareTranscripts(a, b);
       Object.assign(result, {
         method: 'ai-verified',

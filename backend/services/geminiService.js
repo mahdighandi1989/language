@@ -27,7 +27,19 @@ export async function analyzeWithGemini(parts, systemPrompt, options = {}) {
   }
 
   const result = await response.json();
-  return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return candidateText(result, options);
+}
+
+/**
+ * All text parts of the first candidate (long answers can come in several
+ * parts — reading only parts[0] dropped the rest). When `options.onFinish` is
+ * given it receives the finishReason, so callers can flag a transcript cut by
+ * the output-token limit (MAX_TOKENS) instead of presenting it as complete.
+ */
+export function candidateText(result, options = {}) {
+  const cand = result?.candidates?.[0];
+  options.onFinish?.(cand?.finishReason || null);
+  return (cand?.content?.parts || []).filter((p) => typeof p.text === 'string' && !p.thought).map((p) => p.text).join('');
 }
 
 // Upload a large file to the Gemini File API (supports both buffer and file
@@ -130,7 +142,7 @@ export async function uploadToGeminiFileAPI(filePathOrBuffer, mimeType, displayN
 }
 
 // Analyze a large uploaded file using the Gemini File API with a specific model.
-export async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemPrompt, modelName) {
+export async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemPrompt, modelName, options = {}) {
   const apiUrl = `${GEMINI_BASE}/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
   console.log(`Using model: ${modelName} for file analysis`);
 
@@ -143,6 +155,7 @@ export async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemP
       ],
     }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
+    ...(options.generationConfig ? { generationConfig: options.generationConfig } : {}),
   };
 
   const response = await fetch(apiUrl, {
@@ -157,7 +170,7 @@ export async function analyzeWithGeminiFileAPIWithModel(fileUri, prompt, systemP
   }
 
   const result = await response.json();
-  return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return candidateText(result, options);
 }
 
 // Analyze a large uploaded file using the Gemini File API.

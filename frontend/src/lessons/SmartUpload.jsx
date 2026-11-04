@@ -4,7 +4,7 @@
 // marked; possible اعراب/معنا issues go to a SEPARATE list. «افزودن به جزوه»
 // APPENDS one unified handout — the existing notes are never rewritten.
 // Upstream: POST /api/lesson-files/:lessonId, ./unifiedNotes.js, ./markdown.jsx.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { buildUnifiedNotes, appendUnified, collectCorrections, methodLabel } from './unifiedNotes.js';
 import { MarkdownRenderer } from './markdown.jsx';
 
@@ -16,6 +16,45 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
   const [done, setDone] = useState(null);
   const [review, setReview] = useState(true);
   const blocked = Boolean(lesson._bodyPending || lesson._bodyError);
+  // Extractions that finished on the server but never reached the notes (tab
+  // closed during a long class recording, network drop…): offer to restore them.
+  const [orphans, setOrphans] = useState([]);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetchImpl(`/api/lesson-files/${lesson.id}`);
+        if (!res?.ok) return;
+        const body = await res.json();
+        // Text not yet in the notes: never applied, and not a failed/empty extraction.
+        const applied = new Set((lesson.appliedExtracts || []).map(String));
+        const legacy = new Set((lesson.files || []).filter((f) => f.stored && !(lesson.appliedExtracts || []).length).map((f) => String(f.id)));
+        if (live) setOrphans((body.files || []).filter((f) => f.hasExtract && f.status === 'ok' && !applied.has(String(f.id)) && !legacy.has(String(f.id))));
+      } catch { /* offline or old server: nothing to restore */ }
+    })();
+    return () => { live = false; };
+  }, [lesson.id, (lesson.appliedExtracts || []).length]);
+  const restore = async () => {
+    setBusy(true); setError(null);
+    try {
+      const got = [];
+      for (const f of orphans) {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetchImpl(`/api/lesson-files/${lesson.id}/${f.id}/extract`);
+        if (!res.ok) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const { file, extract } = await res.json();
+        got.push({ ...extract, filename: file.name, file });
+      }
+      if (!got.length) throw new Error('متنِ ذخیره‌شده‌ای پیدا نشد');
+      setResults(got);
+      setOrphans([]);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const run = async () => {
     setBusy(true); setError(null); setDone(null); setResults(null);
@@ -27,6 +66,10 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `خطای ${res.status}`);
       setResults(body.results || []);
+      // The originals are already stored on the server: attach them to the lesson
+      // now, even when no text came out (failed transcription) — so they can be
+      // played and downloaded. «افزودن به جزوه» then only adds text.
+      attachFiles(body.results || []);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -34,13 +77,21 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
     }
   };
 
+  const storedOf = (rs) => {
+    const known = new Set((lesson.files || []).map((f) => String(f.id)));
+    return rs.filter((r) => r.file && !known.has(String(r.file.id))).map((r) => ({ id: r.file.id, name: r.file.name, type: r.file.type, size: r.file.size, stored: true, method: r.method }));
+  };
+  function attachFiles(rs) {
+    const add = storedOf(rs);
+    if (add.length) updateLesson(lesson.id, { files: [...(lesson.files || []), ...add] });
+  }
   const unified = results ? buildUnifiedNotes(results) : '';
   const apply = () => {
-    const stored = results.map((r) => ({ id: r.file.id, name: r.file.name, type: r.file.type, size: r.file.size, stored: true, method: r.method }));
     updateLesson(lesson.id, {
       archivedNotes: appendUnified(lesson.archivedNotes, unified),
       corrections: collectCorrections(results, lesson.corrections),
-      files: [...(lesson.files || []), ...stored],
+      files: [...(lesson.files || []), ...storedOf(results)],
+      appliedExtracts: [...new Set([...(lesson.appliedExtracts || []), ...results.map((r) => String(r.file?.id)).filter(Boolean)])],
     });
     setDone(`جزوهٔ یکپارچه از ${results.length} فایل افزوده شد؛ اصلِ فایل‌ها نگه داشته شد.`);
     setResults(null);
@@ -69,6 +120,12 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
       <button disabled={busy || !files.length || blocked} onClick={run} className="px-4 py-2 rounded-lg bg-teal-600 text-white disabled:bg-slate-300">
         {busy ? 'در حالِ استخراج و اعتبارسنجی… (ممکن است چند دقیقه طول بکشد)' : 'استخراجِ دقیق'}
       </button>
+      {orphans.length > 0 && !results && (
+        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm flex flex-wrap items-center justify-between gap-2" role="status">
+          <span>📥 {orphans.length} فایل روی سرور استخراج شده ولی هنوز به جزوه افزوده نشده ({orphans.map((f) => f.name).join('، ')}).</span>
+          <button onClick={restore} disabled={busy || blocked} className="px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-50">بازیابی و پیش‌نمایش</button>
+        </div>
+      )}
       {blocked && <p className="text-xs text-amber-700">متنِ این درس هنوز از فضای ابری بارگذاری نشده است.</p>}
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {done && <p role="status" className="text-sm text-emerald-700">✅ {done}</p>}

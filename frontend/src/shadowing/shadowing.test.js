@@ -14,6 +14,24 @@ describe('shadowing logic', () => {
     const s = extractPracticeSentences(notes);
     expect(s).toEqual([{ text: 'كِيفَك؟', meaning: 'حالت چطوره؟' }, { text: 'بِدّي روح عَالبَيت', meaning: 'می‌خواهم بروم خانه' }]);
   });
+  it('real notes typed with a Persian keyboard (ی/ک): Lebanese side found, Persian side = meaning', () => {
+    const notes = [
+      'متعوِّد هیک : اینجوری عادت کردم',
+      'منکَوِّن : بسازیم',
+      'هی ما کان بدا شای = او چایی نمی خواست',
+      'راسی عم یوجعنی = سرم داره درد میکنه',
+      'برای حفظ و تثیت یک کلمه باید تا قبل از 24 ساعت تمرین کنیم',
+      'ما فیکی تجیبی البنطلون معک؟',
+    ].join('\n');
+    expect(extractPracticeSentences(notes)).toEqual([
+      { text: 'متعوِّد هیک', meaning: 'اینجوری عادت کردم' },
+      { text: 'منکَوِّن', meaning: 'بسازیم' },
+      { text: 'هی ما کان بدا شای', meaning: 'او چایی نمی خواست' },
+      { text: 'راسی عم یوجعنی', meaning: 'سرم داره درد میکنه' },
+      { text: 'ما فیکی تجیبی البنطلون معک؟', meaning: '' },
+    ]);
+    expect(isArabicText('یک خطِ فارسی')).toBe(false);
+  });
   it('records attempts with best/last and computes stats', () => {
     let sh = recordAttempt({}, 7, 'كيفك', 60, 't1');
     sh = recordAttempt(sh, 7, 'كيفك', 90, 't2');

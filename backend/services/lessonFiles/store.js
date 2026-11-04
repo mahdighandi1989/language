@@ -53,6 +53,18 @@ export async function readLessonFile(fileId) {
   return store.getBlob(`lessonfile-${safe(fileId)}`);
 }
 
+/** The extraction result of a file (text, marked text, corrections, notes) — kept so a closed tab never loses it. */
+export async function saveLessonExtract(fileId, extract) {
+  const store = await getInspectionStore();
+  await store.putBlob(`lessonfile-${safe(fileId)}-extract`, Buffer.from(JSON.stringify(extract), 'utf8'));
+}
+
+export async function readLessonExtract(fileId) {
+  const store = await getInspectionStore();
+  const raw = await store.getBlob(`lessonfile-${safe(fileId)}-extract`);
+  return raw ? JSON.parse(raw.toString('utf8')) : null;
+}
+
 export async function storeInfo() {
   return (await getInspectionStore()).describe();
 }

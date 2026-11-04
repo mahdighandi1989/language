@@ -14,7 +14,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAuthIfConfigured } from '../middleware/firebaseAuth.js';
 import { extractLessonFile } from '../services/lessonFiles/pipeline.js';
-import { saveLessonFile, listLessonFiles, readLessonFile, updateLessonFile, storeInfo } from '../services/lessonFiles/store.js';
+import { saveLessonFile, listLessonFiles, readLessonFile, updateLessonFile, storeInfo, saveLessonExtract, readLessonExtract } from '../services/lessonFiles/store.js';
 
 export const MAX_LESSON_FILE = 25 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_LESSON_FILE, files: 10 } });
@@ -42,24 +42,29 @@ lessonFilesRouter.post('/api/lesson-files/:lessonId', requireAuthIfConfigured, (
       const results = [];
       for (const f of files) {
         const filename = Buffer.from(f.originalname, 'latin1').toString('utf8');
-        // eslint-disable-next-line no-await-in-loop
-        const ex = await extractLessonFile({ buffer: f.buffer, filename, mime: f.mimetype }, { ai: aiOverride || undefined, review });
+        // 1) The original is stored FIRST: a long extraction (a 30–60 minute class
+        //    takes minutes) that fails or whose tab is closed never loses the upload.
         const meta = {
           id: crypto.randomBytes(9).toString('hex'),
           name: filename,
           type: f.mimetype || 'application/octet-stream',
           size: f.size,
           sha256: crypto.createHash('sha256').update(f.buffer).digest('hex'),
-          method: ex.method,
-          status: ex.status,
-          agreement: ex.agreement,
-          suspectCount: ex.suspectCount,
+          status: 'processing',
           uploadedAt: new Date().toISOString(),
           stored: 'db',
         };
         // eslint-disable-next-line no-await-in-loop
         await saveLessonFile(uid, lessonId, meta, f.buffer);
-        results.push({ ...ex, file: meta });
+        // 2) Extract, then keep the result on the server too (GET …/extract).
+        // eslint-disable-next-line no-await-in-loop
+        const ex = await extractLessonFile({ buffer: f.buffer, filename, mime: f.mimetype }, { ai: aiOverride || undefined, review });
+        const done = { method: ex.method, status: ex.status, agreement: ex.agreement, suspectCount: ex.suspectCount, textChars: ex.text.length, extractedAt: new Date().toISOString(), hasExtract: true };
+        // eslint-disable-next-line no-await-in-loop
+        await saveLessonExtract(meta.id, { text: ex.text, markedText: ex.markedText, corrections: ex.corrections, notes: ex.notes, suspectLines: ex.suspectLines, method: ex.method, status: ex.status, agreement: ex.agreement });
+        // eslint-disable-next-line no-await-in-loop
+        await updateLessonFile(uid, lessonId, meta.id, (x) => Object.assign(x, done));
+        results.push({ ...ex, file: { ...meta, ...done } });
       }
       return res.json({ results, store: await storeInfo() });
     } catch (e) {
@@ -80,9 +85,22 @@ lessonFilesRouter.get('/api/lesson-files/:lessonId/:fileId/raw', requireAuthIfCo
   if (!meta) return res.status(404).json({ error: 'فایل پیدا نشد' });
   const bytes = await readLessonFile(meta.id);
   if (!bytes) return res.status(410).json({ error: 'بایت‌های فایل در دسترس نیست' });
-  res.setHeader('Content-Type', 'application/octet-stream');
+  // The real type for media (so <audio>/<video> from the blob play everywhere);
+  // anything else stays a plain download.
+  const playable = /^(audio|video|image)\//.test(meta.type || '') || meta.type === 'application/pdf';
+  res.setHeader('Content-Type', playable ? meta.type : 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(meta.name)}`);
   return res.send(bytes);
+});
+
+lessonFilesRouter.get('/api/lesson-files/:lessonId/:fileId/extract', requireAuthIfConfigured, async (req, res) => {
+  const list = await listLessonFiles(uidOf(req), lessonIdOf(req));
+  const meta = list.find((f) => f.id === req.params.fileId);
+  if (!meta) return res.status(404).json({ error: 'فایل پیدا نشد' });
+  const extract = await readLessonExtract(meta.id);
+  if (!extract) return res.status(404).json({ error: 'برای این فایل متنِ استخراج‌شده‌ای ذخیره نشده' });
+  return res.json({ file: meta, extract });
 });
 
 lessonFilesRouter.post('/api/lesson-files/:lessonId/:fileId/remove', requireAuthIfConfigured, async (req, res) => {

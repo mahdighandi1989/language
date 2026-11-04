@@ -34,10 +34,14 @@ describe('SmartUpload', () => {
     fireEvent.change(screen.getByLabelText('فایل‌های درس'), { target: { files: [new File(['x'], 'a.docx'), new File(['y'], 'p.jpg')] } });
     fireEvent.click(screen.getByText('استخراجِ دقیق'));
     await screen.findByTestId('smart-results');
-    expect(fetchImpl.mock.calls[0][0]).toBe('/api/lesson-files/7');
-    expect(fetchImpl.mock.calls[0][1].body.getAll('files')).toHaveLength(2);
+    const post = fetchImpl.mock.calls.find((c) => c[1]?.method === 'POST');
+    expect(post[0]).toBe('/api/lesson-files/7');
+    expect(post[1].body.getAll('files')).toHaveLength(2);
+    // Stored originals are attached at once (playable even without text).
+    expect(updateLesson.mock.calls[0][1]).toEqual({ files: [{ id: 'old' }, ...updateLesson.mock.calls[0][1].files.slice(1)] });
+    expect(updateLesson.mock.calls[0][1].files.map((f) => f.id)).toEqual(['old', 'f1', 'f2']);
     fireEvent.click(screen.getByText(/افزودن به جزوهٔ درس/));
-    const patch = updateLesson.mock.calls[0][1];
+    const patch = updateLesson.mock.calls.at(-1)[1];
     expect(patch.archivedNotes.startsWith('جزوهٔ مالک\n\n---\n')).toBe(true);
     expect(patch.files.map((f) => f.id)).toEqual(['old', 'f1', 'f2']);
     expect(patch.corrections).toHaveLength(2);
@@ -55,5 +59,27 @@ describe('SmartUpload', () => {
   it('corrections panel lists kind, quote, unverified flag', () => {
     render(<CorrectionsPanel corrections={[{ quote: 'q', kind: 'معنا', issue: 'i', verifiedQuote: false }]} />);
     expect(screen.getByText('(نقلِ نایافته)')).toBeTruthy();
+  });
+});
+
+describe('SmartUpload restore', () => {
+  it('offers server-side extractions that never reached the notes, and appends them', async () => {
+    const { render: r, screen: sc, fireEvent: fe, waitFor: wf } = await import('@testing-library/react');
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === '/api/lesson-files/9') return { ok: true, json: async () => ({ files: [{ id: 'old', name: 'x.mp3', hasExtract: true, status: 'ok' }, { id: 'f1', name: 'in.mp3', hasExtract: true, status: 'ok' }, { id: 'bad', name: 'b.mp3', hasExtract: true, status: 'failed' }] }) };
+      if (url === '/api/lesson-files/9/old/extract') return { ok: true, json: async () => ({ file: { id: 'old', name: 'x.mp3', type: 'audio/mpeg' }, extract: { text: 'رونویسیِ کلاس', markedText: 'رونویسیِ کلاس', method: 'ai-verified', status: 'ok', corrections: [], notes: [] } }) };
+      return { ok: false, json: async () => ({}) };
+    });
+    const updateLesson = vi.fn();
+    r(<SmartUpload lesson={{ id: 9, archivedNotes: 'قدیمی', files: [{ id: 'f1', stored: true }], appliedExtracts: ['f1'] }} updateLesson={updateLesson} fetchImpl={fetchImpl} />);
+    await wf(() => expect(sc.getByText(/1 فایل روی سرور استخراج شده/)).toBeTruthy());
+    fe.click(sc.getByText('بازیابی و پیش‌نمایش'));
+    await wf(() => expect(sc.getByTestId('smart-results')).toBeTruthy());
+    fe.click(sc.getByText(/افزودن به جزوه/));
+    const patch = updateLesson.mock.calls[0][1];
+    expect(patch.archivedNotes.startsWith('قدیمی')).toBe(true);
+    expect(patch.archivedNotes).toContain('رونویسیِ کلاس');
+    expect(patch.files.map((f) => f.id)).toEqual(['f1', 'old']);
+    expect(patch.appliedExtracts).toEqual(['f1', 'old']);
   });
 });

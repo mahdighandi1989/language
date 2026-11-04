@@ -92,3 +92,34 @@ test('YouTube links are found in pasted text (watch, youtu.be, shorts), deduplic
   assert.equal(stripYouTubeUrls('درس https://youtu.be/abcDEF12345'), 'درس');
   assert.deepEqual(extractYouTubeUrls('بدونِ لینک'), []);
 });
+
+test('API: extraction result is kept on the server (closed tab loses nothing); media served with its real type', async () => {
+  const form = new FormData();
+  form.append('files', new Blob([Buffer.from([7, 7])], { type: 'audio/mpeg' }), '25.mp3');
+  form.append('review', '0');
+  const up = await (await fetch(`${base}/api/lesson-files/2525`, { method: 'POST', body: form })).json();
+  const f = up.results[0].file;
+  assert.equal(f.hasExtract, true);
+  assert.equal(f.status, 'ok');
+  const ex = await (await fetch(`${base}/api/lesson-files/2525/${f.id}/extract`)).json();
+  assert.equal(ex.extract.text, 'رونویسی');
+  assert.equal((await fetch(`${base}/api/lesson-files/9999/${f.id}/extract`)).status, 404);
+  const raw = await fetch(`${base}/api/lesson-files/2525/${f.id}/raw`);
+  assert.equal(raw.headers.get('content-type'), 'audio/mpeg');
+  assert.equal(raw.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('pipeline: a transcript cut by the output limit (MAX_TOKENS) is flagged, not presented as complete', async () => {
+  const ai = { transcribe: async () => ({ text: 'سطر\nسطر دو', finish: 'MAX_TOKENS' }), review: async () => [] };
+  const r = await extractLessonFile({ buffer: Buffer.from([1]), filename: 'long.mp3', mime: 'audio/mpeg' }, { ai, review: false });
+  assert.equal(r.text, 'سطر\nسطر دو');
+  assert.match(r.notes.join(' '), /سقفِ خروجی/);
+});
+
+test('candidateText joins every text part and skips thoughts', async () => {
+  const { candidateText } = await import('../services/geminiService.js');
+  let fin;
+  assert.equal(candidateText({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'a' }, { text: 'x', thought: true }, { text: 'b' }] } }] }, { onFinish: (r) => { fin = r; } }), 'ab');
+  assert.equal(fin, 'STOP');
+  assert.equal(candidateText({}), '');
+});

@@ -95,3 +95,10 @@ html.dark .overflow-y-auto::-webkit-scrollbar-thumb { background: #334155; }
 /* Lesson text: Arabic diacritics need room (visual audit B). */
 .prose td, .prose th { line-height: 1.9; }
 .prose :lang(ar), .prose [dir="auto"] { line-height: 2; }
+/* More dark-mode text shades found in the real-lesson test (2026-11-04). */
+html.dark .text-teal-800, html.dark .text-teal-900, html.dark .text-emerald-800, html.dark .text-green-800 { color: #99f6e4 !important; }
+html.dark .text-amber-900, html.dark .text-yellow-900, html.dark .text-orange-900 { color: #fde68a !important; }
+html.dark .text-blue-900, html.dark .text-purple-800, html.dark .text-purple-900, html.dark .text-pink-800 { color: #c4b5fd !important; }
+html.dark .text-red-900 { color: #fecaca !important; }
+html.dark .bg-amber-100, html.dark .bg-emerald-100 { background-color: #3a2d0c !important; }
+html.dark .border-amber-200, html.dark .border-teal-200, html.dark .border-blue-200, html.dark .border-yellow-200, html.dark .border-green-200, html.dark .border-red-200, html.dark .border-purple-200 { border-color: #475569 !important; }

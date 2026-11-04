@@ -2,19 +2,40 @@
 // sentences of a lesson (verbatim, from tables and lines), record attempts and
 // parse the AI's score. Upstream: lesson.archivedNotes. Downstream: Shadowing.jsx.
 
-const ARABIC_ONLY = /[ً-ْةيكىإأؤئ]/; // harakat or letters Persian does not use
-const PERSIAN_ONLY = /[پچژگکی]/;
-const ARABIC_SCRIPT = /[؀-ۿ]/;
+// Real notes type Lebanese with a PERSIAN keyboard (ی، ک): those letters are
+// neutral. Only پ چ ژ گ are truly Persian. The decision is a word-level score:
+// Lebanese/Arabic function words and Arabic-only marks vs Persian ones.
+const ARABIC_SCRIPT = /[\u0600-\u06FF]/;
+const HARAKAT = /[\u064B-\u0652]/;
+const ARABIC_LETTERS = /[ةىإأؤئ]/;
+const PERSIAN_LETTERS = /[پچژگ]/;
+const norm = (w) => w.replace(/[\u064B-\u0652\u0640]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/[؟?!.,،؛:«»"'()]/g, '');
+const AR_WORDS = new Set('عم بد بدی بدک بدو بدا بدکن ما مش هو هی هنی انا انتی انت انتو نحنا لیش شو شی هیک هیدا هیدی هیدول هون هونیک کتیر کمان علی عل ع فی فیک فیکی فیو فیا مع معک عند عندی عندک عندا عندو کان کنت رح یا بس لما وین ایمتی قدیش کیف کیفک کیفیک منیح حلو حلوه هلق هلا یلا بکرا مبارح ولا لا ایه اکید متل عشان مشان بتحب بحب بعرف بدی تروح یروح روح تعا جیب جابت ازا بیکون یکون'.split(' '));
+const FA_WORDS = new Set('می نمی است هست نیست را رو که این اون آن داره دارد دارم داری کرد کردم کردن کنید میکنه میکنی میکنم شد شدن شده برای با از به در تا هم یک یه خیلی چه چرا چی کجا وقتی اگر باید نباید میشود میشه بود بودن خود خودم من تو ما شما او ایشان آنها اینجوری باهات بهت بهش ازم دلم'.split(' '));
 
-/** Is this text (mostly) Arabic rather than Persian? */
+/** >0 Lebanese/Arabic, <0 Persian, 0 unknown. */
+export function langScore(s) {
+  const t = String(s || '');
+  if (!ARABIC_SCRIPT.test(t)) return 0;
+  let score = 0;
+  if (HARAKAT.test(t)) score += 1; // weak: Persian ezafe uses kasra too
+  if (ARABIC_LETTERS.test(t)) score += 2;
+  if (PERSIAN_LETTERS.test(t)) score -= 3;
+  if (/\u200c/.test(t)) score -= 2; // ZWNJ (نیم‌فاصله) is Persian typing
+  for (const raw of t.split(/\s+/)) {
+    const w = norm(raw);
+    if (!w) continue;
+    if (AR_WORDS.has(w)) score += 1;
+    if (FA_WORDS.has(w)) score -= 1.5;
+    if (/^(می|نمی)[^\s]{2,}/.test(w)) score -= 1.5;
+    if (/^ال[^\s]{2,}/.test(w)) score += 1;
+  }
+  return score;
+}
+
+/** Is this text (mostly) Lebanese/Arabic rather than Persian? */
 export function isArabicText(s) {
-  const t = String(s || '').trim();
-  if (!t || !ARABIC_SCRIPT.test(t)) return false;
-  const words = t.split(/\s+/).filter((w) => ARABIC_SCRIPT.test(w));
-  if (!words.length) return false;
-  const arabic = words.filter((w) => ARABIC_ONLY.test(w) && !PERSIAN_ONLY.test(w)).length;
-  const persian = words.filter((w) => PERSIAN_ONLY.test(w)).length;
-  return arabic > 0 && arabic >= persian;
+  return langScore(s) > 0;
 }
 
 const clean = (s) => String(s || '').replace(/\*\*|__|~~|`/g, '').replace(/^[#>\-*\d.)\s]+/, '').replace(/\s+/g, ' ').trim();
@@ -44,10 +65,17 @@ export function extractPracticeSentences(text, max = 300) {
       if (ar) push(ar, fa);
       continue;
     }
-    const parts = line.split(/[:=—()«»]| - /).map((p) => p.trim()).filter(Boolean);
-    const ar = parts.filter(isArabicText);
-    const fa = parts.find((p) => !isArabicText(p) && ARABIC_SCRIPT.test(p));
-    for (const a of ar) push(a, ar.length === 1 ? fa : '');
+    // «X = Y» / «X : Y»: the notes put Lebanese on one side, Persian on the
+    // other — take the more Lebanese side, the other as its meaning.
+    const pair = line.split(/\s[=:]\s?|\s?[=:]\s|\s?=\\?>\s?|\s[–—-]{1,2}\s/).map((p) => p.trim()).filter(Boolean);
+    if (pair.length >= 2) {
+      const scored = pair.map((p) => ({ p, s: langScore(p) }));
+      const best = scored.reduce((a, b) => (b.s > a.s ? b : a));
+      const meaning = scored.filter((x) => x !== best && x.s < best.s && x.s <= 0).map((x) => x.p).join(' — ');
+      if (best.s > 0 && best.s > Math.min(...scored.map((x) => x.s))) push(best.p, meaning);
+      continue;
+    }
+    if (isArabicText(line)) push(line);
   }
   return out.slice(0, max);
 }
