@@ -25,6 +25,7 @@ import { compareLessons, courseOf, courseList, naturalCompare, searchKey, lesson
 import LessonImportPanel from '../lessons/LessonImportPanel.jsx';
 import SmartUpload, { CorrectionsPanel } from '../lessons/SmartUpload.jsx';
 import { createBodyLoader } from '../lessons/bodyLoader.js';
+import { createBodyCache } from '../lessons/bodyCache.js';
 import { lessonContextExcerpt } from '../lessons/excerpt.js';
 
 // --- Extracted modules (contexts, hooks, command guard, utilities) ---
@@ -534,6 +535,7 @@ export default function App() {
   const bodyLoaderRef = useRef(null);
   const [bodyProgress, setBodyProgress] = useState(null); // { done, total, failed }
   const prioritizeRef = useRef(null); // body key of the lesson the user has open
+  const localBodyCacheRef = useRef(null); // IndexedDB copy of bodies (this browser)
   const saveTimerRef = useRef(null);
   const savingRef = useRef(false);
   const dirtyRef = useRef(false);
@@ -685,15 +687,34 @@ export default function App() {
     // Fetch the bodies of lessons marked _bodyPending, one by one.
     // Fetch the bodies of lessons marked _bodyPending: 6 at a time, the open
     // lesson first, applied in small batches (lessons/bodyLoader.js).
-    const hydrateBodies = (uid, lessons) => {
+    const hydrateBodies = async (uid, lessons) => {
       const pending = (lessons || []).filter((l) => l._bodyPending);
       if (!pending.length) return;
       bodyLoaderRef.current?.stop();
       const store = createBodyStore({ doc, getDoc, writeBatch }, db, `/artifacts/${appId}/users/${uid}`);
       const t0 = Date.now();
+      // 1) This browser's own copy, when its hash still matches (lessons/bodyCache.js).
+      const local = createBodyCache(uid);
+      localBodyCacheRef.current = local;
+      const fresh = await local.getFresh(pending.map((l) => ({ key: l.bodyRef.key, hash: l.bodyRef.hash })).filter((r) => r.hash));
+      if (fresh.size) {
+        for (const [key, v] of fresh) { bodyCacheRef.current.set(key, v); bodyHashesRef.current.set(key, v.hash); }
+        setData((prev) => ({ ...prev, lessons: prev.lessons.map((x) => {
+          const v = x.bodyRef && x._bodyPending ? fresh.get(x.bodyRef.key) : null;
+          if (!v) return x;
+          const { _bodyPending, _bodyError, ...rest } = x;
+          return { ...rest, archivedNotes: v.text };
+        }) }));
+      }
+      // 2) The rest from Firestore: small lessons first, the open one first of all.
+      const remote = pending.filter((l) => !fresh.has(l.bodyRef.key)).sort((a, b) => (a.bodyRef.chars || 0) - (b.bodyRef.chars || 0));
+      const refs = new Map(remote.map((l) => [l.bodyRef.key, l.bodyRef]));
+      console.info(`lesson bodies: ${fresh.size} from this browser, ${remote.length} from the cloud`);
+      if (!remote.length) { setBodyProgress(null); return; }
       const loader = createBodyLoader({
-        read: (key) => store.read(key),
-        keys: pending.map((l) => l.bodyRef.key),
+        read: async (key) => { const r = await store.read(key, refs.get(key)); local.put(key, r.text, r.hash); return r; },
+        keys: remote.map((l) => l.bodyRef.key),
+        concurrency: 12,
         // Progress re-renders the app: only every 5 lessons (and at the end).
         onProgress: (p) => { if (p.done >= p.total) setBodyProgress(null); else if (p.done % 5 === 0) setBodyProgress(p); },
         onBatch: (batch) => {
@@ -860,6 +881,7 @@ export default function App() {
           const hash = hashes.get(l.bodyRef.key);
           bodyHashesRef.current.set(l.bodyRef.key, hash);
           bodyCacheRef.current.set(l.bodyRef.key, { text: l.archivedNotes, hash });
+          localBodyCacheRef.current?.put(l.bodyRef.key, l.archivedNotes, hash);
         }
         lastSyncedJsonRef.current = json;
         console.info(`cloud save: ${changedBodies.length} lesson bodies + main (${Math.round(json.length / 1024)}KB) in ${Date.now() - t0}ms`);

@@ -108,7 +108,23 @@ export function createBodyStore(fs, db, basePath) {
       await batch.commit();
       return hash;
     },
-    async read(key) {
+    /**
+     * Read a body. With `known` ({ chars, hash } from the main document's
+     * bodyRef) the chunk count is derived (same chunk size as write) and the
+     * chunks are fetched straight away — one round trip instead of two; the
+     * hash check proves it. Any mismatch falls back to reading the head.
+     */
+    async read(key, known = null) {
+      if (known && Number.isFinite(known.chars) && known.hash) {
+        const n = Math.max(1, Math.ceil(known.chars / BODY_CHUNK_CHARS));
+        try {
+          const snaps = await Promise.all(Array.from({ length: n }, (_, i) => fs.getDoc(fs.doc(db, `${basePath}/lessonBodies/${key}/chunks/${String(i).padStart(4, '0')}`))));
+          if (snaps.every((c) => c.exists())) {
+            const text = snaps.map((c) => c.data().text || '').join('');
+            if (textHash(text) === known.hash) return { text, hash: known.hash };
+          }
+        } catch { /* fall back to the head below */ }
+      }
       const h = await fs.getDoc(head(key));
       if (!h.exists()) throw new Error('متنِ این درس در فضای ابری پیدا نشد');
       const { chunks, hash } = h.data();

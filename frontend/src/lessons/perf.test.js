@@ -60,3 +60,26 @@ describe('memoised work', () => {
     expect(textHash(big)).not.toBe(textHash(`${'ع'.repeat(9999)}غ`));
   });
 });
+
+import { createBodyStore, textHash as th } from './lessonBodies.js';
+describe('body read fast path', () => {
+  it('with a known ref it skips the head (one round trip), and falls back on mismatch', async () => {
+    const docs = new Map();
+    const calls = [];
+    const fs = {
+      doc: (db, path) => ({ path }),
+      getDoc: async (ref) => { calls.push(ref.path); return { exists: () => docs.has(ref.path), data: () => docs.get(ref.path) }; },
+      writeBatch: () => { const ops = []; return { set: (r, d) => ops.push([r.path, d]), commit: async () => ops.forEach(([p, d]) => docs.set(p, d)) }; },
+    };
+    const store = createBodyStore(fs, {}, '/u');
+    const text = 'ج'.repeat(300000);
+    await store.write('L1', text);
+    calls.length = 0;
+    expect((await store.read('L1', { chars: text.length, hash: th(text) })).text).toBe(text);
+    expect(calls.some((p) => p === '/u/lessonBodies/L1')).toBe(false);
+    expect(calls).toHaveLength(2);
+    calls.length = 0;
+    expect((await store.read('L1', { chars: 5, hash: 'stale' })).text).toBe(text); // wrong ref ⇒ head path
+    expect(calls).toContain('/u/lessonBodies/L1');
+  });
+});
