@@ -46,3 +46,17 @@ export function compareLessons(a, b) {
 export function courseList(lessons) {
   return Array.from(new Set((lessons || []).map(courseOf).filter(Boolean))).sort(naturalCompare);
 }
+
+// Normalised search text per lesson object, memoised (lesson objects are
+// immutable in state, so a WeakMap is exact): typing in the search box no
+// longer re-normalises millions of characters per keystroke.
+const searchMemo = new WeakMap();
+export function lessonSearchText(lesson) {
+  if (!lesson || typeof lesson !== 'object') return '';
+  let v = searchMemo.get(lesson);
+  if (v === undefined) {
+    v = searchKey(`${lesson.title || ''}\n${lesson.summary || ''}\n${lesson.archivedNotes || ''}`);
+    searchMemo.set(lesson, v);
+  }
+  return v;
+}

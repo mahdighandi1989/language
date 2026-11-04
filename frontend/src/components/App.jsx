@@ -21,9 +21,11 @@ import { serializeForSync, shouldSaveToCloud } from '../storage/sync.js';
 // Lessons at scale: separate body store (1 MiB cap), list helpers, markdown, admin import.
 import { toCloudDoc, bodiesToWrite, mergeCachedBodies, createBodyStore, writeCloudDoc } from '../lessons/lessonBodies.js';
 import { MarkdownRenderer as LessonMarkdown } from '../lessons/markdown.jsx';
-import { compareLessons, courseOf, courseList, naturalCompare, searchKey } from '../lessons/sortLessons.js';
+import { compareLessons, courseOf, courseList, naturalCompare, searchKey, lessonSearchText } from '../lessons/sortLessons.js';
 import LessonImportPanel from '../lessons/LessonImportPanel.jsx';
 import SmartUpload, { CorrectionsPanel } from '../lessons/SmartUpload.jsx';
+import { createBodyLoader } from '../lessons/bodyLoader.js';
+import { lessonContextExcerpt } from '../lessons/excerpt.js';
 
 // --- Extracted modules (contexts, hooks, command guard, utilities) ---
 import { ExecutionFlowProvider, useExecutionFlow, FLOW_NODES } from '../contexts/ExecutionFlowContext';
@@ -528,6 +530,11 @@ export default function App() {
   // One cloud write at a time (auto-save and the import share it), and a flag
   // the unload guard reads: unsaved or in-flight changes ⇒ the browser warns.
   const cloudLockRef = useRef(Promise.resolve());
+  // Background loading of lesson bodies: the loader (for priority) and progress.
+  const bodyLoaderRef = useRef(null);
+  const [bodyProgress, setBodyProgress] = useState(null); // { done, total, failed }
+  const prioritizeRef = useRef(null); // body key of the lesson the user has open
+  const saveTimerRef = useRef(null);
   const savingRef = useRef(false);
   const dirtyRef = useRef(false);
 
@@ -676,32 +683,43 @@ export default function App() {
     };
 
     // Fetch the bodies of lessons marked _bodyPending, one by one.
-    const hydrateBodies = async (uid, lessons) => {
+    // Fetch the bodies of lessons marked _bodyPending: 6 at a time, the open
+    // lesson first, applied in small batches (lessons/bodyLoader.js).
+    const hydrateBodies = (uid, lessons) => {
       const pending = (lessons || []).filter((l) => l._bodyPending);
       if (!pending.length) return;
+      bodyLoaderRef.current?.stop();
       const store = createBodyStore({ doc, getDoc, writeBatch }, db, `/artifacts/${appId}/users/${uid}`);
-      for (const l of pending) {
-        const key = l.bodyRef.key;
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          const { text, hash } = await store.read(key);
-          bodyCacheRef.current.set(key, { text, hash });
-          bodyHashesRef.current.set(key, hash);
+      const t0 = Date.now();
+      const loader = createBodyLoader({
+        read: (key) => store.read(key),
+        keys: pending.map((l) => l.bodyRef.key),
+        // Progress re-renders the app: only every 5 lessons (and at the end).
+        onProgress: (p) => { if (p.done >= p.total) setBodyProgress(null); else if (p.done % 5 === 0) setBodyProgress(p); },
+        onBatch: (batch) => {
+          const got = new Map();
+          for (const r of batch) {
+            if (r.error) {
+              console.error('lesson body load failed:', r.key, r.error);
+              reportError(r.error, { source: 'firebase' });
+              got.set(r.key, { error: String(r.error?.message || r.error) });
+            } else {
+              bodyCacheRef.current.set(r.key, { text: r.text, hash: r.hash });
+              bodyHashesRef.current.set(r.key, r.hash);
+              got.set(r.key, { text: r.text });
+            }
+          }
           setData((prev) => ({ ...prev, lessons: prev.lessons.map((x) => {
-            if (x.bodyRef?.key !== key || !x._bodyPending) return x;
+            const r = x.bodyRef && x._bodyPending ? got.get(x.bodyRef.key) : null;
+            if (!r) return x;
             const { _bodyPending, _bodyError, ...rest } = x;
-            return { ...rest, archivedNotes: text };
+            return r.error ? { ...rest, _bodyError: r.error } : { ...rest, archivedNotes: r.text };
           }) }));
-        } catch (e) {
-          console.error('lesson body load failed:', key, e);
-          reportError(e, { source: 'firebase' });
-          setData((prev) => ({ ...prev, lessons: prev.lessons.map((x) => {
-            if (x.bodyRef?.key !== key || !x._bodyPending) return x;
-            const { _bodyPending, ...rest } = x;
-            return { ...rest, _bodyError: String(e?.message || e) };
-          }) }));
-        }
-      }
+        },
+      });
+      bodyLoaderRef.current = loader;
+      if (prioritizeRef.current) loader.prioritize(prioritizeRef.current);
+      loader.finished.then((p) => console.info(`lesson bodies loaded: ${p.done - p.failed}/${p.total} in ${Date.now() - t0}ms`));
     };
 
     // One-time migration: copy the legacy shared document into the owner's own
@@ -835,6 +853,7 @@ export default function App() {
       const base = `/artifacts/${appId}/users/${userId}`;
       const changedBodies = bodiesToWrite(snapshot, bodyHashesRef.current);
       savingRef.current = true;
+      const t0 = Date.now();
       try {
         const hashes = await writeCloudDoc({ doc, writeBatch }, db, base, `${base}/data/main`, cloud, changedBodies, onProgress);
         for (const l of changedBodies) {
@@ -843,6 +862,7 @@ export default function App() {
           bodyCacheRef.current.set(l.bodyRef.key, { text: l.archivedNotes, hash });
         }
         lastSyncedJsonRef.current = json;
+        console.info(`cloud save: ${changedBodies.length} lesson bodies + main (${Math.round(json.length / 1024)}KB) in ${Date.now() - t0}ms`);
         dirtyRef.current = serializeForSync(toCloudDoc(dataRef.current)) !== json;
         setSyncError(null);
         saveBackup(snapshot);
@@ -893,17 +913,29 @@ export default function App() {
     dirtyRef.current = shouldSaveToCloud({
       loadedUid: loadedUidRef.current, userId, json: serializeForSync(toCloudDoc(data)), lastSyncedJson: lastSyncedJsonRef.current,
     });
-    const handler = setTimeout(() => {
+    // At most 1 s after the FIRST unsaved change (not reset by every later
+    // change): background body loading must not postpone the user's save.
+    if (!saveTimerRef.current) {
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
         persistCloud(dataRef.current).catch(() => { /* shown in the banner by persistCloud */ });
-    }, 1000);
-
-    return () => clearTimeout(handler);
+      }, 1000);
+    }
   }, [data, userId, isAuthReady, firebaseServices]);
+
+  useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
   
   const selectedLesson = useMemo(() => {
       if (!selectedLessonId) return null;
       return data.lessons.find(l => l.id === selectedLessonId);
   }, [selectedLessonId, data.lessons]);
+
+  // The lesson the user opened is loaded next.
+  useEffect(() => {
+    const key = selectedLesson?.bodyRef?.key;
+    prioritizeRef.current = key || null;
+    if (key && selectedLesson._bodyPending) bodyLoaderRef.current?.prioritize(key);
+  }, [selectedLesson?.bodyRef?.key, selectedLesson?._bodyPending]);
 
   const addLesson = (title) => {
     const newLesson = {
@@ -1185,6 +1217,12 @@ export default function App() {
           <div className="flex flex-col md:flex-row min-h-screen">
             <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} showInspection={inspectionEnabled} />
             <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">
+              {bodyProgress && (
+                <div role="status" className="mb-4 bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-2 text-sm">
+                  ⏳ در حالِ بارگذاریِ متنِ درس‌ها: {bodyProgress.done.toLocaleString('fa-IR')} از {bodyProgress.total.toLocaleString('fa-IR')}
+                  {bodyProgress.failed ? ` · ${bodyProgress.failed.toLocaleString('fa-IR')} ناموفق` : ''} — درسی که باز کنید زودتر بار می‌شود.
+                </div>
+              )}
               {syncError && (
                 <div role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-sm flex justify-between gap-3">
                   <span>⚠️ ذخیره در فضای ابری ناموفق بود: {syncError} (نسخهٔ پشتیبان در همین مرورگر هست.)</span>
@@ -2856,10 +2894,7 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
         return lessons
             .filter(lesson => {
                 // Text search (digit-, diacritic- and ی/ي-insensitive)
-                const matchesSearch = !q ||
-                    searchKey(lesson.title).includes(q) ||
-                    searchKey(lesson.summary).includes(q) ||
-                    searchKey(lesson.archivedNotes || '').includes(q);
+                const matchesSearch = !q || lessonSearchText(lesson).includes(q);
                 if (courseFilter !== 'all' && courseOf(lesson) !== courseFilter) return false;
 
                 // Filter by content status
@@ -3533,7 +3568,7 @@ ${analyzedContent}
                 ) : (
                     <div className="max-h-96 overflow-y-auto p-4 border rounded-lg bg-slate-50">
                         {lesson._bodyPending ? (
-                            <p className="text-slate-500">در حالِ بارگذاریِ متنِ کاملِ درس از فضای ابری…</p>
+                            <p className="text-slate-500">⏳ در حالِ بارگذاریِ متنِ کاملِ این درس (در اولویت است؛ معمولاً چند ثانیه)…</p>
                         ) : lesson._bodyError ? (
                             <p className="text-red-600">متنِ این درس بارگذاری نشد: {lesson._bodyError} — صفحه را تازه کنید. (تا آن موقع ویرایش غیرفعال است تا متنِ ذخیره‌شده بازنویسی نشود.)</p>
                         ) : lesson.archivedNotes && lesson.archivedNotes.trim() ? (
@@ -5196,6 +5231,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             // Clean up extra whitespace and empty lines
             cleanedNotes = cleanedNotes.replace(/\n{3,}/g, '\n\n').trim();
         }
+        // Long lessons: the opening + the sections most related to the recent
+        // conversation, verbatim, within a budget (lessons/excerpt.js) — not the
+        // whole 50k-char text with every message.
+        const recent = [...(chatHistory || [])].slice(-6).map((m) => m?.parts?.[0]?.text || '').join(' ') + ' ' + (textToSend || '');
+        cleanedNotes = lessonContextExcerpt(cleanedNotes, recent, 16000);
         systemPrompt += `\n${getPrompt(customPrompts, 'chatLessonContext')} \n---\n${cleanedNotes}\n---`;
         // Add feedback instruction for lesson contexts to track correct/incorrect responses
         systemPrompt += `\n${getPrompt(customPrompts, 'chatFeedbackInstruction')}`;
@@ -7960,7 +8000,7 @@ function GlobalSearchModal({ isOpen, onClose, data, navigateTo }) {
         if (!searchTerm.trim()) return null;
         const term = searchTerm.toLowerCase();
         const found = { lessons: [], knowledge: [], journal: [] };
-        data.lessons.forEach(l => { if (l.title.toLowerCase().includes(term) || l.summary.toLowerCase().includes(term) || l.archivedNotes?.toLowerCase().includes(term)) found.lessons.push(l); });
+        { const q = searchKey(term); data.lessons.forEach(l => { if (lessonSearchText(l).includes(q)) found.lessons.push(l); }); }
         Object.values(data.knowledgeBase).flat().forEach(i => { if (i.term.toLowerCase().includes(term) || i.definition.toLowerCase().includes(term)) found.knowledge.push(i); });
         data.journal.forEach(j => { if (j.entry.toLowerCase().includes(term)) found.journal.push(j); });
         return found;

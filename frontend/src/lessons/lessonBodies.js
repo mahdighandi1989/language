@@ -12,9 +12,26 @@
 
 export const BODY_CHUNK_CHARS = 250000; // ≤ ~750 KB UTF-8 per chunk document
 
+// Recently hashed strings: the same string object is not hashed twice (saves
+// re-hashing ~4M characters on every save check).
+const hashMemo = new Map();
+
 /** FNV-1a 32-bit + length: cheap change detection, not security. */
 export function textHash(s) {
   const str = String(s ?? '');
+  if (str.length > 2000) {
+    const hit = hashMemo.get(str.length);
+    if (hit && hit.text === str) return hit.hash;
+  }
+  const h = fnv(str);
+  if (str.length > 2000) {
+    hashMemo.set(str.length, { text: str, hash: h });
+    if (hashMemo.size > 1000) hashMemo.delete(hashMemo.keys().next().value);
+  }
+  return h;
+}
+
+function fnv(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i += 1) {
     h ^= str.charCodeAt(i);
@@ -95,13 +112,12 @@ export function createBodyStore(fs, db, basePath) {
       const h = await fs.getDoc(head(key));
       if (!h.exists()) throw new Error('متنِ این درس در فضای ابری پیدا نشد');
       const { chunks, hash } = h.data();
-      const parts = [];
-      for (let i = 0; i < chunks; i += 1) {
-        // eslint-disable-next-line no-await-in-loop
-        const c = await fs.getDoc(fs.doc(db, `${basePath}/lessonBodies/${key}/chunks/${String(i).padStart(4, '0')}`));
+      // All chunks in parallel (a lesson is 1–20 chunks).
+      const snaps = await Promise.all(Array.from({ length: chunks }, (_, i) => fs.getDoc(fs.doc(db, `${basePath}/lessonBodies/${key}/chunks/${String(i).padStart(4, '0')}`))));
+      const parts = snaps.map((c, i) => {
         if (!c.exists()) throw new Error(`تکهٔ ${i + 1} از ${chunks} ِ متنِ درس پیدا نشد`);
-        parts.push(c.data().text || '');
-      }
+        return c.data().text || '';
+      });
       const text = parts.join('');
       if (textHash(text) !== hash) throw new Error('متنِ خوانده‌شده با نشانهٔ ذخیره نمی‌خواند');
       return { text, hash };
