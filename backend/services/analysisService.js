@@ -19,6 +19,17 @@ import { uploadDir } from '../middleware/upload.js';
 // plain text are each analyzed with Gemini and merged into a single result.
 // Temp files are always cleaned up before returning. Returns
 // { analysis, mediaItems, processedFiles }.
+const YT = /https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?[^\s]*v=|shorts\/|live\/)|youtu\.be\/)[A-Za-z0-9_-]{6,}[^\s]*/g;
+
+/** Public YouTube links in a text (deduplicated, max 5). */
+export function extractYouTubeUrls(text) {
+  return [...new Set(String(text || '').match(YT) || [])].slice(0, 5);
+}
+
+export function stripYouTubeUrls(text) {
+  return String(text || '').replace(YT, '').trim();
+}
+
 export async function analyzeUploads({ files = [], textContent = '', userInstructions = '' }) {
   console.log(`Files received: ${files.length}, Text length: ${textContent.length}`);
 
@@ -71,7 +82,15 @@ export async function analyzeUploads({ files = [], textContent = '', userInstruc
           const pdfBuffer = isLargeFile ? fs.readFileSync(filePath) : fileBuffer;
           const pdfText = await extractPdfText(pdfBuffer);
 
-          if (pdfText.length > 50000) {
+          if (pdfText.replace(/\s/g, '').length < 200 && pdfBuffer.length <= 15 * 1024 * 1024) {
+            // Scanned PDF (no text layer): previously Gemini got an empty text and
+            // answered with nonsense. Send the PDF itself — Gemini reads it (OCR).
+            const result = await analyzeWithGemini([
+              { text: `فایل PDF "${fileName}" (اسکن‌شده؛ متن را از تصویرِ صفحه‌ها بخوان و تحلیل کن):` },
+              { inline_data: { mime_type: 'application/pdf', data: pdfBuffer.toString('base64') } },
+            ], systemPrompt);
+            allAnalysisResults.push(result);
+          } else if (pdfText.length > 50000) {
             // Chunk large PDFs
             const chunks = splitIntoChunks(pdfText, 30000);
             console.log(`PDF split into ${chunks.length} chunks`);
@@ -360,6 +379,22 @@ ${frameResults.length > 0 ? frameResults.join('\n\n---\n\n') : 'متن قابل 
         allAnalysisResults.push(`**خطا در پردازش "${fileName}":**\n${fileError.message}`);
       }
     }
+
+    // YouTube links in the pasted text: Gemini reads public YouTube videos
+    // directly (file_data.file_uri) — transcribe + analyse each one.
+    for (const url of extractYouTubeUrls(textContent)) {
+      try {
+        const result = await analyzeWithGemini([
+          { text: `این ویدیوی یوتیوب (${url}) آموزشِ لهجهٔ لبنانی است. گفتارِ عربیِ آن را کامل رونویسی کن و سپس محتوا را تحلیل کن:` },
+          { file_data: { file_uri: url, mime_type: 'video/*' } },
+        ], systemPrompt);
+        allAnalysisResults.push(`**ویدیوی یوتیوب:** ${url}\n\n${result}`);
+      } catch (ytError) {
+        console.error('YouTube analysis error:', ytError?.message);
+        allAnalysisResults.push(`**خطا در تحلیلِ ویدیوی یوتیوب ${url}:** ${ytError.message} (فقط ویدیوهای عمومی پشتیبانی می‌شوند)`);
+      }
+    }
+    if (extractYouTubeUrls(textContent).length) textContent = stripYouTubeUrls(textContent);
 
     // Process text content if provided
     if (textContent.trim()) {

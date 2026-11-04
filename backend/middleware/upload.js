@@ -28,6 +28,22 @@ export function safeUploadName(name) {
 const ALLOWED_MIME_PREFIXES = ['audio/', 'video/', 'image/', 'text/'];
 const ALLOWED_MIME_TYPES = new Set(['application/pdf', 'application/json']);
 
+// Phones often send audio/images with an empty or generic type
+// (application/octet-stream) — infer it from the extension so the file is
+// analysed instead of rejected.
+const EXT_MIME = {
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', oga: 'audio/ogg', flac: 'audio/flac', amr: 'audio/amr', weba: 'audio/webm',
+  mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska', '3gp': 'video/3gpp', avi: 'video/x-msvideo',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif',
+  pdf: 'application/pdf', txt: 'text/plain', md: 'text/markdown', srt: 'text/plain', vtt: 'text/vtt', json: 'application/json',
+};
+export function inferMimeType(mimeType, filename) {
+  const m = String(mimeType || '').toLowerCase();
+  if (m && m !== 'application/octet-stream' && m !== 'binary/octet-stream') return m;
+  const ext = String(filename || '').toLowerCase().split('.').pop();
+  return EXT_MIME[ext] || m;
+}
+
 export function isAllowedMimeType(mimeType) {
   if (!mimeType) return false;
   if (ALLOWED_MIME_TYPES.has(mimeType)) return true;
@@ -41,6 +57,7 @@ export const upload = multer({
   storage: storage,
   limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES },
   fileFilter: (req, file, cb) => {
+    file.mimetype = inferMimeType(file.mimetype, file.originalname);
     if (isAllowedMimeType(file.mimetype)) {
       cb(null, true);
     } else {

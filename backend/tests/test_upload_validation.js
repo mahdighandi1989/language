@@ -119,3 +119,11 @@ test('test_non_multer_error_passes_through', () => {
   assert.equal(res.statusCode, undefined, 'should not write a response');
   assert.equal(forwarded, original, 'the original error should reach next()');
 });
+
+test('inferMimeType: empty/octet-stream types are inferred from the extension', async () => {
+  const { inferMimeType } = await import('../middleware/upload.js');
+  assert.equal(inferMimeType('', 'voice.m4a'), 'audio/mp4');
+  assert.equal(inferMimeType('application/octet-stream', 'scan.PDF'), 'application/pdf');
+  assert.equal(inferMimeType('image/png', 'x.jpg'), 'image/png');
+  assert.equal(inferMimeType('', 'x.exe'), '');
+});

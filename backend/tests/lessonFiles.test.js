@@ -84,3 +84,11 @@ test('API: multi-file upload keeps originals, lists, downloads, removes without 
   assert.equal((await fetch(`${base}/api/lesson-files/1712/${id}/raw`)).status, 200); // bytes kept
   assert.equal((await fetch(`${base}/api/lesson-files/999/${id}/raw`)).status, 404); // other lesson: not found
 });
+
+test('YouTube links are found in pasted text (watch, youtu.be, shorts), deduplicated', async () => {
+  const { extractYouTubeUrls, stripYouTubeUrls } = await import('../services/analysisService.js');
+  const t = 'ببین https://www.youtube.com/watch?v=abcDEF12345 و https://youtu.be/abcDEF12345 و https://youtube.com/shorts/XYZ_987654 و https://example.com/x';
+  assert.deepEqual(extractYouTubeUrls(t), ['https://www.youtube.com/watch?v=abcDEF12345', 'https://youtu.be/abcDEF12345', 'https://youtube.com/shorts/XYZ_987654']);
+  assert.equal(stripYouTubeUrls('درس https://youtu.be/abcDEF12345'), 'درس');
+  assert.deepEqual(extractYouTubeUrls('بدونِ لینک'), []);
+});

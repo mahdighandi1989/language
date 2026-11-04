@@ -49,6 +49,9 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // session summaries to the backend so the product KPIs / outcome_rate can be
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
+import ErrorBoundary from './ErrorBoundary.jsx';
+import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
+import { normalizeQuiz } from '../quiz/normalizeQuiz.js';
 
 // Module-level singleton: one tracker for the app's chat activity. Analytics is
 // strictly best-effort and must never affect the chat UX.
@@ -492,6 +495,7 @@ export default function App() {
     try { window.history.replaceState(null, '', `/${hashFor(initialRoute.view, initialRoute.id)}`); } catch { /* ignore */ }
   }
   const [activeView, setActiveView] = useState(initialRoute?.view || 'dashboard');
+  const [viewRetry, setViewRetry] = useState(0);
   const [data, setData] = useState(initialData);
   const [selectedLessonId, setSelectedLessonId] = useState(
     initialRoute?.view === 'lesson' && initialRoute.id ? (Number(initialRoute.id) || initialRoute.id) : null
@@ -641,6 +645,7 @@ export default function App() {
 
     let unsubData = null;     // listener on the user's own data document
     let unsubAccess = null;   // listener on the user's accessControl record
+    let currentAuthUid = null; // the signed-in uid (guards access-listener retries)
 
     const stopData = () => {
       if (unsubData) { unsubData(); unsubData = null; }
@@ -799,7 +804,14 @@ export default function App() {
       }
 
       // Live-subscribe so approvals / permission changes apply without reload.
+      // A listener error (offline, token refresh, network blip) used to throw
+      // an APPROVED user out to the gate screen — «پرت‌شدن به صفحهٔ ورود». Now
+      // an approved session keeps running and the listener re-subscribes.
+      let lastApproved = false;
+      let retry = 0;
+      const subscribeAccess = () => {
       unsubAccess = onSnapshot(accessRef, async (snap) => {
+        retry = 0;
         const rec = snap.exists()
           ? snap.data()
           : { status: 'pending', role: 'user', permissions: emptyPermissions(), email };
@@ -807,6 +819,7 @@ export default function App() {
         setAccessError(null);
         const state = accessStateOf(rec);
         const approved = state === 'approved';
+        lastApproved = approved;
         setAccessStatus(state);
         if (approved) {
           if (rec.role === 'admin') await migrateSharedDataForAdmin(user.uid);
@@ -817,15 +830,26 @@ export default function App() {
           setIsAuthReady(true);
         }
       }, (error) => {
-        // Not «pending»: the owner must see WHY (rules not published, network…).
         console.error('Access listener error:', error);
-        setAccessError(describeAuthError(error));
-        setAccessStatus('error');
-        setIsAuthReady(true);
+        reportError(error, { source: 'firebase' });
+        unsubAccess = null;
+        if (currentAuthUid !== user.uid) return;
+        retry += 1;
+        const delay = Math.min(30000, 1000 * 2 ** Math.min(retry, 5));
+        if (!lastApproved || retry > 6) {
+          // Not «pending»: the owner must see WHY (rules not published, network…).
+          setAccessError(describeAuthError(error));
+          setAccessStatus('error');
+          setIsAuthReady(true);
+        }
+        setTimeout(() => { if (!unsubAccess && currentAuthUid === user.uid) subscribeAccess(); }, delay);
       });
+      };
+      subscribeAccess();
     };
 
     const unsubAuth = onAuthStateChanged(auth, (user) => {
+      currentAuthUid = user?.uid || null;
       stopData();
       stopAccess();
       if (!user) {
@@ -1019,7 +1043,7 @@ export default function App() {
     setData(prev => {
       const newKnowledgeBase = { ...prev.knowledgeBase };
       if (!newKnowledgeBase[category]) newKnowledgeBase[category] = [];
-      const exists = newKnowledgeBase[category].some(i => i.term.trim().toLowerCase() === item.term.trim().toLowerCase());
+      const exists = newKnowledgeBase[category].some(i => String(i?.term || '').trim().toLowerCase() === String(item?.term || '').trim().toLowerCase());
       if (!exists) newKnowledgeBase[category].push({ ...item, id: Date.now() + Math.random() });
       return { ...prev, knowledgeBase: newKnowledgeBase };
     });
@@ -1168,6 +1192,19 @@ export default function App() {
     if (accessRecord && !canAccess(accessRecord, activeView)) {
       return <AccessNotice title="دسترسی ندارید" message="هنوز به این بخش دسترسی داده نشده است. لطفاً با مدیر تماس بگیرید." />;
     }
+    return (
+      <ErrorBoundary key={`${activeView}:${viewRetry}`} fallback={
+        <div role="alert" dir="rtl" className="p-6 bg-red-50 border border-red-200 rounded-xl text-red-800 space-y-3">
+          <p className="font-bold">این صفحه به خطا خورد (بقیهٔ برنامه سالم است؛ خطا برای بررسی ثبت شد).</p>
+          <button onClick={() => setViewRetry((n) => n + 1)} className="bg-red-600 text-white px-4 py-2 rounded-lg">تلاشِ دوباره</button>
+        </div>
+      }>
+        {renderViewInner(commonProps)}
+      </ErrorBoundary>
+    );
+  };
+
+  const renderViewInner = (commonProps) => {
     switch (activeView) {
       case 'dashboard': return <Dashboard {...commonProps} stats={data.stats} lessons={data.lessons} addLesson={addLesson} knowledgeBase={data.knowledgeBase} updateKnowledgeBase={updateKnowledgeBase} saveChatHistory={saveChatHistory} chatHistories={data.chatHistories} />;
       case 'lessons': return <LessonList {...commonProps} lessons={data.lessons} deleteLesson={confirmDeleteLesson} editLesson={editLesson} addLesson={addLesson} />;
@@ -2876,7 +2913,7 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
            <Card title="مرکز دانش شما">
-             <KnowledgeBase knowledgeBase={knowledgeBase} />
+             <KnowledgeCenter knowledgeBase={knowledgeBase} kbCategories={data?.kbCategories} setData={setData} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />
            </Card>
           <Card title="شروع کنید">
             <h3 className="text-lg font-bold mb-4 text-slate-700">ایجاد درس جدید</h3>
@@ -3218,7 +3255,26 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
       updateLesson(lesson.id, { files: [...(lesson.files || []), ...fileMetadata] });
   };
 
+  // Download the ORIGINAL of a file kept by «آپلودِ هوشمند» (older entries are
+  // metadata only — their bytes were never stored).
+  const downloadFile = async (file) => {
+      try {
+          const res = await fetch(`/api/lesson-files/${lesson.id}/${file.id}/raw`);
+          if (!res.ok) throw new Error(res.status === 404 ? 'اصلِ این فایل روی سرور نیست' : `خطای ${res.status}`);
+          const url = URL.createObjectURL(await res.blob());
+          const a = document.createElement('a');
+          a.href = url; a.download = file.name || 'file'; document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+      } catch (e) {
+          setModalConfig({ title: 'دانلود نشد', message: e.message });
+      }
+  };
+
   const removeFile = (fileId) => {
+      const target = (lesson.files || []).find(f => f.id === fileId);
+      if (!window.confirm(`«${target?.name || 'فایل'}» از این درس برداشته شود؟${target?.stored ? ' (اصلِ فایل روی سرور نگه داشته می‌شود)' : ''}`)) return;
+      // A stored original is only taken off the lesson on the server (never deleted).
+      if (target?.stored) fetch(`/api/lesson-files/${lesson.id}/${fileId}/remove`, { method: 'POST' }).catch(() => {});
       updateLesson(lesson.id, { files: (lesson.files || []).filter(f => f.id !== fileId) });
       // Also remove from uploadedFiles by name match
       const fileToRemove = (lesson.files || []).find(f => f.id === fileId);
@@ -3424,12 +3480,20 @@ ${analyzedContent}
         body: formData
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'خطا در تحلیل');
+      // A proxy timeout/502 returns HTML, not JSON — read text first so the
+      // owner sees the real reason instead of «Unexpected token <».
+      const raw = await response.text();
+      let result;
+      try { result = JSON.parse(raw); } catch { result = null; }
+      if (!response.ok || !result) {
+        const reason = result?.error
+          || (response.status === 401 || response.status === 403 ? 'دسترسی رد شد؛ دوباره وارد شوید.'
+            : response.status === 413 ? 'حجمِ فایل بیش از حد است.'
+            : response.status === 429 ? 'تعدادِ تحلیل‌ها زیاد بوده؛ چند دقیقه بعد دوباره امتحان کنید.'
+            : response.status >= 500 ? `سرور پاسخ نداد (کد ${response.status})؛ برای فایلِ بزرگ، فایل را کوچک‌تر کنید یا دوباره امتحان کنید.`
+            : `پاسخِ نامعتبر از سرور (کد ${response.status}).`);
+        throw new Error(reason);
       }
-
-      const result = await response.json();
 
       // IMPORTANT: Save analysis result to lesson immediately so it persists even if user navigates away
       updateLesson(lesson.id, {
@@ -3525,9 +3589,14 @@ ${analyzedContent}
                            {file.size && <span className="text-slate-500 text-sm mr-2">({formatFileSize(file.size)})</span>}
                          </div>
                        </div>
-                       <button onClick={() => removeFile(file.id)} className="p-1 hover:bg-red-100 rounded-full text-red-500" title="حذف فایل">
-                         <Trash2 size={16}/>
-                       </button>
+                       <div className="flex items-center gap-1">
+                         <button onClick={() => downloadFile(file)} disabled={!file.stored} className="p-1 hover:bg-teal-100 rounded-full text-teal-700 disabled:opacity-30" title={file.stored ? 'دانلودِ اصلِ فایل' : 'اصلِ این فایل ذخیره نشده بود (فقط «آپلودِ هوشمند» اصلِ فایل را نگه می‌دارد)'} aria-label="دانلودِ فایل">
+                           <Download size={16}/>
+                         </button>
+                         <button onClick={() => removeFile(file.id)} className="p-1 hover:bg-red-100 rounded-full text-red-500" title="برداشتن از درس" aria-label="برداشتنِ فایل">
+                           <Trash2 size={16}/>
+                         </button>
+                       </div>
                      </li>
                    ))}
                  </ul>
@@ -3561,30 +3630,34 @@ ${analyzedContent}
                 }
             >
                 {isEditingNotes ? (
-                    <div className="space-y-4">
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-                            💡 نکته: می‌توانید از فرمت Markdown استفاده کنید (## برای عنوان، ** برای بولد، ~~ برای خط‌خورده)
-                        </div>
-                        <textarea
-                            value={editedNotes}
-                            onChange={(e) => setEditedNotes(e.target.value)}
-                            className="w-full h-96 p-4 border-2 border-slate-300 rounded-xl font-mono text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                            placeholder="نکات درس را اینجا بنویسید..."
-                            dir="rtl"
-                        />
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={handleCancelEdit}
-                                className="px-4 py-2 border-2 border-slate-300 rounded-lg hover:bg-slate-100 font-medium"
-                            >
-                                انصراف
-                            </button>
-                            <button
-                                onClick={handleSaveNotes}
-                                className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 font-medium flex items-center gap-2"
-                            >
-                                <Check size={18}/> ذخیره تغییرات
-                            </button>
+                    // Full-screen editor + live preview: the old in-card textarea was
+                    // 24rem tall, monospace (broke Arabic shaping/diacritics) and one
+                    // direction for every line, which scrambled mixed Arabic/Persian
+                    // lines and tables. plaintext bidi = each line picks its own direction.
+                    <div className="fixed inset-0 z-50 bg-black/50 flex items-stretch justify-center p-2 md:p-6" dir="rtl" role="dialog" aria-label="ویرایشِ نکاتِ درس">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl flex flex-col overflow-hidden">
+                            <div className="flex items-center justify-between gap-3 p-3 border-b bg-slate-50">
+                                <h3 className="font-bold text-slate-800 truncate">✏️ ویرایشِ نکات: {lesson.title}</h3>
+                                <div className="flex gap-2 shrink-0">
+                                    <button onClick={handleCancelEdit} className="px-4 py-2 border-2 border-slate-300 rounded-lg hover:bg-slate-100 font-medium">انصراف</button>
+                                    <button onClick={handleSaveNotes} className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 font-medium flex items-center gap-2"><Check size={18}/> ذخیره تغییرات</button>
+                                </div>
+                            </div>
+                            <p className="px-3 py-2 text-xs text-yellow-800 bg-yellow-50 border-b">💡 Markdown: ## عنوان، **بولد**، جدول با | ستون |. پیش‌نمایش زنده کنارِ متن است. {editedNotes.length.toLocaleString('fa-IR')} نویسه</p>
+                            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2">
+                                <textarea
+                                    value={editedNotes}
+                                    onChange={(e) => setEditedNotes(e.target.value)}
+                                    className="w-full h-full min-h-[40vh] p-4 border-0 lg:border-l resize-none text-base leading-8 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-200"
+                                    style={{ unicodeBidi: 'plaintext', fontFamily: "'Vazirmatn', 'Noto Naskh Arabic', 'Segoe UI', Tahoma, sans-serif" }}
+                                    placeholder="نکات درس را اینجا بنویسید..."
+                                    dir="rtl"
+                                    autoFocus
+                                />
+                                <div className="hidden lg:block h-full overflow-y-auto p-4 bg-slate-50">
+                                    <MarkdownRenderer text={editedNotes.length > 60000 ? editedNotes.slice(0, 60000) + '\n\n[…پیش‌نمایش فقط ۶۰هزار نویسهٔ اول…]' : editedNotes} />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -3613,7 +3686,7 @@ ${analyzedContent}
                         </audio>
                       )}
                       {item.type === 'video' && (
-                        <video controls className="w-full rounded" src={`data:${item.mimeType};base64,${item.data}`}>
+                        <video controls preload="metadata" playsInline className="w-full rounded" src={`data:${item.mimeType};base64,${item.data}`}>
                           مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
                         </video>
                       )}
@@ -3690,8 +3763,9 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
 
         setIsLoading(true); setQuiz(null); setUserAnswers({}); setMatchingAnswers({}); setSubmitted(false); clearTimeout(timerRef.current);
 
-        const lessonId = parseInt(selectedLessonId);
-        const lesson = lessons.find(l => l.id === lessonId);
+        // Imported lessons have string ids — compare as strings.
+        const lesson = lessons.find(l => String(l.id) === String(selectedLessonId));
+        const lessonId = lesson?.id;
 
         if (!lesson) {
             setModalConfig({ title: "خطا", message: "لطفاً یک درس انتخاب کنید." });
@@ -3816,12 +3890,9 @@ ${lesson.archivedNotes}`;
             }
 
             // Filter and validate questions
-            const validQuiz = generatedQuiz.filter(q => {
-                if (!q || !q.type) return false;
-                if (q.type === 'matching') return q.pairs && q.pairs.length >= 3;
-                if (q.type === 'word_order') return q.words && q.words.length >= 2 && q.correctAnswer;
-                return q.question && q.correctAnswer;
-            });
+            // Coerce every field to a string (numbers/objects from the model
+            // used to crash rendering ⇒ white screen) and drop invalid items.
+            const validQuiz = normalizeQuiz(generatedQuiz);
 
             if (validQuiz.length === 0) {
                 throw new Error('No valid questions');
@@ -3882,8 +3953,9 @@ ${lesson.archivedNotes}`;
         addJournalEntry(`آزمون با امتیاز ${finalScore.toFixed(0)}% به پایان رسید.`);
 
         // Update lesson progress
-        const lessonId = parseInt(selectedLessonId);
-        const lesson = lessons.find(l => l.id === lessonId);
+        // Imported lessons have string ids — compare as strings.
+        const lesson = lessons.find(l => String(l.id) === String(selectedLessonId));
+        const lessonId = lesson?.id;
         if (lesson) {
             const currentProgress = lesson.progress || { totalItems: 0, learnedItems: 0, quizzesTaken: 0, correctAnswers: 0, chatPracticeCount: 0 };
             setData(prev => ({
@@ -4189,7 +4261,7 @@ ${lesson.archivedNotes}`;
                     <div className="flex justify-between items-center mb-6 p-4 bg-slate-100 rounded-xl">
                         <div>
                             <h3 className="text-2xl font-bold text-slate-800">
-                                📝 آزمون: {lessons.find(l => l.id === parseInt(selectedLessonId))?.title}
+                                📝 آزمون: {lessons.find(l => String(l.id) === String(selectedLessonId))?.title}
                             </h3>
                             <p className="text-sm text-slate-500 mt-1">
                                 {quiz.length} سوال | سطح {difficultyLabels[difficulty].label}
@@ -4213,7 +4285,7 @@ ${lesson.archivedNotes}`;
                                     </span>
                                     <div className="flex-1">
                                         <span className="text-xs bg-slate-200 px-2 py-1 rounded-full text-slate-600">
-                                            {questionTypeLabels[q.type.replace('_', '')]?.label || questionTypeLabels[Object.keys(questionTypeLabels).find(k => k.toLowerCase().replace(/[^a-z]/g, '') === q.type.toLowerCase().replace(/[^a-z]/g, ''))]?.label || q.type}
+                                            {questionTypeLabels[String(q.type || '').replace('_', '')]?.label || questionTypeLabels[Object.keys(questionTypeLabels).find(k => k.toLowerCase().replace(/[^a-z]/g, '') === q.type.toLowerCase().replace(/[^a-z]/g, ''))]?.label || q.type}
                                         </span>
                                         {q.question && q.type !== 'matching' && (
                                             <p className="font-bold text-lg mt-2 flex items-center gap-2">
@@ -4940,6 +5012,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const chatHistoryRef = useRef(chatHistory); // Ref to track latest chatHistory for async callbacks
   const currentAudioRef = useRef(null);
   const sessionIdRef = useRef(Date.now()); // Unique session ID to prevent stale responses from triggering new recordings
+  const maxRecordTimerRef = useRef(null); // safety stop for a forgotten recording
   const isVoiceConvActiveRef = useRef(false); // Ref to track global voice conv state for cleanup decisions
   const isMountedRef = useRef(true); // Track if component is mounted for async callbacks
   const [pendingAutoStartRecording, setPendingAutoStartRecording] = useState(false); // Flag to trigger auto-start after return
@@ -5135,7 +5208,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
     if (voiceConversationModeRef.current) return;
 
     if (archiveCurrent && chatHistory.length > 1) {
-        const conversationTitle = chatHistory[1]?.parts[0]?.text.substring(0, 30) + '...';
+        const conversationTitle = (chatHistory[1]?.parts?.[0]?.text || 'مکالمهٔ صوتی').substring(0, 30) + '...';
         const newArchive = [...(data.archivedConversations || []), { id: Date.now(), title: conversationTitle, history: chatHistory }];
         saveChatHistory(context, []); // Clear current history
 
@@ -5535,7 +5608,12 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   const startVoiceRecording = async (useVoiceConversation = false) => {
     const isVoiceConvMode = useVoiceConversation || voiceConversationMode;
     // Use both state and ref to prevent race conditions
-    if (isRecording || isRecordingRef.current || isLoading) return false;
+    if (isRecording || isRecordingRef.current) return false;
+    if (isLoading) {
+      // Say why instead of silently ignoring the click (it looked «locked»).
+      if (!useVoiceConversation) setModalConfig({ title: "کمی صبر کنید", message: "استاد در حالِ پاسخ‌دادن است؛ پس از پاسخ دوباره میکروفون را بزنید." });
+      return false;
+    }
 
     // Check if getUserMedia is supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -5651,15 +5729,11 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
-        if (sendVoiceAs === 'text' && recognitionRef.current && !voiceConversationModeRef.current) {
-          try {
-            recognitionRef.current.start();
-          } catch (err) {
-            handleSend("[پیام صوتی]", audioUrl);
-          }
-        } else {
-          handleSend("[پیام صوتی]", audioUrl);
-        }
+        // Both modes send the RECORDED audio; handleSend transcribes it with
+        // Gemini («تبدیل به متن» shows it as text). The old text mode started the
+        // browser's SpeechRecognition AFTER recording — it listened again, kept
+        // the microphone busy and threw the recording away («ضبط قفل می‌شود»).
+        handleSend("[پیام صوتی]", audioUrl);
       };
 
       mediaRecorderRef.current.onerror = (err) => {
@@ -5681,6 +5755,12 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
       mediaRecorderRef.current.start();
       isRecordingRef.current = true;
       setIsRecording(true);
+      // Safety net: never keep the microphone open for more than 3 minutes.
+      if (maxRecordTimerRef.current) clearTimeout(maxRecordTimerRef.current);
+      maxRecordTimerRef.current = setTimeout(() => {
+        maxRecordTimerRef.current = null;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') mediaRecorderRef.current.stop();
+      }, 180000);
       return true;
     } catch (err) {
       console.error('Microphone error:', err);
@@ -5714,8 +5794,13 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
   // Stop voice recording
   const stopVoiceRecording = () => {
     cleanupSilenceDetection();
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+    if (maxRecordTimerRef.current) { clearTimeout(maxRecordTimerRef.current); maxRecordTimerRef.current = null; }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+    } else if (streamRef.current) {
+      // Recorder already gone (device unplugged, tab suspended): release the mic anyway.
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
     }
     isRecordingRef.current = false;
     setIsRecording(false);
@@ -5864,7 +5949,7 @@ function ChatInterface({ data, setData, context, lessonTitle, lessonNotes, addJo
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => fileInputRef.current.click()} className="p-2 border rounded-xl hover:bg-slate-200 flex-shrink-0" disabled={voiceConversationMode}><Paperclip size={20}/></button>
               <input type="file" ref={fileInputRef} onChange={handleFileAttach} className="hidden" />
-              <button onClick={handleMicClick} className={`p-2 border rounded-xl flex-shrink-0 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'hover:bg-slate-200'}`} disabled={voiceConversationMode}><Mic size={20}/></button>
+              <button onClick={handleMicClick} aria-label={isRecording ? 'توقفِ ضبط و ارسال' : 'ضبطِ پیامِ صوتی'} title={isRecording ? 'توقفِ ضبط و ارسال' : (isLoading ? 'استاد در حالِ پاسخ است…' : 'ضبطِ پیامِ صوتی')} className={`p-2 border rounded-xl flex-shrink-0 ${isRecording ? 'bg-red-500 text-white animate-pulse' : isLoading ? 'opacity-50' : 'hover:bg-slate-200'}`} disabled={voiceConversationMode}><Mic size={20}/></button>
               <button
                 onClick={toggleVoiceConversationMode}
                 className={`p-2 border rounded-xl flex items-center gap-1 flex-shrink-0 ${voiceConversationMode ? 'bg-purple-500 text-white' : 'hover:bg-purple-100 text-purple-600 border-purple-300'}`}
@@ -6179,7 +6264,7 @@ function ChatMessage({ message, role, onSave, voice, disableSave = false, msgTyp
                 <p>{mainText}</p>
                 {translation && <p className="text-xs pt-2 mt-2 border-t border-slate-300 opacity-70 italic">{translation}</p>}
             </div>
-            {role === 'model' && !isError && message.audioUrl && <TTSButton textToSpeak={mainText} voice={voice} audioUrl={message.audioUrl} />}
+            {role === 'model' && !isError && (message.audioUrl || mainText) && <TTSButton textToSpeak={mainText} voice={voice} audioUrl={message.audioUrl} />}
         </div>
     );
 }
@@ -6206,6 +6291,7 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
+    const generatedUrlRef = useRef(null);
 
     const playAudio = async () => {
         if (!textToSpeak) return;
@@ -6224,39 +6310,47 @@ function TTSButton({ textToSpeak, voice, audioUrl }) {
         stopActiveTtsAudio();
         stopVoiceConvAudio();
 
-        const startAudio = (url, onEnd) => {
+        const startAudio = (url, onEnd, onFail) => {
             const audio = new Audio(url);
             audioRef.current = audio;
             activeTtsAudio = audio;
             audio.onplay = () => setIsPlaying(true);
             audio.onpause = () => setIsPlaying(false);
-            audio.onerror = () => { setIsPlaying(false); if (activeTtsAudio === audio) activeTtsAudio = null; };
+            let failed = false;
+            const fail = () => { if (failed) return; failed = true; setIsPlaying(false); if (activeTtsAudio === audio) activeTtsAudio = null; onFail?.(); };
+            audio.onerror = fail;
             audio.onended = () => {
                 setIsPlaying(false);
                 if (activeTtsAudio === audio) activeTtsAudio = null;
                 if (onEnd) onEnd();
             };
-            audio.play().catch(() => { setIsPlaying(false); if (activeTtsAudio === audio) activeTtsAudio = null; });
+            audio.play().catch(fail);
         };
 
-        // If we have a pre-generated audio URL, use it.
-        if (audioUrl) {
-            startAudio(audioUrl);
+        // Generate (once) and play the teacher's voice from the text.
+        const generate = async () => {
+            if (generatedUrlRef.current) { startAudio(generatedUrlRef.current); return; }
+            if (isLoading) return;
+            setIsLoading(true);
+            try {
+                const result = await callGeminiTTS(`Say: ${textToSpeak}`, voice);
+                if (result) {
+                    generatedUrlRef.current = getWavUrl(result.audioData, result.mimeType);
+                    startAudio(generatedUrlRef.current);
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        // A pre-generated clip is a blob: URL that only lives in this tab — in
+        // archived conversations (or after reload) it is dead. Fall back to
+        // generating the voice again instead of silently doing nothing.
+        if (audioUrl && !generatedUrlRef.current) {
+            startAudio(audioUrl, null, generate);
             return;
         }
-
-        // Generate new TTS.
-        if (isLoading) return;
-        setIsLoading(true);
-
-        const result = await callGeminiTTS(`Say: ${textToSpeak}`, voice);
-        if (result) {
-            const newAudioUrl = getWavUrl(result.audioData, result.mimeType);
-            startAudio(newAudioUrl, () => URL.revokeObjectURL(newAudioUrl));
-            setIsLoading(false);
-        } else {
-            setIsLoading(false);
-        }
+        await generate();
     };
 
     return (
@@ -7959,12 +8053,13 @@ function Flashcard({ term, definition }) {
     );
 }
 
+// QUARANTINED (replaced by ../knowledge/KnowledgeCenter.jsx, kept per «no removal»).
 function KnowledgeBase({ knowledgeBase }) {
     const [activeTab, setActiveTab] = useState('vocabulary');
     const [searchTerm, setSearchTerm] = useState('');
     
     const renderContent = () => {
-        const items = (knowledgeBase[activeTab] || []).filter(item => item.term.toLowerCase().includes(searchTerm.toLowerCase()) || item.definition.toLowerCase().includes(searchTerm.toLowerCase()));
+        const items = (knowledgeBase[activeTab] || []).filter(item => String(item?.term || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(item?.definition || '').toLowerCase().includes(searchTerm.toLowerCase()));
         if (items.length === 0) return <p className="text-center text-slate-500 py-4">موردی یافت نشد.</p>;
         return (<ul className="space-y-3">{items.map((item, index) => (<li key={`${item.id}-${index}`} className="p-3 bg-slate-100 rounded-lg"><p className="font-bold">{item.term}</p><p className="text-sm text-slate-600">{item.definition}</p><p className="text-xs text-teal-600 mt-1">منبع: {item.source}</p></li>))}</ul>);
     };
@@ -8023,7 +8118,7 @@ function GlobalSearchModal({ isOpen, onClose, data, navigateTo }) {
         const term = searchTerm.toLowerCase();
         const found = { lessons: [], knowledge: [], journal: [] };
         { const q = searchKey(term); data.lessons.forEach(l => { if (lessonSearchText(l).includes(q)) found.lessons.push(l); }); }
-        Object.values(data.knowledgeBase).flat().forEach(i => { if (i.term.toLowerCase().includes(term) || i.definition.toLowerCase().includes(term)) found.knowledge.push(i); });
+        Object.values(data.knowledgeBase || {}).filter(Array.isArray).flat().forEach(i => { if (String(i?.term || '').toLowerCase().includes(term) || String(i?.definition || '').toLowerCase().includes(term)) found.knowledge.push(i); });
         data.journal.forEach(j => { if (j.entry.toLowerCase().includes(term)) found.journal.push(j); });
         return found;
     }, [searchTerm, data]);
@@ -8181,7 +8276,7 @@ function GlobalAssistant({ onClose, updateKnowledgeBase, setModalConfig, addJour
     );
 }
 
-function ArchivedConversations({ conversations, setData, setModalConfig }) {
+function ArchivedConversations({ conversations, setData, setModalConfig, data }) {
   const [viewingConversation, setViewingConversation] = useState(null);
 
   const deleteConversation = (id) => {
@@ -8206,6 +8301,7 @@ function ArchivedConversations({ conversations, setData, setModalConfig }) {
       {viewingConversation && (
         <ConversationViewerModal
           conversation={viewingConversation}
+          voice={data?.defaultChatSettings?.aiVoice}
           onClose={() => setViewingConversation(null)}
         />
       )}
@@ -8233,7 +8329,7 @@ function ArchivedConversations({ conversations, setData, setModalConfig }) {
   );
 }
 
-function ConversationViewerModal({ conversation, onClose }) {
+function ConversationViewerModal({ conversation, onClose, voice }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg h-[85vh] sm:h-[80vh] flex flex-col" dir="rtl" onClick={e => e.stopPropagation()}>
@@ -8242,8 +8338,11 @@ function ConversationViewerModal({ conversation, onClose }) {
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full"><X size={24}/></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {conversation.history.map((msg, index) => (
-            <ChatMessage key={`${index}-${msg.parts[0].text.slice(0, 10)}`} message={msg.parts[0]} role={msg.role} onSave={() => {}} voice="Charon" disableSave={true} />
+          {/* Same props as the live chat: the teacher's recorded voice
+              (audioData / voice-call audio) was dropped here, and a message
+              without text (audio-only) crashed the viewer on .slice. */}
+          {(conversation.history || []).filter((msg) => msg?.parts?.[0]).map((msg, index) => (
+            <ChatMessage key={`${index}-${msg.parts[0].text?.slice(0, 10) || 'audio'}`} message={msg.parts[0]} role={msg.role} onSave={() => {}} voice={voice || 'Charon'} disableSave={true} msgType={msg.type} audioData={msg.audioData} mimeType={msg.mimeType} isVoiceCall={msg.isVoiceCall} isVoiceCallHeader={msg.isVoiceCallHeader} isCallAnalysis={msg.isCallAnalysis} />
           ))}
         </div>
       </div>

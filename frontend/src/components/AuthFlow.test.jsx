@@ -34,7 +34,7 @@ vi.mock('firebase/firestore', () => ({
   updateDoc: vi.fn(() => Promise.resolve()),
   getDoc: vi.fn((ref) => h.getDocImpl(ref)),
   setDoc: vi.fn((ref, data, opts) => { h.setDocCalls.push({ path: ref.path, data, opts }); return Promise.resolve(); }),
-  onSnapshot: vi.fn((ref, next) => { h.snapCbs[ref.path] = next; return () => {}; }),
+  onSnapshot: vi.fn((ref, next, error) => { h.snapCbs[ref.path] = next; (h.errCbs ||= {})[ref.path] = error; return () => {}; }),
   writeBatch: vi.fn(() => { const ops = []; return { set: (r, d) => ops.push({ path: r.path, data: d }), commit: () => { h.batches.push(ops); return Promise.resolve(); } }; }),
 }));
 
@@ -79,6 +79,15 @@ describe('sign-in flow', () => {
     expect(await screen.findByText('بررسیِ دسترسی ناموفق بود')).toBeTruthy();
     expect(screen.getByText(/firestore\.rules/)).toBeTruthy();
     expect(screen.queryByText('در انتظار تأیید مدیر')).toBeNull();
+  });
+
+  it('an approved user is NOT thrown to the gate screen by a transient access-listener error', async () => {
+    render(<App />);
+    await act(async () => { await h.authCb({ uid: 'u1', email: 'mohamad.mahdi1988@gmail.com' }); });
+    await act(async () => { await h.snapCbs[ACCESS](snap({ role: 'admin', status: 'approved', permissions: {} })); });
+    await act(async () => { h.errCbs[ACCESS](Object.assign(new Error('offline'), { code: 'unavailable' })); });
+    expect(screen.queryByText('بررسیِ دسترسی ناموفق بود')).toBeNull();
+    expect(screen.queryByText('ورود با گوگل')).toBeNull();
   });
 
   it('a normal user without a record gets a pending request and the waiting screen', async () => {
