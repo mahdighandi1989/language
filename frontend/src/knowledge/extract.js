@@ -24,10 +24,19 @@ export function categoryFromHint(text) {
   return null;
 }
 
-const CORRECTIONS_HEAD = /⚠️\s*\**\s*(اصلاحات|هشدار)|^#{1,6}\s*.*(اصلاحات و هشدار|هشدارهای پیشنهادی|اصلاحاتِ پیشنهادی)/;
+// The corrections/warnings part of a handout, in any form: a heading, a bold or
+// short title line («⚠️ اصلاحات و هشدارهای پیشنهادی», «**اصلاحات**», «تصحیحات», «غلط‌نامه»…).
+const CORRECTIONS_WORD = /اصلاح|هشدار|تصحیح|غلط‌?\s?نامه|غلط‌های|خطاهای|corrections?|warnings?|errata/i;
+const CORRECTIONS_HEAD = /^(#{1,6}\s+.*|\*\*.*\*\*|⚠️.*)$/;
+// A table header that describes problems, not vocabulary.
+const CORRECTIONS_COLS = /مشکل|ایراد|پیشنهاد|اصلاح|نوعِ?\s*خطا|اطمینان|توضیحِ?\s*خطا|issue|suggestion|confidence/i;
 const NOISE_LINE = /⚠️|\[مشکوک\]|\[ناخوانا\]|⟲|اطمینان\s*(کم|متوسط|بالا)/;
-// A «meaning» that is really a review note.
-const NOTE_WORDS = /غلط|اشتباه|باید\s|حرکت‌?گذاری|اعراب|تایپی|اطمینان|اصلاح|پیشنهاد|درستش|صحیح\s+آن/;
+// A «meaning» that is really a review note (starts with, or is about, harakat/typos).
+const NOTE_START = /^\s*(حرکت‌?\s?گذاری|اعراب|غلط|تایپ|اشتباه|املا|اصلاح|پیشنهاد|درست(ش)?\s|صحیح|نادرست|با ضمیر|باید)/;
+const NOTE_WORDS = /غلط|اشتباه|باید\s|حرکت‌?گذاری|اعراب|تایپی|اطمینان|اصلاح|پیشنهاد|درستش|صحیح\s+آن|نادرست/;
+// A grammar/usage explanation rather than a meaning.
+const EXPLANATION = /(استفاده\s*می|به\s*کار\s*می|به‌کار\s*می|یعنی\s|فرق\s|تفاوت\s|برای\s+گفتن|توصیه|تکلیف|تمرین\s*کن)/;
+export const MAX_ITEM_CHARS = 150;
 const clean = (s) => String(s || '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
 const words = (s) => clean(s).split(' ').filter(Boolean).length;
 const byLength = (term) => (words(term) <= 2 ? 'vocabulary' : 'phrases');
@@ -46,8 +55,9 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
     const h = line.match(/^#{1,6}\s+(.*)$/);
     // The corrections/warnings block (smart upload, review) is ABOUT the text, not
     // vocabulary: skip it up to the next heading or «---».
-    if (CORRECTIONS_HEAD.test(line)) { skipping = true; header = null; continue; }
-    if (skipping) { if (h || /^-{3,}$/.test(line)) skipping = false; else continue; }
+    const isTitle = CORRECTIONS_HEAD.test(line) || (line.length <= 60 && !/[|=:\t]/.test(raw));
+    if (isTitle && CORRECTIONS_WORD.test(line)) { skipping = true; header = null; continue; }
+    if (skipping) { if ((h && !CORRECTIONS_WORD.test(line)) || /^-{3,}$/.test(line)) skipping = false; else continue; }
     if (h) { heading = h[1]; header = null; continue; }
     if (NOISE_LINE.test(line)) continue;
     // A short title line without separators (PDF headings: «صفات», «verbs») sets the tab hint too.
@@ -62,11 +72,12 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
         if (looksHeader) {
           const arCol = cells.findIndex((c) => /عربی|لبنانی|arab|leb|فعل|صفت|ضمیر|لغت|کلمه|عبارت/i.test(c));
           const faCol = cells.findIndex((c) => /فارسی|معنی|ترجمه|persian|meaning/i.test(c));
-          header = { arCol, faCol, hint: categoryFromHint(cells.join(' ')) };
+          header = { arCol, faCol, hint: categoryFromHint(cells.join(' ')), skip: CORRECTIONS_COLS.test(cells.join(' ')) };
           continue;
         }
         header = { arCol: -1, faCol: -1, hint: null };
       }
+      if (header.skip) continue; // a problems/suggestions table
       // Columns named in the header decide; otherwise the most Lebanese cell vs the
       // most Persian one (a bare word like «شاطر» is ambiguous on its own).
       const scripted = cells.filter((c) => ARABIC_SCRIPT.test(c));
@@ -100,9 +111,9 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
       terms.forEach((t, k) => split.push({ ...c, term: t, definition: defs.length === terms.length ? defs[k] : c.definition, category: c.category === 'phrases' ? 'vocabulary' : c.category }));
     } else split.push(c);
   }
-  // de-duplicate inside the lesson
+  // de-duplicate inside the lesson; a «row» holding a whole table (pipes, very long) is not an item
   const seen = new Set();
-  return split.filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
+  return split.filter((c) => !/\|/.test(c.term + c.definition) && c.term.length + c.definition.length <= MAX_ITEM_CHARS * 3).filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map((c) => ({ ...c, source: lessonTitle ? `درس: ${lessonTitle}` : '' }));
 }
 
@@ -162,7 +173,10 @@ export function quality(c) {
   const term = String(c.term || '');
   const def = String(c.definition || '');
   const arabicMarks = /[\u064B-\u0652يكةىإأ]/.test(term);
+  if (term.length > MAX_ITEM_CHARS || def.length > MAX_ITEM_CHARS) return { ok: false, reason: 'بیش از ۱۵۰ نویسه' };
   if (words(term) > 6) return { ok: false, reason: 'سمتِ چپ جملهٔ بلند است' };
+  if (NOTE_START.test(def)) return { ok: false, reason: 'معنی یادداشتِ اعراب/املاست' };
+  if (EXPLANATION.test(term) || (EXPLANATION.test(def) && words(def) > 5)) return { ok: false, reason: 'توضیح/توصیه است نه معنی' };
   // A table whose header names the Arabic and the Persian column is trusted for
   // bare words («زعلان»); a loose «X : Y» line needs positive evidence.
   const lebanese = arabicMarks || langScore(term) > 0 || (c.trusted && langScore(term) >= 0 && !/[پچژگ]/.test(term));
@@ -170,5 +184,15 @@ export function quality(c) {
   if (NOTE_WORDS.test(def)) return { ok: false, reason: 'معنی شبیهِ یادداشتِ اصلاح است' };
   if (langScore(def) > 0 && !/[پچژگ]/.test(def)) return { ok: false, reason: 'معنی فارسی به نظر نمی‌رسد' };
   if (words(def) > 14) return { ok: false, reason: 'معنی بیش از حد بلند است' };
-  return { ok: true, reason: '' };
+  return { ok: true, reason: '', warn: spellingDoubt(def) };
+}
+
+/**
+ * The original is kept as written, but a Persian meaning typed with Arabic
+ * letters (ي ك ة) or with a letter Persian rarely puts there is shown as doubtful.
+ */
+export function spellingDoubt(def) {
+  const d = String(def || '');
+  if (/[يكة]/.test(d) && /[پچژگی]|‌/.test(d + 'ی')) return 'املای معنی مشکوک (حرفِ عربی در متنِ فارسی)';
+  return '';
 }
