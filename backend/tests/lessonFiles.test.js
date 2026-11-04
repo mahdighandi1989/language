@@ -144,3 +144,47 @@ test('candidateText joins every text part and skips thoughts', async () => {
   assert.equal(fin, 'STOP');
   assert.equal(candidateText({}), '');
 });
+
+test('repetition loops are collapsed (line and phrase level); real short repeats are kept', async () => {
+  const { collapseRepeats } = await import('../services/lessonFiles/repeats.js');
+  const oneLine = `قالت انو هي ${'اماراتيه '.repeat(480)}وبعدين راحت`;
+  const r1 = collapseRepeats(oneLine);
+  assert.equal(r1.runs[0].times, 480);
+  assert.match(r1.text, /^قالت انو هي اماراتيه ⟲ \[تکرارِ ماشینی حذف شد ×480\] وبعدين راحت$/);
+  const r2 = collapseRepeats(['مرحبا', ...Array(30).fill('[00:12] اماراتيه'), 'خلص'].join('\n'));
+  assert.equal(r2.text.split('\n').length, 4);
+  assert.equal(collapseRepeats('لا لا لا ما بدي').text, 'لا لا لا ما بدي'); // speech, not a loop
+  assert.equal(collapseRepeats('كيفك\nكيفك').runs.length, 0);
+  const r3 = collapseRepeats(`يعني ${'شو بدك تعمل '.repeat(12)}هلق`);
+  assert.equal(r3.runs[0].times, 12);
+  assert.equal(r3.runs[0].unit, 'شو بدك تعمل');
+});
+
+test('pipeline: a loop / low agreement is retried with shorter MP3 parts and the better result kept', async () => {
+  const { RETRY_PART_BYTES } = await import('../services/lessonFiles/pipeline.js');
+  const frames = Math.ceil((RETRY_PART_BYTES * 3.5) / 417);
+  const buf = Buffer.alloc(frames * 417);
+  for (let i = 0; i < frames; i += 1) buf.set([0xff, 0xfb, 0x90, 0x00], i * 417);
+  const sizes = [];
+  const ai = {
+    transcribe: async (b, mime, name, variant) => {
+      sizes.push(b.length);
+      if (b.length === buf.length) return { text: `بدي روح ${'اماراتيه '.repeat(300)}`, finish: 'STOP' }; // whole file: a loop
+      return { text: variant === 'a' ? 'لازم تكتب فروضتك ما لازم بس للأسف لازم' : 'لازم تكتب فروضتك، ما لازم بس للأسف لازم', finish: 'STOP' };
+    },
+    review: async () => [],
+  };
+  const r = await extractLessonFile({ buffer: buf, filename: '26.mp3', mime: 'audio/mpeg' }, { ai, review: false });
+  assert.ok(sizes.filter((s) => s < buf.length).length >= 8, `parts: ${sizes.length}`); // 4 parts × 2 passes
+  assert.ok(sizes.every((s) => s === buf.length || s <= RETRY_PART_BYTES));
+  assert.equal(r.agreement, 1);
+  assert.doesNotMatch(r.text, /اماراتيه/);
+  assert.match(r.notes.join(' '), /🔁 .*تکهٔ کوتاه‌تر/);
+});
+
+test('pipeline: when retry is impossible (m4a) the loop is still collapsed and reported', async () => {
+  const ai = { transcribe: async () => ({ text: `سلام\n${'اماراتيه\n'.repeat(50)}خلص`, finish: 'STOP' }), review: async () => [] };
+  const r = await extractLessonFile({ buffer: Buffer.alloc(100), filename: 'x.m4a', mime: 'audio/mp4' }, { ai, review: false });
+  assert.equal(r.text.split('\n').length, 4);
+  assert.match(r.notes.join(' '), /حلقهٔ تکرار/);
+});

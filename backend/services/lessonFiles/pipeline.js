@@ -17,13 +17,19 @@
  */
 import { extractText } from '../inspection/extract.js';
 import { compareTranscripts, markSuspect } from './verify.js';
+import { collapseRepeats } from './repeats.js';
+import { splitMp3, splitWav } from './splitAudio.js';
+
+/** Retry a bad transcription (loop or low agreement) with parts of about this size. */
+export const RETRY_PART_BYTES = 2.5 * 1024 * 1024;
+export const LOW_AGREEMENT = 0.5;
 
 export const INLINE_MAX = 15 * 1024 * 1024;
 const REVIEW_CHUNK = 20000;
 const REVIEW_MAX_CHUNKS = 15;
 
-const PROMPT_A = 'متنِ این فایل را کلمه‌به‌کلمه و کامل رونویسی کن. هیچ خلاصه، ترجمه، اصلاح یا توضیحی نده. اعراب، املا و ترتیبِ سطرها را همان‌طور که هست نگه دار. جای ناخوانا یا نامفهوم را دقیقاً با [ناخوانا] مشخص کن. برای صوت/ویدیو هر جمله را با برچسبِ زمان [mm:ss] در سطرِ جدا بنویس و نوشته‌های روی تصویر را هم جدا بیاور.';
-const PROMPT_B = 'Transcribe this file verbatim, line by line, exactly as written or spoken — no summary, no translation, no corrections, keep all diacritics and spelling. Mark anything unreadable or unclear as [ناخوانا]. For audio/video put each sentence on its own line with a [mm:ss] timestamp; include on-screen text.';
+const PROMPT_A = 'متنِ این فایل را کلمه‌به‌کلمه و کامل رونویسی کن. هیچ خلاصه، ترجمه، اصلاح یا توضیحی نده. هر کلمه یا جمله را فقط به تعدادی که واقعاً گفته شده بنویس و هرگز تکرار نکن؛ سکوت یا صدای نامفهومِ طولانی را یک بار با [ناخوانا] مشخص کن. اعراب، املا و ترتیبِ سطرها را همان‌طور که هست نگه دار. جای ناخوانا یا نامفهوم را دقیقاً با [ناخوانا] مشخص کن. برای صوت/ویدیو هر جمله را با برچسبِ زمان [mm:ss] در سطرِ جدا بنویس و نوشته‌های روی تصویر را هم جدا بیاور.';
+const PROMPT_B = 'Transcribe this file verbatim, line by line, exactly as written or spoken — no summary, no translation, no corrections, keep all diacritics and spelling. Write each word only as many times as it is actually spoken — never loop or repeat; mark long silence or unclear noise once as [ناخوانا]. Mark anything unreadable or unclear as [ناخوانا]. For audio/video put each sentence on its own line with a [mm:ss] timestamp; include on-screen text.';
 
 function isMedia(mime, name) {
   return /^(image|audio|video)\//.test(mime || '') || /\.(png|jpe?g|webp|gif|heic|tiff?|mp3|wav|m4a|ogg|opus|flac|aac|mp4|mov|mkv|webm|avi)$/i.test(name || '');
@@ -39,7 +45,7 @@ export function geminiAi() {
       // the largest output budget, so a 30–60 minute class is not cut short.
       let finish = null;
       const options = {
-        generationConfig: { temperature: variant === 'b' ? 0.7 : 0, maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: variant === 'b' ? 0.2 : 0, maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 } },
         onFinish: (r) => { finish = r; },
       };
       const sys = 'You are an exact transcriber. Never summarise, never correct.';
@@ -69,6 +75,51 @@ export function geminiAi() {
   };
 }
 
+const unwrap = (r) => (r && typeof r === 'object' ? { text: String(r.text || ''), finish: r.finish || null } : { text: String(r || ''), finish: null });
+
+/** Two independent transcriptions, loops collapsed, compared. */
+async function transcribePair(ai, buffer, mime, filename) {
+  const [ra, rb] = await Promise.all([ai.transcribe(buffer, mime, filename, 'a'), ai.transcribe(buffer, mime, filename, 'b')]);
+  const A = unwrap(ra); const B = unwrap(rb);
+  const ca = collapseRepeats(A.text); const cb = collapseRepeats(B.text);
+  return {
+    a: ca.text, b: cb.text, cmp: compareTranscripts(ca.text, cb.text),
+    loops: ca.runs.filter((r) => r.times >= 5).length,
+    loopSample: ca.runs.slice(0, 2).map((r) => `«${r.unit.slice(0, 30)}» ×${r.times}`).join('، '),
+    finish: [A.finish, B.finish],
+  };
+}
+
+/** Parts transcribed one by one (bounded parallelism 2), texts joined in order. */
+async function transcribeParts(ai, parts, mime, filename) {
+  const out = new Array(parts.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < parts.length) {
+      const i = next; next += 1;
+      // eslint-disable-next-line no-await-in-loop
+      out[i] = await transcribePair(ai, Buffer.from(parts[i]), mime, `${filename} (تکهٔ ${i + 1} از ${parts.length})`);
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  const a = out.map((r) => r.a).join('\n');
+  const b = out.map((r) => r.b).join('\n');
+  return {
+    a, b, cmp: compareTranscripts(a, b),
+    loops: out.reduce((n, r) => n + r.loops, 0),
+    loopSample: out.map((r) => r.loopSample).filter(Boolean).slice(0, 2).join('، '),
+    finish: out.flatMap((r) => r.finish),
+  };
+}
+
+function splitForRetry(buffer, mime, filename) {
+  if (buffer.length < 2 * RETRY_PART_BYTES) return null;
+  const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.length);
+  if (/mpeg|mp3/.test(mime) || /\.mp3$/i.test(filename)) return splitMp3(ab, RETRY_PART_BYTES);
+  if (/wav/.test(mime) || /\.wav$/i.test(filename)) return splitWav(ab, RETRY_PART_BYTES);
+  return null;
+}
+
 function chunks(text, size) {
   const out = [];
   for (let i = 0; i < text.length && out.length < REVIEW_MAX_CHUNKS; i += size) out.push(text.slice(i, i + size));
@@ -89,18 +140,26 @@ export async function extractLessonFile({ buffer, filename = '', mime = '' }, { 
   } else if (isMedia(mime, filename) || isPdf) {
     if (scanned) result.notes.push('PDF ِ اسکن‌شده (لایهٔ متن ندارد یا ناچیز است) — با دو رونویسیِ مستقل خوانده شد');
     try {
-      let [a, b] = await Promise.all([
-        ai.transcribe(buffer, mime || 'application/pdf', filename, 'a'),
-        ai.transcribe(buffer, mime || 'application/pdf', filename, 'b'),
-      ]);
-      // transcribe() may return a string (tests) or { text, finish }.
-      const finishA = typeof a === 'object' && a ? a.finish : null;
-      const finishB = typeof b === 'object' && b ? b.finish : null;
-      if (a && typeof a === 'object') a = a.text;
-      if (b && typeof b === 'object') b = b.text;
-      if (finishA === 'MAX_TOKENS' || finishB === 'MAX_TOKENS') result.notes.push('⚠️ رونویسی به سقفِ خروجیِ Gemini رسید و انتهایش ممکن است بریده باشد؛ فایل را به بخش‌های کوتاه‌تر (حدودِ ۲۰ دقیقه) تقسیم کنید');
-      if (finishA && !['STOP', 'MAX_TOKENS'].includes(finishA)) result.notes.push(`⚠️ Gemini رونویسی را با وضعیتِ «${finishA}» تمام کرد`);
-      const cmp = compareTranscripts(a, b);
+      const mimeOut = mime || 'application/pdf';
+      let best = await transcribePair(ai, buffer, mimeOut, filename);
+      // Loop or very low agreement: try again with shorter parts (MP3/WAV can be
+      // cut without decoding). The better of the two attempts is kept.
+      const bad = (r) => r.cmp.agreement < LOW_AGREEMENT || r.loops > 0;
+      if (bad(best)) {
+        const parts = splitForRetry(buffer, mimeOut, filename);
+        if (parts && parts.length > 1) {
+          const retry = await transcribeParts(ai, parts, mimeOut, filename);
+          result.notes.push(`🔁 توافقِ دو رونویسی ${Math.round(best.cmp.agreement * 100)}٪${best.loops ? ` و ${best.loops} حلقهٔ تکرار` : ''} بود؛ دوباره با ${parts.length} تکهٔ کوتاه‌تر رونویسی شد ⇒ ${Math.round(retry.cmp.agreement * 100)}٪${retry.cmp.agreement >= best.cmp.agreement ? ' (این نتیجه نگه داشته شد)' : ' (نتیجهٔ اول بهتر بود و نگه داشته شد)'}`);
+          if (retry.cmp.agreement >= best.cmp.agreement) best = retry;
+        } else if (best.loops) {
+          result.notes.push('این قالب را نمی‌شود بی‌رمزگشایی تکه کرد؛ برای رونویسیِ بهتر mp3 بفرستید');
+        }
+      }
+      const { a, cmp } = best;
+      if (best.loops) result.notes.push(`⟲ ${best.loops} «حلقهٔ تکرارِ» ماشینی در رونویسی پیدا و حذف شد (${best.loopSample}) — جای آن در متن علامت دارد`);
+      if (best.finish.includes('MAX_TOKENS')) result.notes.push('⚠️ رونویسی به سقفِ خروجیِ Gemini رسید و انتهایش ممکن است بریده باشد؛ فایل را به بخش‌های کوتاه‌تر (حدودِ ۲۰ دقیقه) تقسیم کنید');
+      const odd = best.finish.find((f) => f && !['STOP', 'MAX_TOKENS'].includes(f));
+      if (odd) result.notes.push(`⚠️ Gemini رونویسی را با وضعیتِ «${odd}» تمام کرد`);
       Object.assign(result, {
         method: 'ai-verified',
         status: String(a || '').trim() ? 'ok' : 'empty',
