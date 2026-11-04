@@ -179,7 +179,7 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
           </div>
         );
       })}
-      <div dir="rtl" data-inspection-ui="1" className="fixed bottom-6 left-6 z-[9995] flex flex-col items-start gap-2">
+      <div dir="rtl" data-inspection-ui="1" className="fixed bottom-6 left-24 z-[9995] flex flex-col items-start gap-2">
         {notice && <div className="bg-slate-800 text-white text-sm px-3 py-2 rounded-lg shadow">{notice}</div>}
         <div className="flex gap-2">
           <button onClick={() => setDrawing((d) => !d)} aria-pressed={drawing}
