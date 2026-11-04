@@ -50,6 +50,8 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import DocCapacity from '../lessons/DocCapacity.jsx';
+import { sectionsToWrite, mergeSection, hasInlineSections } from '../lessons/sections.js';
 import ProgressInsights from '../progress/ProgressInsights.jsx';
 import { CULTURE_GUIDE, cacheInsight } from '../culture/cultureGuide.js';
 import Shadowing from '../shadowing/Shadowing.jsx';
@@ -676,16 +678,49 @@ export default function App() {
         // Our own write echoing back: local state is already newer — ignore it.
         if (snap.metadata?.hasPendingWrites) return;
         if (snap.exists()) {
-          const raw = { ...initialData, ...snap.data() };
+          const stored = snap.data();
+          const raw = { ...initialData, ...stored };
           // Long lesson texts live in their own documents: put back what is
           // cached, fetch the rest (never written until loaded — see toCloudDoc).
           const merged = { ...raw, lessons: mergeCachedBodies(raw.lessons, bodyCacheRef.current) };
           for (const l of raw.lessons || []) if (l.bodyRef?.hash) bodyHashesRef.current.set(l.bodyRef.key, l.bodyRef.hash);
+          // Sections (knowledge, chats, journal…) in their own documents
+          // (lessons/sections.js): from memory when the hash matches, else
+          // PENDING — a pending section is never written.
+          const sectionRefs = stored.sectionRefs || {};
+          const pendingSections = [];
+          for (const [name, ref] of Object.entries(sectionRefs)) {
+            if (!ref?.key) continue;
+            if (ref.hash) bodyHashesRef.current.set(ref.key, ref.hash);
+            const hit = bodyCacheRef.current.get(ref.key);
+            if (hit && hit.hash === ref.hash) {
+              try { merged[name] = mergeSection(name, JSON.parse(hit.text), stored[name], initialData[name]); continue; } catch { /* fetch below */ }
+            }
+            pendingSections.push(name);
+            if (stored[name] === undefined) merged[name] = initialData[name];
+          }
+          merged._sectionsPending = pendingSections;
           lastSyncedJsonRef.current = serializeForSync(toCloudDoc(merged));
           loadedUidRef.current = uid;
           setData(merged);
-          if (!merged.lessons.some((l) => l._bodyPending)) saveBackup(merged);
+          if (!merged.lessons.some((l) => l._bodyPending) && !pendingSections.length) saveBackup(merged);
           hydrateBodies(uid, merged.lessons);
+          if (pendingSections.length) hydrateSections(uid, pendingSections.map((n) => ({ name: n, ref: sectionRefs[n] })));
+          // One-time migration of a legacy document (sections inline): a backup copy
+          // first, then a save — which writes sections + main in ONE atomic batch.
+          if (hasInlineSections(stored, initialData)) {
+            (async () => {
+              try {
+                const backupRef = doc(db, `/artifacts/${appId}/users/${uid}/data/premigration-sections-v1`);
+                const b = await getDoc(backupRef);
+                if (!b.exists()) await setDoc(backupRef, { ...stored, _backupOf: 'data/main', _backupAt: new Date().toISOString() });
+                console.info('sections migration: backup copy at data/premigration-sections-v1; saving sections separately…');
+                if (loadedUidRef.current === uid) { lastSyncedJsonRef.current = '__migrate-sections__'; setData((prev) => ({ ...prev })); }
+              } catch (e) {
+                console.warn('sections migration postponed (backup failed):', e?.message || e);
+              }
+            })();
+          }
         } else {
           setDoc(userDocRef, initialData).catch((e) => console.error('init data doc:', e));
           lastSyncedJsonRef.current = serializeForSync(initialData);
@@ -757,6 +792,36 @@ export default function App() {
       bodyLoaderRef.current = loader;
       if (prioritizeRef.current) loader.prioritize(prioritizeRef.current);
       loader.finished.then((p) => console.info(`lesson bodies loaded: ${p.done - p.failed}/${p.total} in ${Date.now() - t0}ms`));
+    };
+
+    // Load pending sections: this browser's copy when the hash matches, else Firestore.
+    // Arrivals are MERGED with whatever memory got meanwhile (never replaced blindly).
+    const hydrateSections = async (uid, items) => {
+      const store = createBodyStore({ doc, getDoc, writeBatch }, db, `/artifacts/${appId}/users/${uid}`);
+      const local = localBodyCacheRef.current || createBodyCache(uid);
+      localBodyCacheRef.current = local;
+      let fresh = new Map();
+      try { fresh = await local.getFresh(items.filter((i) => i.ref.hash).map((i) => ({ key: i.ref.key, hash: i.ref.hash }))); } catch { /* no local cache */ }
+      await Promise.all(items.map(async ({ name, ref }) => {
+        try {
+          const r = fresh.get(ref.key) || await store.read(ref.key, ref);
+          const value = JSON.parse(r.text);
+          bodyCacheRef.current.set(ref.key, { text: r.text, hash: r.hash });
+          bodyHashesRef.current.set(ref.key, r.hash);
+          if (!fresh.has(ref.key)) local.put(ref.key, r.text, r.hash);
+          if (loadedUidRef.current !== uid) return;
+          setData((prev) => ({
+            ...prev,
+            [name]: mergeSection(name, value, prev[name], initialData[name]),
+            _sectionsPending: (prev._sectionsPending || []).filter((n) => n !== name),
+          }));
+        } catch (e) {
+          // Stays pending ⇒ never written; the owner sees why.
+          console.error(`section ${name} load failed:`, e);
+          reportError(e, { source: 'firebase' });
+          setSyncError(`بخشِ «${name}» از فضای ابری بارگذاری نشد (${e?.message || e}). تا بارگذاری نشود ذخیره نمی‌شود — صفحه را تازه کنید.`);
+        }
+      }));
     };
 
     // One-time migration: copy the legacy shared document into the owner's own
@@ -907,7 +972,9 @@ export default function App() {
       if (!shouldSaveToCloud({ loadedUid: loadedUidRef.current, userId, json, lastSyncedJson: lastSyncedJsonRef.current })) return false;
       const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
       const base = `/artifacts/${appId}/users/${userId}`;
-      const changedBodies = bodiesToWrite(snapshot, bodyHashesRef.current);
+      // Changed lesson bodies AND changed sections (knowledge, chats, journal…) go in
+      // the same atomic batch as the main document (lessons/sections.js).
+      const changedBodies = [...bodiesToWrite(snapshot, bodyHashesRef.current), ...sectionsToWrite(snapshot, bodyHashesRef.current)];
       savingRef.current = true;
       const t0 = Date.now();
       try {
@@ -919,7 +986,7 @@ export default function App() {
           localBodyCacheRef.current?.put(l.bodyRef.key, l.archivedNotes, hash);
         }
         lastSyncedJsonRef.current = json;
-        console.info(`cloud save: ${changedBodies.length} lesson bodies + main (${Math.round(json.length / 1024)}KB) in ${Date.now() - t0}ms`);
+        console.info(`cloud save: ${changedBodies.filter((b) => !b.section).length} lesson bodies + ${changedBodies.filter((b) => b.section).map((b) => b.section).join(',') || 'no'} sections + main (${Math.round(json.length / 1024)}KB) in ${Date.now() - t0}ms`);
         dirtyRef.current = serializeForSync(toCloudDoc(dataRef.current)) !== json;
         setSyncError(null);
         saveBackup(snapshot);
@@ -1583,6 +1650,7 @@ function AdminPanel({ db, appId, currentUid, data, setData, externalize = true, 
     return (
         <div dir="rtl" className="max-w-4xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold text-slate-800">مدیریت کاربران</h1>
+            {data && <DocCapacity data={data} />}
             {data && setData && <LessonImportPanel data={data} setData={setData} externalize={externalize} persist={persist} />}
             {error && <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
             <section className="space-y-3">
@@ -1832,8 +1900,10 @@ function SettingsPage({ data, setData, setModalConfig, removePronunciationCorrec
                 mergedData.chatHistories = { ...mergedData.chatHistories, ...oldData.chatHistories };
             }
 
-            // Save to Firebase and local state
-            await setDoc(currentDocRef, mergedData, { merge: true });
+            // Local state only: the normal cloud save writes it (sections and lesson
+            // bodies in their own documents). A direct setDoc would put everything
+            // back inline into the 1 MiB main document.
+            void currentDocRef;
             setData(mergedData);
 
             setModalConfig({

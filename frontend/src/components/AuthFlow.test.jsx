@@ -170,13 +170,17 @@ describe('lesson bodies outside the 1 MiB document', () => {
     expect(await screen.findByText(/ذخیره در فضای ابری تأیید شد/)).toBeTruthy();
     expect(h.batches).toHaveLength(1);
     const ops = h.batches[0];
-    expect(ops.filter((o) => o.path.includes('/lessonBodies/') && o.path.includes('/chunks/'))).toHaveLength(2);
-    expect(ops.filter((o) => o.path.includes('/chunks/')).map((o) => o.data.text).join('')).toBe(longText);
+    expect(ops.filter((o) => o.path.includes('/lessonBodies/L') && o.path.includes('/chunks/'))).toHaveLength(2); // lesson body (sections are S_*)
+    expect(ops.filter((o) => o.path.includes('/lessonBodies/L') && o.path.includes('/chunks/')).map((o) => o.data.text).join('')).toBe(longText);
     const main = ops.find((o) => o.path === DATA).data;
     expect(main.lessons[0]).toMatchObject({ ...old, archivedNotes: expect.stringMatching(/^یادداشتِ قدیمی/), importedSourceKeys: ['rita/1'] });
     expect(main.lessons[1]).toMatchObject({ title: '3 - ریتا', archivedNotes: '', sourceKey: 'rita/3' });
     expect(main.lessons[1].bodyRef.chars).toBe(longText.length);
-    expect(main.chatHistories['lesson-1']).toHaveLength(1);
+    // Chats live in their own section document, written in the SAME atomic batch.
+    expect(main.chatHistories).toBeUndefined();
+    expect(main.sectionRefs.chatHistories.key).toBe('S_chatHistories');
+    const chatText = ops.filter((o) => o.path.includes('/lessonBodies/S_chatHistories/chunks/')).map((o) => o.data.text).join('');
+    expect(JSON.parse(chatText)['lesson-1']).toHaveLength(1);
     expect(JSON.stringify(main).length).toBeLessThan(20000);
     expect(h.setDocCalls.filter((c) => c.path === DATA)).toHaveLength(0); // the main doc went in the batch
     window.location.hash = '';
@@ -194,5 +198,57 @@ describe('lesson bodies outside the 1 MiB document', () => {
     writeBatch.mockReset();
     writeBatch.mockImplementation(() => { const o = []; return { set: (r, d) => o.push({ path: r.path, data: d }), commit: () => { h.batches.push(o); return Promise.resolve(); } }; });
     window.location.hash = '';
+  });
+});
+
+describe('sections (knowledge, chats, journal) outside the main document', () => {
+  const signIn = async () => {
+    render(<App />);
+    await act(async () => { await h.authCb({ uid: 'u1', email: 'mohamad.mahdi1988@gmail.com' }); });
+    await act(async () => { await h.snapCbs[ACCESS](snap({ role: 'admin', status: 'approved', permissions: {} })); });
+  };
+  const kb = { vocabulary: Array.from({ length: 1334 }, (_, i) => ({ id: i, term: `كلمة ${i}`, definition: `معنی ${i}` })), grammar: [], phrases: [], verbs: [], pronouns: [], adjectives: [] };
+
+  it('legacy inline document: backup copy FIRST, then one atomic batch moves the sections out — nothing lost', async () => {
+    await signIn();
+    const legacy = { lessons: [{ id: 1, title: 'درس', archivedNotes: 'متن', files: [], progress: {} }], knowledgeBase: kb, journal: [{ id: 5, date: '2026-11-01T00:00:00Z', entry: 'قدیمی' }] };
+    await act(async () => { h.snapCbs[DATA](snap(legacy)); });
+    await waitFor(() => expect(h.batches.length).toBeGreaterThan(0), { timeout: 4000 });
+    const backup = h.setDocCalls.find((c) => c.path.endsWith('/data/premigration-sections-v1'));
+    expect(backup.data.knowledgeBase.vocabulary).toHaveLength(1334); // full copy before migrating
+    const ops = h.batches.at(-1);
+    const main = ops.find((o) => o.path === DATA).data;
+    expect(main.knowledgeBase).toBeUndefined();
+    expect(main.journal).toBeUndefined();
+    expect(main.sectionRefs.knowledgeBase.key).toBe('S_knowledgeBase');
+    const text = (name) => ops.filter((o) => o.path.includes(`/lessonBodies/S_${name}/chunks/`)).map((o) => o.data.text).join('');
+    expect(JSON.parse(text('knowledgeBase')).vocabulary).toHaveLength(1334);
+    expect(JSON.parse(text('journal'))[0].entry).toBe('قدیمی');
+    expect(JSON.stringify(main).length).toBeLessThan(5000);
+  });
+
+  it('a section not loaded yet is never written over; once it arrives it is in memory and, unchanged, not rewritten', async () => {
+    let releaseKb;
+    const kbText = JSON.stringify(kb);
+    const { textHash } = await import('../lessons/lessonBodies.js');
+    const { serializeForSync } = await import('../storage/sync.js');
+    const stableKb = serializeForSync(kb);
+    h.getDocImpl = async (ref) => {
+      if (ref.path.endsWith('/lessonBodies/S_knowledgeBase/chunks/0000')) { await new Promise((r) => { releaseKb = r; }); return snap({ i: 0, text: stableKb }); }
+      return snap(null);
+    };
+    await signIn();
+    const stored = { lessons: [], sectionRefs: { knowledgeBase: { key: 'S_knowledgeBase', chars: stableKb.length, hash: textHash(stableKb) } } };
+    await act(async () => { h.snapCbs[DATA](snap(stored)); });
+    // While the knowledge base is loading, the journal changes (a save happens) —
+    // but the knowledge-base section must NOT be written (it would be empty).
+    await new Promise((r) => setTimeout(r, 1300));
+    for (const b of h.batches) expect(b.some((o) => o.path.includes('/S_knowledgeBase'))).toBe(false);
+    for (const b of h.batches) { const m = b.find((o) => o.path === DATA); if (m) expect(m.data.sectionRefs.knowledgeBase.hash).toBe(textHash(stableKb)); }
+    await act(async () => { releaseKb(); await new Promise((r) => setTimeout(r, 50)); });
+    // Loaded: it is in memory (dashboard counter shows 1334 words) and unchanged ⇒ not rewritten.
+    expect((await screen.findAllByText('1334')).length).toBeGreaterThan(0);
+    for (const b of h.batches) expect(b.some((o) => o.path.includes('/S_knowledgeBase'))).toBe(false);
+    void kbText;
   });
 });

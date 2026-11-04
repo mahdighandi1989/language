@@ -10,6 +10,8 @@
 // Transient fields start with «_» (_bodyPending, _bodyError) and are never saved.
 // Rules: covered by match /artifacts/{appId}/users/{uid}/{document=**}.
 
+import { sectionsToCloud } from './sections.js';
+
 export const BODY_CHUNK_CHARS = 250000; // ≤ ~750 KB UTF-8 per chunk document
 
 // Recently hashed strings: the same string object is not hashed twice (saves
@@ -74,7 +76,8 @@ export function toCloudDoc(data) {
     }
     return { ...base, archivedNotes: '' }; // not in memory: keep the stored ref as is
   });
-  return { ...data, lessons };
+  // Knowledge, chats, journal… live in their own documents too (./sections.js).
+  return sectionsToCloud({ ...data, lessons }, data);
 }
 
 /** Loaded lessons whose text differs from what is known to be stored. */
