@@ -55,3 +55,15 @@ export function normalizeQuiz(raw) {
   }
   return out;
 }
+
+/** Model text ⇒ valid questions, or [] (bad JSON, empty, nothing usable). Tolerates code fences / prose around the array. */
+export function parseQuizResponse(text) {
+  const s = String(text || '');
+  let raw = null;
+  try { raw = JSON.parse(s); } catch {
+    const m = s.match(/\[[\s\S]*\]/);
+    if (m) { try { raw = JSON.parse(m[0]); } catch { raw = null; } }
+  }
+  if (raw && !Array.isArray(raw) && Array.isArray(raw.questions)) raw = raw.questions;
+  return normalizeQuiz(Array.isArray(raw) ? raw : []);
+}

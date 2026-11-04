@@ -58,8 +58,8 @@ import ExportMenu from '../exports/ExportMenu.jsx';
 import { download as downloadBlob } from '../exports/exports.js';
 import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
 import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
-import { normalizeQuiz } from '../quiz/normalizeQuiz.js';
-import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET } from '../quiz/quizSource.js';
+import { normalizeQuiz, parseQuizResponse } from '../quiz/normalizeQuiz.js';
+import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET, QUIZ_MAX_QUESTIONS } from '../quiz/quizSource.js';
 
 // Module-level singleton: one tracker for the app's chat activity. Analytics is
 // strictly best-effort and must never affect the chat UX.
@@ -3892,39 +3892,37 @@ ${lessonContent}`;
             generationConfig: { responseMimeType: "application/json", responseSchema: schema }
         };
 
-        // Never wait forever: 75s timeout, «لغو» aborts at once.
+        // Never wait forever: ONE deadline of 45s for everything, «لغو» aborts at once.
+        // Attempt 1: the full request (no «thinking», bounded output). If the JSON is
+        // unusable, attempt 2 within the same deadline: temperature 0.1 and a simpler
+        // format (multiple-choice only, ≤5 questions).
         const controller = new AbortController();
         quizAbortRef.current = controller;
         let timedOut = false;
-        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 75000);
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 45000);
+        const fast = { thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 8192 };
         try {
-            const response = await callGeminiAPI(payload, 3, 1000, controller.signal);
-            let generatedQuiz;
-
-            try {
-                generatedQuiz = JSON.parse(response);
-            } catch (parseError) {
-                // Try to extract JSON from response
-                const jsonMatch = response.match(/\[[\s\S]*\]/);
-                if (jsonMatch) {
-                    generatedQuiz = JSON.parse(jsonMatch[0]);
-                } else {
-                    throw new Error('Invalid JSON response');
-                }
-            }
-
-            if (!Array.isArray(generatedQuiz) || generatedQuiz.length === 0) {
-                throw new Error('Empty quiz');
-            }
-
-            // Filter and validate questions
-            // Coerce every field to a string (numbers/objects from the model
-            // used to crash rendering ⇒ white screen) and drop invalid items.
-            const validQuiz = normalizeQuiz(generatedQuiz);
-
+            payload.generationConfig = { ...payload.generationConfig, ...fast, temperature: 0.4 };
+            let validQuiz = parseQuizResponse(await callGeminiAPI(payload, 1, 1000, controller.signal));
             if (validQuiz.length === 0) {
-                throw new Error('No valid questions');
+                const simple = Math.min(5, questionCount);
+                const simplePrompt = `${quizSystemPrompt} بر اساسِ متنِ درسِ زیر دقیقاً ${simple} سؤالِ چهارگزینه‌ای بساز (هر سؤال یک پاسخِ درست که عیناً یکی از ۴ گزینه است). فقط آرایهٔ JSON.
+
+محتوای درس:
+${lessonContent.slice(0, 8000)}`;
+                validQuiz = parseQuizResponse(await callGeminiAPI({
+                    contents: [{ parts: [{ text: "آزمون بساز" }] }],
+                    systemInstruction: { parts: [{ text: simplePrompt }] },
+                    generationConfig: {
+                        responseMimeType: "application/json", temperature: 0.1, ...fast,
+                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING" }, question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, correctAnswer: { type: "STRING" } }, required: ["question", "options", "correctAnswer"] } },
+                    },
+                }, 1, 1000, controller.signal).then((t) => {
+                    // the simple schema may omit «type»
+                    try { const a = JSON.parse(t); return JSON.stringify(Array.isArray(a) ? a.map((q) => ({ type: 'mcq', ...q })) : a); } catch { return t; }
+                }));
             }
+            if (validQuiz.length === 0) throw new Error('No valid questions');
 
             setQuiz(validQuiz);
             if (timeLimit > 0) setTimeLeft(timeLimit * 60);
@@ -3933,11 +3931,11 @@ ${lessonContent}`;
             console.error('Quiz generation error:', error);
             const aborted = error?.name === 'AbortError';
             if (aborted && !timedOut) return; // cancelled by the user
-            const message = aborted ? 'ساختِ آزمون بیش از ۷۵ ثانیه طول کشید و متوقف شد. دوباره امتحان کنید یا تعدادِ سؤال‌ها را کمتر کنید.'
+            const message = aborted ? 'ساختِ آزمون بیش از ۴۵ ثانیه طول کشید و متوقف شد. دوباره امتحان کنید، تعدادِ سؤال‌ها را کمتر کنید یا یک درس را جدا انتخاب کنید.'
                 : error?.status === 401 || error?.status === 403 ? 'دسترسی رد شد؛ یک بار خارج و دوباره وارد شوید.'
                 : error?.status === 429 ? 'سهمیهٔ Gemini موقتاً پر است؛ یک دقیقهٔ دیگر دوباره امتحان کنید.'
                 : error?.status >= 500 ? `سرور پاسخ نداد (کد ${error.status}). دوباره امتحان کنید.`
-                : 'پاسخِ مدل قابلِ استفاده نبود. دوباره تلاش کنید یا محتوای بیشتری به درس اضافه کنید.';
+                : 'پاسخِ مدل دو بار (یک بار با قالبِ ساده‌تر) قابلِ استفاده نبود. دوباره تلاش کنید یا یک درسِ دیگر انتخاب کنید.';
             setModalConfig({ title: "ساختِ آزمون ناموفق بود", message });
         } finally {
             clearTimeout(timer);
@@ -4209,10 +4207,10 @@ ${lessonContent}`;
                         <input
                             type="number"
                             value={questionCount}
-                            onChange={(e) => setQuestionCount(Math.max(1, Math.min(15, parseInt(e.target.value) || 5)))}
+                            onChange={(e) => setQuestionCount(Math.max(1, Math.min(QUIZ_MAX_QUESTIONS, parseInt(e.target.value) || 5)))}
                             className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-teal-500"
                             min="1"
-                            max="15"
+                            max="10"
                         />
                     </div>
                 </div>

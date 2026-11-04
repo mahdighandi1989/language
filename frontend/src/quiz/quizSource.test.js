@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET } from './quizSource.js';
+import { recentLessons, sampleLessonText, cleanForQuiz, QUIZ_CHAR_BUDGET } from './quizSource.js';
 
 const big = (i) => Array.from({ length: 3000 }, (_, k) => (k % 2 ? `| كلمة${i}_${k} | معنی ${k} |` : `توضیحِ فارسیِ ${k}`)).join('\n');
 
@@ -28,5 +28,16 @@ describe('quiz source', () => {
     expect(lines.filter((x) => x.includes('كلمة')).length / lines.length).toBeGreaterThan(0.6);
     expect(a).not.toBe(b);
     expect(sampleLessonText([{ title: 's', archivedNotes: 'کوتاه ولی بیش از پنجاه نویسه برای این آزمونِ کوچک است!!' }])).toContain('کوتاه');
+  });
+});
+
+describe('cleanForQuiz', () => {
+  it('drops suspect/unreadable/loop lines, timestamps, metadata and repeats; keeps the real lesson', () => {
+    const t = ['> روش: رونویسیِ دوبار‌سنجیده · توافق ۴۲٪', '[00:12] لازم تكتب فروضتك', '⚠️ [مشکوک] شي ما بينفهم', 'كان [ناخوانا] هون',
+      'اماراتيه ⟲ [تکرارِ ماشینی حذف شد ×480]', 'لا لا لا لا لا لا لا', '(0:20 - 0:25) بس للأسف لازم', 'بس للأسف لازم', 'متعوِّد هیک : اینجوری عادت کردم'].join('\n');
+    expect(cleanForQuiz(t)).toBe('لازم تكتب فروضتك\nبس للأسف لازم\nمتعوِّد هیک : اینجوری عادت کردم');
+  });
+  it('a lesson that is only noise counts as having no content', () => {
+    expect(recentLessons([{ id: 1, archivedNotes: '⚠️ [مشکوک] ' + 'x'.repeat(80) }])).toEqual([]);
   });
 });

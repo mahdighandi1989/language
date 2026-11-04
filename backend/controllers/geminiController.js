@@ -1,3 +1,4 @@
+import { candidateText } from '../services/geminiService.js';
 import { GEMINI_API_KEY } from '../config/env.js';
 import { redactSensitiveData } from '../utils/redact.js';
 import { probeLiveModels } from '../services/liveProxyService.js';
@@ -102,7 +103,8 @@ export async function chat(req, res) {
       // sanitize the validated result so only known fields reach the client.
       res.json(sanitizeGeminiResponse(result));
     } else {
-      const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      // All text parts (long JSON can arrive split), never «thought» parts.
+      const text = candidateText(result);
       if (!text) {
         return res.status(500).json({ error: 'No text in response' });
       }

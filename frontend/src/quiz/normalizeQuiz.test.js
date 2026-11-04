@@ -15,3 +15,15 @@ describe('normalizeQuiz', () => {
     expect(q[2].pairs).toHaveLength(3);
   });
 });
+
+describe('parseQuizResponse', () => {
+  it('accepts plain, fenced, wrapped JSON; rejects broken output', async () => {
+    const { parseQuizResponse } = await import('./normalizeQuiz.js');
+    const q = [{ type: 'mcq', question: 'كيفك؟', options: ['a', 'b', 'c', 'd'], correctAnswer: 'a' }];
+    expect(parseQuizResponse(JSON.stringify(q))).toHaveLength(1);
+    expect(parseQuizResponse('```json\n' + JSON.stringify(q) + '\n```')).toHaveLength(1);
+    expect(parseQuizResponse(JSON.stringify({ questions: q }))).toHaveLength(1);
+    expect(parseQuizResponse('[{"type":"mcq","question":"x","options":["a","b"')).toEqual([]);
+    expect(parseQuizResponse('')).toEqual([]);
+  });
+});
