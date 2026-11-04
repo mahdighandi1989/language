@@ -4,9 +4,11 @@
 // components/App.jsx passes knowledgeBase + setData + setModalConfig.
 import React, { useMemo, useState } from 'react';
 import { Search, Pencil, Trash2, Plus, Check, X, Eye } from 'lucide-react';
+import KbTools from './KbTools.jsx';
 import { categoryList, updateItem, deleteItem, addCategory, renameCategory, removeCategory, showCategory, matches } from './kb.js';
 
-export default function KnowledgeCenter({ knowledgeBase = {}, kbCategories = {}, setData, setModalConfig, addJournalEntry }) {
+export default function KnowledgeCenter({ knowledgeBase = {}, kbCategories = {}, setData, setModalConfig, addJournalEntry, data }) {
+  const [mode, setMode] = useState('list');
   const [activeTab, setActiveTab] = useState('vocabulary');
   const [searchTerm, setSearchTerm] = useState('');
   const [editing, setEditing] = useState(null); // {ref, term, definition, source, category}
@@ -48,8 +50,19 @@ export default function KnowledgeCenter({ knowledgeBase = {}, kbCategories = {},
     save((kb, meta) => removeCategory(kb, meta, c.key));
   };
 
+  const modes = [['list', '📋 فهرست'], ['review', '🩺 بازبینی'], ['cards', '🃏 فلش‌کارت'], ['quiz', '❓ آزمونِ سریع']];
+  const modeBar = editable && (
+    <div className="flex gap-1 mb-3 flex-wrap" role="tablist">
+      {modes.map(([k, l]) => <button key={k} role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={`px-3 py-1 rounded-full text-sm ${mode === k ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{l}</button>)}
+    </div>
+  );
+  if (mode !== 'list') {
+    return <div dir="rtl">{modeBar}<KbTools mode={mode} knowledgeBase={knowledgeBase} kbCategories={kbCategories} data={data} setData={setData} addJournalEntry={addJournalEntry} /></div>;
+  }
+
   return (
     <div dir="rtl">
+      {modeBar}
       <div className="flex items-center border-b mb-4 gap-1">
         <div className="flex overflow-x-auto flex-1">
           {visible.map((c) => (

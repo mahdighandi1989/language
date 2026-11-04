@@ -2920,7 +2920,7 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
            <Card title="مرکز دانش شما">
-             <KnowledgeCenter knowledgeBase={knowledgeBase} kbCategories={data?.kbCategories} setData={setData} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />
+             <KnowledgeCenter data={data} knowledgeBase={knowledgeBase} kbCategories={data?.kbCategories} setData={setData} setModalConfig={setModalConfig} addJournalEntry={addJournalEntry} />
            </Card>
           <Card title="شروع کنید">
             <h3 className="text-lg font-bold mb-4 text-slate-700">ایجاد درس جدید</h3>
