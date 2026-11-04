@@ -3815,6 +3815,8 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
 
         addJournalEntry(`ایجاد آزمون ${difficultyLabels[difficulty].label} برای ${isRecent ? `${sources.length} درسِ اخیر` : `درس "${lesson.title}"`}`);
 
+        // Canonical names = the ones the page renders (see quiz/normalizeQuiz.js QUIZ_TYPES).
+        const TYPE_NAMES = { mcq: 'mcq', fillInBlank: 'fill_in_blank', translateToPersian: 'translate_to_persian', translateToArabic: 'translate_to_arabic', wordOrder: 'word_order', matching: 'matching' };
         const typeDescriptions = {
             mcq: 'سوال چهارگزینه‌ای با یک پاسخ صحیح',
             fillInBlank: 'جمله با جای خالی که باید کلمه صحیح نوشته شود',
@@ -3833,7 +3835,9 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
 سطح سختی: ${difficultyLabels[difficulty].label} (${difficultyLabels[difficulty].desc})
 
 انواع سوالات مورد نیاز:
-${selectedTypes.map(t => `- ${t}: ${typeDescriptions[t]}`).join('\n')}
+${selectedTypes.map(t => `- ${TYPE_NAMES[t]}: ${typeDescriptions[t]}`).join('\n')}
+
+فیلدِ «type» فقط و فقط یکی از این مقدارها باشد: ${selectedTypes.map(t => TYPE_NAMES[t]).join('، ')}. هر نوعِ دیگر (مثلِ verb_conjugation یا grammar) ممنوع است — سؤالِ صرفِ فعل را به‌صورتِ mcq با ۴ گزینه بساز.
 
 ${quizInstructions}
 
@@ -3891,7 +3895,7 @@ ${lessonContent}${glossaryBlock}`;
             items: {
                 type: "OBJECT",
                 properties: {
-                    type: { type: "STRING" },
+                    type: { type: "STRING", enum: selectedTypes.map(t => TYPE_NAMES[t]) },
                     question: { type: "STRING" },
                     options: { type: "ARRAY", items: { type: "STRING" } },
                     correctAnswer: { type: "STRING" },
@@ -3934,11 +3938,11 @@ ${lessonContent.slice(0, 8000)}${glossaryBlock}`;
                     systemInstruction: { parts: [{ text: simplePrompt }] },
                     generationConfig: {
                         responseMimeType: "application/json", temperature: 0.1, ...fast,
-                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING" }, question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, correctAnswer: { type: "STRING" }, explanation: { type: "STRING" } }, required: ["question", "options", "correctAnswer"] } },
+                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING", enum: ["mcq"] }, question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, correctAnswer: { type: "STRING" }, explanation: { type: "STRING" } }, required: ["question", "options", "correctAnswer"] } },
                     },
                 }, 1, 1000, controller.signal).then((t) => {
                     // the simple schema may omit «type»
-                    try { const a = JSON.parse(t); return JSON.stringify(Array.isArray(a) ? a.map((q) => ({ type: 'mcq', ...q })) : a); } catch { return t; }
+                    try { const a = JSON.parse(t); return JSON.stringify(Array.isArray(a) ? a.map((q) => ({ ...q, type: 'mcq' })) : a); } catch { return t; }
                 }));
             }
             // Knowledge questions interleaved; tense-contradictory model questions dropped.

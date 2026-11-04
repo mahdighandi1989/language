@@ -36,26 +36,50 @@ export function planQuiz(n, lessons, pool) {
   return { kbCount, slots: slots.filter((s) => s.count > 0) };
 }
 
-/** Local multiple-choice questions from knowledge items (half each direction), distractors from the same tab. */
+const nWords = (x) => String(x || '').trim().split(/\s+/).filter(Boolean).length;
+/** Rough «kind» of a term/meaning: a word, a short phrase or a sentence. */
+export const shapeOf = (x) => { const n = nWords(x); return n <= 1 ? 'word' : n <= 3 ? 'phrase' : 'sentence'; };
+
+/**
+ * Distractors of the SAME kind as the answer (word with words, sentence with
+ * sentences), same tab first: «تخم می‌گذارد» no longer sits next to a sentence.
+ */
+export function pickDistractors(answer, candidates, category, rnd = Math.random) {
+  const shape = shapeOf(answer.text);
+  const others = candidates.filter((c) => c.text !== answer.text);
+  const tiers = [
+    others.filter((c) => c.category === category && shapeOf(c.text) === shape),
+    others.filter((c) => c.category !== category && shapeOf(c.text) === shape),
+    others.filter((c) => shapeOf(c.text) !== shape),
+  ];
+  const out = [];
+  const used = new Set([answer.text]);
+  for (const tier of tiers) for (const c of shuffle(tier, rnd)) {
+    if (out.length >= 3) return out;
+    if (!used.has(c.text)) { used.add(c.text); out.push(c.text); }
+  }
+  return out.length >= 3 ? out : null;
+}
+
+/** Local multiple-choice questions from knowledge items (half each direction). */
 export function knowledgeQuestions(pool, count, rnd = Math.random) {
   const out = [];
-  const meaningsBy = (cat) => [...new Set(pool.filter((p) => p.category === cat).map((p) => String(p.definition).trim()))];
-  const allMeanings = [...new Set(pool.map((p) => String(p.definition).trim()))];
-  const allTerms = [...new Set(pool.map((p) => String(p.term).trim()))];
+  const meanings = pool.map((p) => ({ text: String(p.definition).trim(), category: p.category }));
+  const terms = pool.map((p) => ({ text: String(p.term).trim(), category: p.category }));
   for (const it of pool) {
     if (out.length >= count) break;
     const term = String(it.term).trim();
     const meaning = String(it.definition).trim();
     const reverse = out.length % 2 === 1;
+    const src = it.source ? ` (${it.source})` : '';
     if (!reverse) {
-      let others = meaningsBy(it.category).filter((m) => m !== meaning);
-      if (others.length < 3) others = allMeanings.filter((m) => m !== meaning);
-      if (others.length < 3) continue;
-      out.push({ type: 'mcq', question: `معنیِ «${term}» چیست؟`, options: shuffle([meaning, ...shuffle(others, rnd).slice(0, 3)], rnd), correctAnswer: meaning, explanation: `از مرکزِ دانش${it.source ? ` (${it.source})` : ''}`, source: 'knowledge' });
+      const d = pickDistractors({ text: meaning }, meanings, it.category, rnd);
+      if (!d) continue;
+      out.push({ type: 'mcq', question: `معنیِ «${term}» چیست؟`, options: shuffle([meaning, ...d], rnd), correctAnswer: meaning, explanation: `از مرکزِ دانش${src}`, source: 'knowledge' });
     } else {
-      const others = allTerms.filter((t) => t !== term);
-      if (others.length < 3) continue;
-      out.push({ type: 'mcq', question: `«${meaning}» به لبنانی کدام است؟`, options: shuffle([term, ...shuffle(others, rnd).slice(0, 3)], rnd), correctAnswer: term, explanation: `از مرکزِ دانش${it.source ? ` (${it.source})` : ''}`, source: 'knowledge' });
+      const d = pickDistractors({ text: term }, terms, it.category, rnd);
+      if (!d) continue;
+      out.push({ type: 'mcq', question: `«${meaning}» به لبنانی کدام است؟`, options: shuffle([term, ...d], rnd), correctAnswer: term, explanation: `از مرکزِ دانش${src}`, source: 'knowledge' });
     }
   }
   return out;

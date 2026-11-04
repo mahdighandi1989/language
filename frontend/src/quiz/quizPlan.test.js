@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { knowledgePool, planQuiz, knowledgeQuestions, isContradictory, mergeQuiz } from './quizPlan.js';
+import { knowledgePool, planQuiz, knowledgeQuestions, isContradictory, mergeQuiz, pickDistractors, shapeOf } from './quizPlan.js';
 
 let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const kb = { vocabulary: [
@@ -42,5 +42,21 @@ describe('quiz plan', () => {
     expect(m.quiz).toHaveLength(5);
     // model failed entirely: knowledge-only quiz
     expect(mergeQuiz([], [{ question: 'k1' }, { question: 'k2' }], 5).quiz).toHaveLength(2);
+  });
+});
+
+describe('distractors of the same kind', () => {
+  it('a one-word answer gets one-word options, a sentence gets sentences (same tab first)', () => {
+    const c = [
+      { text: 'خانه', category: 'vocabulary' }, { text: 'آب', category: 'vocabulary' }, { text: 'در', category: 'vocabulary' }, { text: 'پنجره', category: 'phrases' },
+      { text: 'خداوند این خانه را آباد کند', category: 'phrases' }, { text: 'امروز چه کار می‌کنی؟', category: 'phrases' }, { text: 'دلم برایت تنگ شده است', category: 'phrases' }, { text: 'بیا با هم برویم بیرون', category: 'vocabulary' },
+    ];
+    let seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const w = pickDistractors({ text: 'ماشین' }, c, 'vocabulary', rnd);
+    expect(w.every((x) => shapeOf(x) === 'word')).toBe(true);
+    expect(w.filter((x) => ['خانه', 'آب', 'در'].includes(x))).toHaveLength(3); // same tab first
+    const s = pickDistractors({ text: 'تخم‌مرغ را کجا گذاشتی؟ بگو' }, c, 'phrases', rnd);
+    expect(s.every((x) => shapeOf(x) === 'sentence')).toBe(true);
+    expect(pickDistractors({ text: 'x' }, [{ text: 'y' }], 'v', rnd)).toBeNull();
   });
 });

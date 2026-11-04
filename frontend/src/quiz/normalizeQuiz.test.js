@@ -27,3 +27,18 @@ describe('parseQuizResponse', () => {
     expect(parseQuizResponse('')).toEqual([]);
   });
 });
+
+describe('unknown question types', () => {
+  it('maps invented types by shape (options ⇒ mcq) and drops what cannot be rendered', async () => {
+    const { normalizeQuiz } = await import('./normalizeQuiz.js');
+    const q = normalizeQuiz([
+      { type: 'verb_conjugation', question: 'صرف فعل «أخد» برای «إنتِ» در زمان ماضی؟', options: ['أخدتي', 'أخدت', 'أخد', 'بتاخدي'], correctAnswer: 'أخدتي' },
+      { type: 'verb_conjugation', question: 'صرف فعل «أخد» برای «هو»؟', correctAnswer: 'أخد' },
+      { type: 'pairs_game', pairs: [{ arabic: 'a', persian: 'b' }, { arabic: 'c', persian: 'd' }, { arabic: 'e', persian: 'f' }] },
+      { type: 'mcq', question: 'x', options: ['a', 'b', 'c'], correctAnswer: 'z' },
+      { type: 'something', question: 'بی‌گزینه' },
+    ]);
+    expect(q.map((x) => x.type)).toEqual(['mcq', 'matching']);
+    expect(q[0].options).toContain('أخدتي');
+  });
+});

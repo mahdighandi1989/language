@@ -16,9 +16,26 @@ function str(v) {
 
 const TYPE_ALIASES = { fillinblank: 'fill_in_blank', translatetopersian: 'translate_to_persian', translatetoarabic: 'translate_to_arabic', wordorder: 'word_order', multiplechoice: 'mcq' };
 
+/** The only types the quiz page can render. */
+export const QUIZ_TYPES = ['mcq', 'fill_in_blank', 'translate_to_persian', 'translate_to_arabic', 'word_order', 'matching'];
+
 export function normalizeType(t) {
   const k = str(t).toLowerCase().replace(/[^a-z]/g, '');
   return TYPE_ALIASES[k] || (k === 'mcq' || k === 'matching' ? k : str(t).toLowerCase());
+}
+
+/**
+ * Unknown types (the model invents e.g. «verb_conjugation», «multiple_choice_verb»)
+ * become a renderable type from their SHAPE: options ⇒ mcq, pairs ⇒ matching,
+ * words ⇒ word_order; anything else is dropped (null) — never «نوع سوال نامشخص».
+ */
+export function renderableType(q) {
+  const t = normalizeType(q?.type);
+  if (QUIZ_TYPES.includes(t)) return t;
+  if (Array.isArray(q?.options) && q.options.length >= 2) return 'mcq';
+  if (Array.isArray(q?.pairs) && q.pairs.length >= 3) return 'matching';
+  if (Array.isArray(q?.words) && q.words.length >= 2) return 'word_order';
+  return null;
 }
 
 export function normalizeQuiz(raw) {
@@ -26,7 +43,8 @@ export function normalizeQuiz(raw) {
   const out = [];
   for (const q of raw) {
     if (!q || typeof q !== 'object') continue;
-    const type = normalizeType(q.type);
+    const type = renderableType(q);
+    if (!type) continue;
     const item = { type, question: str(q.question), correctAnswer: str(q.correctAnswer), ...(q.explanation ? { explanation: str(q.explanation).slice(0, 400) } : {}) };
     if (type === 'mcq') {
       item.options = (Array.isArray(q.options) ? q.options : []).map(str).filter(Boolean);
@@ -34,7 +52,9 @@ export function normalizeQuiz(raw) {
       if (/^\d+$/.test(item.correctAnswer) && !item.options.includes(item.correctAnswer)) {
         item.correctAnswer = item.options[Number(item.correctAnswer)] || item.correctAnswer;
       }
-      if (item.options.length < 2) continue;
+      item.options = [...new Set(item.options)];
+      // The right answer must be one of the options, or the question is unanswerable.
+      if (item.options.length < 2 || !item.options.includes(item.correctAnswer)) continue;
     }
     if (type === 'word_order') {
       item.words = (Array.isArray(q.words) ? q.words : str(q.words).split(/\s+/)).map(str).filter(Boolean);
