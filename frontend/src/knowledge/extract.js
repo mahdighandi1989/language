@@ -72,12 +72,18 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
         if (looksHeader) {
           const arCol = cells.findIndex((c) => /عربی|لبنانی|arab|leb|فعل|صفت|ضمیر|لغت|کلمه|عبارت/i.test(c));
           const faCol = cells.findIndex((c) => /فارسی|معنی|ترجمه|persian|meaning/i.test(c));
-          header = { arCol, faCol, hint: categoryFromHint(cells.join(' ')), skip: CORRECTIONS_COLS.test(cells.join(' ')) };
+          header = { arCol, faCol, hint: categoryFromHint(cells.join(' ')), skip: CORRECTIONS_COLS.test(cells.join(' ')), conj: conjugationColumns(cells) };
+          if (header.conj) header.hint = 'verbs';
           continue;
         }
         header = { arCol: -1, faCol: -1, hint: null };
       }
       if (header.skip) continue; // a problems/suggestions table
+      // Verb-conjugation table: ضمیر | ماضی | مضارع | امر … ⇒ one item per form.
+      if (header.conj) {
+        for (const item of conjugationRow(cells, header.conj, heading)) out.push({ ...item, from: 'conjugation', trusted: true });
+        continue;
+      }
       // Columns named in the header decide; otherwise the most Lebanese cell vs the
       // most Persian one (a bare word like «شاطر» is ambiguous on its own).
       const scripted = cells.filter((c) => ARABIC_SCRIPT.test(c));
@@ -115,6 +121,52 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
   const seen = new Set();
   return split.filter((c) => !/\|/.test(c.term + c.definition) && c.term.length + c.definition.length <= MAX_ITEM_CHARS * 3).filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map((c) => ({ ...c, source: lessonTitle ? `درس: ${lessonTitle}` : '' }));
+}
+
+// ---- verb-conjugation tables ----
+const TENSES = [
+  [/ماضی|گذشته|past|perfect/i, 'ماضی'],
+  [/مضارع|حال|present|imperfect/i, 'مضارع'],
+  [/امر|imperative/i, 'امر'],
+  [/آینده|مستقبل|future/i, 'آینده'],
+  [/اسم\s*فاعل|participle/i, 'اسمِ فاعل'],
+  [/نهی|منفی|negative/i, 'نهی'],
+];
+const PRONOUNS = {
+  'انا': 'من', 'أنا': 'من', 'إنتَ': 'تو (مذکر)', 'انتَ': 'تو (مذکر)', 'انت': 'تو', 'إنت': 'تو', 'إنتِ': 'تو (مؤنث)', 'انتِ': 'تو (مؤنث)', 'انتی': 'تو (مؤنث)', 'إنتي': 'تو (مؤنث)',
+  'هو': 'او (مذکر)', 'هوّ': 'او (مذکر)', 'هي': 'او (مؤنث)', 'هی': 'او (مؤنث)', 'هيّ': 'او (مؤنث)', 'نحنا': 'ما', 'نحن': 'ما', 'إحنا': 'ما', 'انتو': 'شما', 'إنتو': 'شما', 'انتوا': 'شما',
+  'هنّي': 'آن‌ها', 'هني': 'آن‌ها', 'هنی': 'آن‌ها', 'هم': 'آن‌ها', 'هن': 'آن‌ها',
+};
+/** Columns of a conjugation table: { pron, forms: [{ col, tense }], meaning } or null. */
+export function conjugationColumns(cells) {
+  const forms = [];
+  cells.forEach((c, i) => { const t = TENSES.find(([re]) => re.test(c)); if (t) forms.push({ col: i, tense: t[1] }); });
+  if (forms.length < 2) return null;
+  const pron = cells.findIndex((c) => /ضمیر|شخص|pronoun|person/i.test(c));
+  const meaning = cells.findIndex((c, i) => !forms.some((f) => f.col === i) && /فارسی|معنی|ترجمه|meaning/i.test(c));
+  return { pron, forms, meaning };
+}
+/** The verb's meaning from the table's heading: «صرفِ فعلِ حبّ (دوست داشتن)», «حبّ = دوست داشتن». */
+export function verbMeaningFromHeading(heading) {
+  const h = String(heading || '');
+  const m = h.match(/\(([^)]+)\)/) || h.match(/[:=–—-]\s*([^:=]+)$/);
+  const cand = m ? m[1].trim() : '';
+  return cand && langScore(cand) <= 0 ? cand : '';
+}
+function conjugationRow(cells, conj, heading) {
+  const pronAr = conj.pron >= 0 ? cells[conj.pron] : '';
+  const pronFa = PRONOUNS[pronAr.replace(/[\u064B-\u0652]/g, (x) => x)] || PRONOUNS[pronAr.replace(/[\u064B-\u0650\u0652]/g, '')] || (pronAr && langScore(pronAr) <= 0 ? pronAr : pronAr);
+  const verb = verbMeaningFromHeading(heading);
+  const rowMeaning = conj.meaning >= 0 ? cells[conj.meaning] : '';
+  const out = [];
+  for (const f of conj.forms) {
+    const form = cells[f.col];
+    if (!form || !ARABIC_SCRIPT.test(form) || form === '-' || form === '—') continue;
+    const who = pronFa ? `«${pronFa}»` : '';
+    const what = rowMeaning || verb;
+    out.push({ term: form, definition: [`${f.tense}${who ? ` برای ${who}` : ''}`, what].filter(Boolean).join(' — '), pronunciation: '', category: 'verbs' });
+  }
+  return out;
 }
 
 export const CATEGORIES = ['vocabulary', 'phrases', 'verbs', 'adjectives', 'pronouns', 'grammar'];
@@ -191,8 +243,30 @@ export function quality(c) {
  * The original is kept as written, but a Persian meaning typed with Arabic
  * letters (ي ك ة) or with a letter Persian rarely puts there is shown as doubtful.
  */
+// Common Persian words written with غ / with ع — a word that becomes one of them
+// when ع↔غ is swapped is most likely a typo («عافلگیر» ⇒ «غافلگیر»). Cheap, no dictionary.
+const GHAIN_WORDS = ['غافلگیر', 'غافل', 'غذا', 'غمگین', 'غم', 'غریب', 'غلط', 'غیر', 'غایب', 'غیب', 'غرور', 'غصه', 'غروب', 'غرب', 'غار', 'غول', 'غریبه', 'غرق', 'غنی', 'غوغا', 'غلتیدن', 'غر', 'باغ', 'دروغ', 'شلوغ', 'چراغ', 'مرغ', 'تیغ', 'سراغ', 'جیغ', 'داغ', 'دماغ', 'روغن', 'لغت', 'مغز', 'آغاز', 'آغوش', 'تبلیغ', 'دریغ', 'بلوغ', 'چاق', 'شغل', 'مشغول', 'بغل', 'تغییر', 'فراغت', 'یغما'];
+const AIN_WORDS = ['عادت', 'علم', 'عشق', 'عصبانی', 'عجیب', 'عزیز', 'عکس', 'عمو', 'عمه', 'عید', 'عروس', 'عروسی', 'عقب', 'عصر', 'عمر', 'عجله', 'عوض', 'عالی', 'عیب', 'علت', 'عذر', 'عهد', 'عصا', 'جمع', 'شمع', 'نوع', 'شروع', 'ممنوع', 'موقع', 'واقعا', 'معنی', 'معلم', 'تعطیل', 'بعد', 'بعدا', 'جعبه', 'دعوا', 'دعوت', 'ساعت', 'شعر', 'طعم', 'قطعه', 'لعنت', 'مبلغ'];
+const GHAIN_SET = new Set(GHAIN_WORDS);
+const AIN_SET = new Set(AIN_WORDS);
+const normFa = (w) => w.replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک').replace(/[ً-ْ‌]/g, '').replace(/[.,،:;!؟?()«»"]/g, '');
+
+/**
+ * The original is kept as written, but a meaning that looks mistyped is shown
+ * as doubtful: ع written for غ (or the reverse) in a common Persian word, or a
+ * Persian meaning typed with Arabic letters (ي ك ة).
+ */
 export function spellingDoubt(def) {
   const d = String(def || '');
+  for (const raw of d.split(/\s+/)) {
+    const w = normFa(raw);
+    if (w.length < 2) continue;
+    // whole word, or a known word as the start (compound: «غافلگیر» in «غافلگیرشده»)
+    const swapToGhain = w.replace(/ع/g, 'غ');
+    if (w.includes('ع') && !AIN_SET.has(w) && (GHAIN_SET.has(swapToGhain) || GHAIN_WORDS.some((g) => g.length >= 4 && swapToGhain.startsWith(g) && !w.startsWith(g)))) return `املای معنی مشکوک: «${raw}» احتمالاً «${raw.replace(/ع/g, 'غ')}» (ع به‌جای غ)`;
+    const swapToAin = w.replace(/غ/g, 'ع');
+    if (w.includes('غ') && !GHAIN_SET.has(w) && AIN_SET.has(swapToAin)) return `املای معنی مشکوک: «${raw}» احتمالاً «${raw.replace(/غ/g, 'ع')}» (غ به‌جای ع)`;
+  }
   if (/[يكة]/.test(d) && /[پچژگی]|‌/.test(d + 'ی')) return 'املای معنی مشکوک (حرفِ عربی در متنِ فارسی)';
   return '';
 }

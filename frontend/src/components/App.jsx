@@ -53,6 +53,7 @@ import ErrorBoundary from './ErrorBoundary.jsx';
 import KnowledgeExtract from '../knowledge/KnowledgeExtract.jsx';
 import DocCapacity from '../lessons/DocCapacity.jsx';
 import DrivePanel from '../lessons/DrivePanel.jsx';
+import useDriveLinks from '../lessons/useDriveLinks.js';
 import { sectionsToWrite, mergeSection, hasInlineSections, applyLessonExtras, hasInlineLessonData } from '../lessons/sections.js';
 import { lessonExtrasOf, INLINE_NOTES_MAX } from '../lessons/lessonBodies.js';
 import ProgressInsights from '../progress/ProgressInsights.jsx';
@@ -3348,6 +3349,8 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
 
   // Download the ORIGINAL of a file kept by «آپلودِ هوشمند» (older entries are
   // metadata only — their bytes were never stored).
+  // Drive copies (link / error) of this lesson's stored files — shown next to each file.
+  const driveLinks = useDriveLinks(lesson.id, (lesson.files || []).filter((f) => f.stored).length);
   const downloadFile = async (file) => {
       try {
           const res = await fetch(`/api/lesson-files/${lesson.id}/${file.id}/raw`);
@@ -3746,6 +3749,8 @@ ${analyzedContent}
                          </div>
                        </div>
                        <div className="flex items-center gap-1">
+                         {driveLinks[file.id]?.link && <a href={driveLinks[file.id].link} target="_blank" rel="noopener noreferrer" className="p-1 hover:bg-teal-100 rounded-full text-teal-700 text-sm" title="نسخهٔ این فایل در Google Drive" aria-label="بازکردن در Google Drive">☁️</a>}
+                         {!driveLinks[file.id]?.link && driveLinks[file.id]?.error && <span className="p-1 text-amber-600 text-sm" title={`در Drive کپی نشد: ${driveLinks[file.id].error}`} aria-label="کپی در Drive ناموفق">⚠☁️</span>}
                          <button onClick={() => downloadFile(file)} disabled={!file.stored} className="p-1 hover:bg-teal-100 rounded-full text-teal-700 disabled:opacity-30" title={file.stored ? 'دانلودِ اصلِ فایل' : 'اصلِ این فایل ذخیره نشده بود (فقط «آپلودِ هوشمند» اصلِ فایل را نگه می‌دارد)'} aria-label="دانلودِ فایل">
                            <Download size={16}/>
                          </button>

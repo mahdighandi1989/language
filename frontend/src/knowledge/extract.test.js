@@ -116,3 +116,37 @@ describe('tester report after 23a7df9 («5 - ریتا»)', async () => {
     expect(quality({ term: 'مِعَدتی', definition: 'حرکت‌گذاری نادرست: مَعِدَة' }).ok).toBe(false);
   });
 });
+
+describe('ain/ghain typos and conjugation tables', async () => {
+  const { spellingDoubt, quality, conjugationColumns, verbMeaningFromHeading } = await import('./extract.js');
+  it('flags ع written for غ (and the reverse) in common Persian words; the text is kept', () => {
+    expect(spellingDoubt('عافلگیر شده')).toMatch(/عافلگیر.*غافلگیر.*ع به‌جای غ/);
+    expect(spellingDoubt('عافلگیرشدن')).toMatch(/ع به‌جای غ/);
+    expect(spellingDoubt('عذا خوردن')).toMatch(/غذا/);
+    expect(spellingDoubt('غادت')).toMatch(/عادت.*غ به‌جای ع/);
+    for (const ok of ['غافلگیر شده', 'عادت کردم', 'عصبانی', 'ساعت', 'باغ بزرگ', 'ناراحت']) expect(spellingDoubt(ok)).toBe('');
+    const c = extractLocal('| عربی | فارسی |\n|---|---|\n| مِتفاجِئ | عافلگیر شده |');
+    expect(c[0].definition).toBe('عافلگیر شده');
+    expect(quality(c[0]).ok).toBe(true);
+    expect(quality(c[0]).warn).toMatch(/ع به‌جای غ/);
+  });
+  it('reads a verb-conjugation table: one verbs item per form, tense + Persian pronoun + verb meaning', () => {
+    const notes = ['## صرفِ فعلِ حبّ (دوست داشتن)', '| ضمیر | ماضی | مضارع | امر |', '|---|---|---|---|',
+      '| انا | حَبّيت | بْحِبّ | - |', '| إنتَ | حَبّيت | بِتْحِبّ | حِبّ |', '| هي | حَبِّت | بِتْحِبّ | - |'].join('\n');
+    const c = extractLocal(notes);
+    expect(c.every((x) => x.category === 'verbs')).toBe(true);
+    const by = Object.fromEntries(c.map((x) => [`${x.term}|${x.definition}`, x]));
+    expect(by['بْحِبّ|مضارع برای «من» — دوست داشتن']).toBeTruthy();
+    expect(by['حِبّ|امر برای «تو (مذکر)» — دوست داشتن']).toBeTruthy();
+    expect(by['حَبِّت|ماضی برای «او (مؤنث)» — دوست داشتن']).toBeTruthy();
+    expect(c.some((x) => x.term === '-')).toBe(false);
+    expect(c.every((x) => quality(x).ok)).toBe(true);
+    expect(conjugationColumns(['ضمیر', 'ماضی', 'مضارع'])).toMatchObject({ pron: 0 });
+    expect(conjugationColumns(['عربی', 'فارسی'])).toBeNull();
+    expect(verbMeaningFromHeading('خاف = ترسیدن')).toBe('ترسیدن');
+  });
+  it('tab-separated conjugation rows (PDF text) work too', () => {
+    const c = extractLocal('افعال\nضمیر\tماضی\tمضارع\nانا\tخِفِت\tبْخاف\nهو\tخاف\tبيْخاف');
+    expect(c.map((x) => x.term)).toEqual(['خِفِت', 'بْخاف', 'خاف', 'بيْخاف']);
+  });
+});
