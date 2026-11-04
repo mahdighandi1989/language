@@ -105,6 +105,9 @@ def render_sheet(s: dict) -> str:
         out.append(f"- گره: `{a['selector']}` · جای کادر داخلِ گره (کسر از لبهٔ چپ/بالا): x={a['fx']} y={a['fy']} w={a['fw']} h={a['fh']}")
     if g.get("doc"):
         out.append(f"- مختصاتِ سند: {g['doc']} · پنجره: {g.get('viewport')} · dpr: {g.get('dpr')}")
+    if s.get("env"):
+        e = s["env"]
+        out.append(f"- محیطِ مرورگر: {e.get('url')} · پنجره {e.get('viewport')} · صفحه {e.get('screen')} · dpr {e.get('dpr')} · تم {e.get('theme')} · {e.get('userAgent')}")
     if s.get("domPath"):
         out.append(f"- عنصر: `{s['domPath']}`")
     if s.get("coveredText"):

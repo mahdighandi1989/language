@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { captureGeometry, coveredText, rectFromPoints, resolveRect, buildSelector } from './geometry.js';
 import { takeFocus } from './focus.js';
+import { captureEnv, captureViewportShot, describeGeometry } from './capture.js';
 
 export const TONE_COLOR = {
   open: '#f97316', pending: '#f59e0b', stale: '#f97316',
@@ -25,8 +26,9 @@ function readAsDataUrl(file) {
   });
 }
 
-function SheetForm({ isOwner, draft, onCancel, onSubmit, busy, error }) {
+function SheetForm({ isOwner, draft, autoShot, shotPending, onCancel, onSubmit, busy, error }) {
   const [text, setText] = useState('');
+  const [dropAuto, setDropAuto] = useState(false);
   const [files, setFiles] = useState([]);
   const [shot, setShot] = useState(null);
   const [urgent, setUrgent] = useState(false);
@@ -42,6 +44,25 @@ function SheetForm({ isOwner, draft, onCancel, onSubmit, busy, error }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-3">
         <h3 className="text-lg font-bold text-slate-800">برگهٔ نظارت — {draft.pageLabel || draft.page}</h3>
         {draft.coveredText && <p className="text-xs text-slate-500 line-clamp-2">زیرِ کادر: «{draft.coveredText.slice(0, 160)}»</p>}
+        {draft.geometry && (
+          <details open className="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2" data-testid="inspection-coords">
+            <summary className="cursor-pointer font-bold">📐 مختصات و محیط (خودکار ثبت می‌شود)</summary>
+            <dl className="mt-1 space-y-0.5">
+              {describeGeometry(draft.geometry).map(([k, v]) => <div key={k} className="flex gap-2"><dt className="font-medium shrink-0">{k}:</dt><dd className="break-all" dir="ltr">{v}</dd></div>)}
+              <div className="flex gap-2"><dt className="font-medium shrink-0">مسیر:</dt><dd className="break-all" dir="ltr">{draft.reopen}</dd></div>
+            </dl>
+          </details>
+        )}
+        {!shot && !dropAuto && (shotPending || autoShot) && (
+          <div className="text-xs text-slate-600 space-y-1" data-testid="inspection-autoshot">
+            {shotPending && !autoShot ? <p>در حالِ گرفتنِ اسکرین‌شاتِ صفحه…</p> : (
+              <>
+                <img src={autoShot} alt="اسکرین‌شاتِ خودکار" className="max-h-40 rounded border" />
+                <button onClick={() => setDropAuto(true)} className="text-red-600">حذفِ اسکرین‌شاتِ خودکار</button>
+              </>
+            )}
+          </div>
+        )}
         <textarea
           autoFocus value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} rows={5}
           placeholder="چه چیزی اشتباه است یا چه می‌خواهید؟ (برای افزودنِ تصویر، Ctrl+V)"
@@ -67,7 +88,7 @@ function SheetForm({ isOwner, draft, onCancel, onSubmit, busy, error }) {
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-sm">انصراف</button>
           <button
-            disabled={busy || !text.trim()} onClick={() => onSubmit({ text, files, shot, urgent })}
+            disabled={busy || !text.trim()} onClick={() => onSubmit({ text, files, shot: shot || (dropAuto ? null : autoShot), urgent })}
             className="px-4 py-2 rounded-xl bg-teal-600 text-white hover:bg-teal-700 disabled:bg-slate-300 text-sm"
           >{busy ? 'در حالِ ثبت…' : 'ثبتِ برگه'}</button>
         </div>
@@ -80,6 +101,8 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
   const [drawing, setDrawing] = useState(false);
   const [drag, setDrag] = useState(null);
   const [draft, setDraft] = useState(null);
+  const [autoShot, setAutoShot] = useState(null);
+  const [shotPending, setShotPending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -143,7 +166,11 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
     if (overlayRef.current) overlayRef.current.style.pointerEvents = 'auto';
     const geometry = captureGeometry(rect, anchor, window);
     setDrawing(false);
-    setDraft({ page, pageLabel, reopen, geometry, domPath: anchor ? buildSelector(anchor) : '', coveredText: coveredText(anchor) });
+    setAutoShot(null);
+    setShotPending(true);
+    setDraft({ page, pageLabel, reopen, geometry, env: captureEnv(window), domPath: anchor ? buildSelector(anchor) : '', coveredText: coveredText(anchor) });
+    // The screenshot is taken now (the page is exactly as the person saw it).
+    captureViewportShot(rect, window).then((u) => { setAutoShot(u); setShotPending(false); });
   };
 
   const submit = async ({ text, files, shot, urgent }) => {
@@ -200,7 +227,7 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
           {live && <div style={{ position: 'fixed', left: live.x, top: live.y, width: live.w, height: live.h, border: '2px dashed #f97316', background: 'rgba(249,115,22,0.12)' }} />}
         </div>
       )}
-      {draft && <SheetForm isOwner={isOwner} draft={draft} busy={busy} error={error} onCancel={() => { setDraft(null); setError(null); }} onSubmit={submit} />}
+      {draft && <SheetForm isOwner={isOwner} draft={draft} autoShot={autoShot} shotPending={shotPending} busy={busy} error={error} onCancel={() => { setDraft(null); setError(null); }} onSubmit={submit} />}
     </>
   );
 }
