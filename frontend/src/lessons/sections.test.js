@@ -41,3 +41,38 @@ describe('sections out of the main document', () => {
     expect(SECTIONS).toContain('journal');
   });
 });
+
+describe('lessons: inline texts and heavy extras out of the main document', async () => {
+  const { toCloudDoc, bodiesToWrite, lessonExtrasOf, INLINE_NOTES_MAX } = await import('./lessonBodies.js');
+  const { applyLessonExtras, hasInlineLessonData, lessonFieldUsage } = await import('./sections.js');
+  const big = { id: 7, title: '7 - ریتا', archivedNotes: 'ن'.repeat(5000), corrections: [{ quote: 'x', issue: 'y' }], mediaItems: [{ type: 'image', data: 'A'.repeat(3000) }], sources: ['a.pdf'], files: [] };
+  const small = { id: 8, title: 'کوتاه', archivedNotes: 'متنِ کوتاه', files: [] };
+  const data = { lessons: [big, small] };
+  it('any long inline text gets a body; small ones stay; extras go to the lessonExtras section', () => {
+    const cloud = toCloudDoc(data);
+    expect(cloud.lessons[0]).toMatchObject({ archivedNotes: '', bodyRef: { key: 'L7', chars: 5000 } });
+    expect(cloud.lessons[0].corrections).toBeUndefined();
+    expect(cloud.lessons[0].mediaItems).toBeUndefined();
+    expect(cloud.lessons[1].archivedNotes).toBe('متنِ کوتاه');
+    expect(cloud.sectionRefs.lessonExtras.key).toBe('S_lessonExtras');
+    expect(lessonFieldUsage(cloud.lessons).avg).toBeLessThan(400);
+    const w = bodiesToWrite(data, new Map());
+    expect(w.map((l) => l.bodyRef.key)).toEqual(['L7']);
+    expect(w[0].archivedNotes).toHaveLength(5000);
+    expect(INLINE_NOTES_MAX).toBe(1000);
+  });
+  it('extras come back on the lessons; edits made while loading are kept (arrays unioned)', () => {
+    const extras = lessonExtrasOf(data.lessons);
+    const stripped = [{ ...big, corrections: [{ quote: 'z', issue: 'new' }], mediaItems: undefined, sources: undefined }, small];
+    const back = applyLessonExtras(stripped, JSON.parse(JSON.stringify(extras)));
+    expect(back[0].corrections.map((c) => c.quote)).toEqual(['x', 'z']);
+    expect(back[0].mediaItems[0].data).toHaveLength(3000);
+    expect(back[0].sources).toEqual(['a.pdf']);
+    expect(back[1]).toBe(small);
+  });
+  it('detects legacy lessons that still need moving', () => {
+    expect(hasInlineLessonData({ lessons: [big] })).toBe(true);
+    expect(hasInlineLessonData({ lessons: [small] })).toBe(false);
+    expect(hasInlineLessonData({ lessons: [{ id: 1, bodyRef: { key: 'L1' }, archivedNotes: '' }] })).toBe(false);
+  });
+});

@@ -15,7 +15,8 @@
 import { textHash } from './lessonBodies.js';
 import { serializeForSync } from '../storage/sync.js';
 
-export const SECTIONS = ['knowledgeBase', 'chatHistories', 'archivedConversations', 'journal', 'pronunciationCorrections', 'culturalInsights', 'kbReview', 'kbMergeLog', 'shadowing', 'studyPlan'];
+export const SECTIONS = ['knowledgeBase', 'chatHistories', 'archivedConversations', 'journal', 'pronunciationCorrections', 'culturalInsights', 'kbReview', 'kbMergeLog', 'shadowing', 'studyPlan', 'lessonExtras'];
+// «lessonExtras» is virtual: derived from the lessons (lessonBodies.lessonExtrasOf), applied back by applyLessonExtras.
 export const sectionKey = (name) => `S_${name}`;
 export const DOC_LIMIT_BYTES = 1048576;
 
@@ -91,7 +92,7 @@ export function mergeSection(name, stored, local, defaults) {
 
 /** Does this (legacy) document still carry sections inline? */
 export function hasInlineSections(raw, defaults) {
-  return SECTIONS.some((n) => raw[n] !== undefined && serializeForSync(raw[n]) !== serializeForSync(defaults[n]) && !(raw.sectionRefs || {})[n]);
+  return SECTIONS.filter((n) => n !== 'lessonExtras').some((n) => raw[n] !== undefined && serializeForSync(raw[n]) !== serializeForSync(defaults[n]) && !(raw.sectionRefs || {})[n]);
 }
 
 const utf8 = (s) => (typeof TextEncoder !== 'undefined' ? new TextEncoder().encode(String(s)).length : String(s).length * 3);
@@ -104,4 +105,46 @@ export function docUsage(cloudDoc, data) {
   const sections = {};
   for (const name of SECTIONS) if (data[name] !== undefined) sections[name] = utf8(sectionText(data[name]));
   return { bytes, limit: DOC_LIMIT_BYTES, ratio: bytes / DOC_LIMIT_BYTES, parts, sections };
+}
+
+const unionBy = (a = [], b = []) => {
+  const key = (x) => (x && typeof x === 'object' ? (x.id != null ? `id:${x.id}` : JSON.stringify(x)) : String(x));
+  const seen = new Set(a.map(key));
+  return [...a, ...b.filter((x) => !seen.has(key(x)))];
+};
+
+/**
+ * Put the stored lesson extras back on the lessons. A field the lesson got
+ * meanwhile (edit while loading) is kept: arrays are unioned, other values: local wins.
+ */
+export function applyLessonExtras(lessons = [], extras = {}) {
+  return lessons.map((l) => {
+    const e = extras?.[String(l.id)];
+    if (!e) return l;
+    const next = { ...l };
+    for (const [f, v] of Object.entries(e)) {
+      const local = l[f];
+      if (local === undefined || local === null || local === '' || (Array.isArray(local) && !local.length)) next[f] = v;
+      else if (Array.isArray(local) && Array.isArray(v)) next[f] = unionBy(v, local);
+    }
+    return next;
+  });
+}
+
+/** Legacy lessons that still carry long inline text or heavy extras in the main document. */
+export function hasInlineLessonData(raw, inlineMax = 1000, fields = ['pendingAnalysis', 'corrections', 'mediaItems', 'sources']) {
+  return (raw?.lessons || []).some((l) => (!l.bodyRef && String(l.archivedNotes ?? '').length > inlineMax) || fields.some((f) => l[f] !== undefined && !(Array.isArray(l[f]) && !l[f].length) && l[f] !== '' && l[f] !== null));
+}
+
+/** Per-field totals over all lessons in the main document — what fills it. */
+export function lessonFieldUsage(cloudLessons = []) {
+  const totals = {};
+  const perLesson = [];
+  for (const l of cloudLessons) {
+    let size = 0;
+    for (const [k, v] of Object.entries(l)) { const b = utf8(serializeForSync(v) || ''); totals[k] = (totals[k] || 0) + b; size += b; }
+    perLesson.push({ id: l.id, title: l.title, bytes: size });
+  }
+  perLesson.sort((a, b) => b.bytes - a.bytes);
+  return { totals, top: perLesson.slice(0, 5), count: cloudLessons.length, avg: cloudLessons.length ? Math.round(perLesson.reduce((n, x) => n + x.bytes, 0) / cloudLessons.length) : 0 };
 }

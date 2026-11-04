@@ -252,3 +252,44 @@ describe('sections (knowledge, chats, journal) outside the main document', () =>
     void kbText;
   });
 });
+
+describe('lesson texts and extras out of the main document (migration + reload)', () => {
+  it('legacy inline lessons: backup, atomic move, and after a reload every text and correction is back', async () => {
+    render(<App />);
+    await act(async () => { await h.authCb({ uid: 'u1', email: 'mohamad.mahdi1988@gmail.com' }); });
+    await act(async () => { await h.snapCbs[ACCESS](snap({ role: 'admin', status: 'approved', permissions: {} })); });
+    const lessons = Array.from({ length: 3 }, (_, i) => ({ id: i + 1, title: `${i + 1} - ریتا`, archivedNotes: `متنِ درسِ ${i + 1} `.repeat(400), corrections: [{ quote: `q${i}`, issue: 'اعراب' }], files: [], progress: {} }));
+    const legacy = { lessons };
+    await act(async () => { h.snapCbs[DATA](snap(legacy)); });
+    await waitFor(() => expect(h.batches.length).toBeGreaterThan(0), { timeout: 4000 });
+    expect(h.setDocCalls.find((c) => c.path.endsWith('/data/premigration-lessons-v1')).data.lessons[0].archivedNotes.length).toBeGreaterThan(1000);
+    const ops = h.batches.flat();
+    const main = h.batches.at(-1).find((o) => o.path === DATA).data;
+    for (const l of main.lessons) { expect(l.archivedNotes).toBe(''); expect(l.bodyRef.key).toBe(`L${l.id}`); expect(l.corrections).toBeUndefined(); }
+    expect(JSON.stringify(main).length).toBeLessThan(4000);
+    // Reload: a fresh tab reads only what was written.
+    const written = new Map(ops.map((o) => [o.path, o.data]));
+    h.getDocImpl = async (ref) => (written.has(ref.path) ? snap(written.get(ref.path)) : snap(null));
+    cleanupAndRender: {
+      const { cleanup } = await import('@testing-library/react');
+      cleanup();
+    }
+    h.batches = [];
+    render(<App />);
+    await act(async () => { await h.authCb({ uid: 'u1', email: 'mohamad.mahdi1988@gmail.com' }); });
+    await act(async () => { await h.snapCbs[ACCESS](snap({ role: 'admin', status: 'approved', permissions: {} })); });
+    await act(async () => { h.snapCbs[DATA](snap(main)); await new Promise((r) => setTimeout(r, 300)); });
+    // The texts and the extras were re-read from their own documents (getDoc on the stored paths).
+    const { getDoc } = await import('firebase/firestore');
+    const read = getDoc.mock.calls.map((c) => c[0].path);
+    expect(read.some((p) => p.includes('/lessonBodies/L1/chunks/'))).toBe(true);
+    expect(read.some((p) => p.includes('/lessonBodies/S_lessonExtras/chunks/'))).toBe(true);
+    // …and nothing was overwritten with empty values meanwhile.
+    for (const b of h.batches) for (const o of b) {
+      if (o.path.includes('/lessonBodies/L') && o.path.includes('/chunks/')) expect(o.data.text.length).toBeGreaterThan(1000);
+      if (o.path === DATA) for (const l of o.data.lessons) expect(l.bodyRef.hash).toBe(main.lessons.find((x) => x.id === l.id).bodyRef.hash);
+    }
+    const extrasText = ops.filter((o) => o.path.includes('/S_lessonExtras/chunks/')).map((o) => o.data.text).join('');
+    expect(JSON.parse(extrasText)['2'].corrections[0].quote).toBe('q1');
+  });
+});

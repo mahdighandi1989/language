@@ -13,6 +13,11 @@
 import { sectionsToCloud } from './sections.js';
 
 export const BODY_CHUNK_CHARS = 250000; // ≤ ~750 KB UTF-8 per chunk document
+// ANY lesson text longer than this goes to its own document (not only imported
+// ones > 20k): 190 lessons × a few KB inline filled the main document to 55%.
+export const INLINE_NOTES_MAX = 1000;
+// Heavy per-lesson fields kept in the «lessonExtras» section, not in the main document.
+export const LESSON_EXTRA_FIELDS = ['pendingAnalysis', 'corrections', 'mediaItems', 'sources'];
 
 // Recently hashed strings: the same string object is not hashed twice (saves
 // re-hashing ~4M characters on every save check).
@@ -59,6 +64,28 @@ export function bodyLoaded(lesson) {
   return Boolean(lesson?.bodyRef) && !lesson._bodyPending && !lesson._bodyError;
 }
 
+/** Where a lesson's text is (to be) stored: its ref, or a new one when an inline text is too long. */
+export function effectiveBodyRef(lesson) {
+  if (lesson?.bodyRef) return lesson.bodyRef;
+  if (!lesson || lesson._bodyPending || lesson._bodyError) return null;
+  return String(lesson.archivedNotes ?? '').length > INLINE_NOTES_MAX ? { key: bodyKeyFor(lesson) } : null;
+}
+
+const extrasMemo = new WeakMap();
+/** { lessonId: { pendingAnalysis, corrections, mediaItems, sources } } — same object while lessons are unchanged. */
+export function lessonExtrasOf(lessons = []) {
+  const hit = extrasMemo.get(lessons);
+  if (hit) return hit;
+  const out = {};
+  for (const l of lessons) {
+    const e = {};
+    for (const f of LESSON_EXTRA_FIELDS) if (l?.[f] !== undefined && l[f] !== null && !(Array.isArray(l[f]) && !l[f].length) && l[f] !== '') e[f] = l[f];
+    if (Object.keys(e).length) out[String(l.id)] = e;
+  }
+  extrasMemo.set(lessons, out);
+  return out;
+}
+
 function stripTransient(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj)) if (!k.startsWith('_')) out[k] = v;
@@ -68,21 +95,30 @@ function stripTransient(obj) {
 /** The main document as it is written to Firestore (bodies replaced by refs). */
 export function toCloudDoc(data) {
   const lessons = (data.lessons || []).map((l) => {
-    if (!l.bodyRef) return stripTransient(l);
     const base = stripTransient(l);
-    if (bodyLoaded(l)) {
+    for (const f of LESSON_EXTRA_FIELDS) delete base[f]; // → «lessonExtras» section
+    const ref = effectiveBodyRef(l);
+    if (!ref) return base;
+    if (!l._bodyPending && !l._bodyError) {
       const text = String(l.archivedNotes ?? '');
-      return { ...base, archivedNotes: '', bodyRef: { key: l.bodyRef.key, chars: text.length, hash: textHash(text) } };
+      return { ...base, archivedNotes: '', bodyRef: { key: ref.key, chars: text.length, hash: textHash(text) } };
     }
     return { ...base, archivedNotes: '' }; // not in memory: keep the stored ref as is
   });
-  // Knowledge, chats, journal… live in their own documents too (./sections.js).
-  return sectionsToCloud({ ...data, lessons }, data);
+  // Knowledge, chats, journal… and the lessons' heavy extras live in their own documents (./sections.js).
+  return sectionsToCloud({ ...data, lessons }, { ...data, lessonExtras: lessonExtrasOf(data.lessons || []) });
 }
 
 /** Loaded lessons whose text differs from what is known to be stored. */
 export function bodiesToWrite(data, persistedHashes) {
-  return (data.lessons || []).filter((l) => bodyLoaded(l) && textHash(l.archivedNotes) !== persistedHashes.get(l.bodyRef.key));
+  const out = [];
+  for (const l of data.lessons || []) {
+    const ref = effectiveBodyRef(l);
+    if (!ref || l._bodyPending || l._bodyError) continue;
+    if (textHash(l.archivedNotes) === persistedHashes.get(ref.key)) continue;
+    out.push(l.bodyRef ? l : { ...l, bodyRef: { key: ref.key } }); // newly externalised inline lesson
+  }
+  return out;
 }
 
 /**

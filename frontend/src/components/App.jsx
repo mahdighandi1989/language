@@ -51,7 +51,8 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import DocCapacity from '../lessons/DocCapacity.jsx';
-import { sectionsToWrite, mergeSection, hasInlineSections } from '../lessons/sections.js';
+import { sectionsToWrite, mergeSection, hasInlineSections, applyLessonExtras, hasInlineLessonData } from '../lessons/sections.js';
+import { lessonExtrasOf, INLINE_NOTES_MAX } from '../lessons/lessonBodies.js';
 import ProgressInsights from '../progress/ProgressInsights.jsx';
 import { CULTURE_GUIDE, cacheInsight } from '../culture/cultureGuide.js';
 import Shadowing from '../shadowing/Shadowing.jsx';
@@ -694,10 +695,15 @@ export default function App() {
             if (ref.hash) bodyHashesRef.current.set(ref.key, ref.hash);
             const hit = bodyCacheRef.current.get(ref.key);
             if (hit && hit.hash === ref.hash) {
-              try { merged[name] = mergeSection(name, JSON.parse(hit.text), stored[name], initialData[name]); continue; } catch { /* fetch below */ }
+              try {
+                const value = JSON.parse(hit.text);
+                if (name === 'lessonExtras') merged.lessons = applyLessonExtras(merged.lessons, value);
+                else merged[name] = mergeSection(name, value, stored[name], initialData[name]);
+                continue;
+              } catch { /* fetch below */ }
             }
             pendingSections.push(name);
-            if (stored[name] === undefined) merged[name] = initialData[name];
+            if (name !== 'lessonExtras' && stored[name] === undefined) merged[name] = initialData[name];
           }
           merged._sectionsPending = pendingSections;
           lastSyncedJsonRef.current = serializeForSync(toCloudDoc(merged));
@@ -708,13 +714,14 @@ export default function App() {
           if (pendingSections.length) hydrateSections(uid, pendingSections.map((n) => ({ name: n, ref: sectionRefs[n] })));
           // One-time migration of a legacy document (sections inline): a backup copy
           // first, then a save — which writes sections + main in ONE atomic batch.
-          if (hasInlineSections(stored, initialData)) {
+          const inlineLessons = hasInlineLessonData(stored, INLINE_NOTES_MAX);
+          if (hasInlineSections(stored, initialData) || inlineLessons) {
             (async () => {
               try {
-                const backupRef = doc(db, `/artifacts/${appId}/users/${uid}/data/premigration-sections-v1`);
+                const backupRef = doc(db, `/artifacts/${appId}/users/${uid}/data/${inlineLessons ? 'premigration-lessons-v1' : 'premigration-sections-v1'}`);
                 const b = await getDoc(backupRef);
                 if (!b.exists()) await setDoc(backupRef, { ...stored, _backupOf: 'data/main', _backupAt: new Date().toISOString() });
-                console.info('sections migration: backup copy at data/premigration-sections-v1; saving sections separately…');
+                console.info(`sections migration: backup copy at ${backupRef.path}; saving sections${inlineLessons ? ' and lesson texts/extras' : ''} separately…`);
                 if (loadedUidRef.current === uid) { lastSyncedJsonRef.current = '__migrate-sections__'; setData((prev) => ({ ...prev })); }
               } catch (e) {
                 console.warn('sections migration postponed (backup failed):', e?.message || e);
@@ -812,7 +819,7 @@ export default function App() {
           if (loadedUidRef.current !== uid) return;
           setData((prev) => ({
             ...prev,
-            [name]: mergeSection(name, value, prev[name], initialData[name]),
+            ...(name === 'lessonExtras' ? { lessons: applyLessonExtras(prev.lessons, value) } : { [name]: mergeSection(name, value, prev[name], initialData[name]) }),
             _sectionsPending: (prev._sectionsPending || []).filter((n) => n !== name),
           }));
         } catch (e) {
@@ -974,7 +981,7 @@ export default function App() {
       const base = `/artifacts/${appId}/users/${userId}`;
       // Changed lesson bodies AND changed sections (knowledge, chats, journal…) go in
       // the same atomic batch as the main document (lessons/sections.js).
-      const changedBodies = [...bodiesToWrite(snapshot, bodyHashesRef.current), ...sectionsToWrite(snapshot, bodyHashesRef.current)];
+      const changedBodies = [...bodiesToWrite(snapshot, bodyHashesRef.current), ...sectionsToWrite({ ...snapshot, lessonExtras: lessonExtrasOf(snapshot.lessons || []) }, bodyHashesRef.current)];
       savingRef.current = true;
       const t0 = Date.now();
       try {
