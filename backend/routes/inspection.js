@@ -101,6 +101,14 @@ function geometryOf(body) {
   return json.length > 8000 ? null : JSON.parse(json);
 }
 
+/** Browser snapshot sent with a sheet (url, viewport, UA…) — plain bounded JSON. */
+export function envOf(body) {
+  const e = body?.env;
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+  const json = JSON.stringify(e);
+  return json.length > 3000 ? null : JSON.parse(json);
+}
+
 async function loadVisible(store, actor, id) {
   const sheet = await store.getSheet(String(id));
   if (!sheet || !canSee(actor, sheet)) throw new InspectionError(404, 'برگه پیدا نشد');
@@ -360,6 +368,7 @@ inspectionRouter.post('/api/inspection', authed(async (req, res) => {
     // colours, ⚡ and binder; it simply has no box/highlight.
     general: Boolean(req.body?.general),
     geometry: req.body?.general ? null : geometryOf(req.body),
+    env: envOf(req.body),
     notes: [{ id: noteId, by: req.actor.role === 'supervisor' ? 'reviewer' : req.actor.role, author: req.actor.email, at: now, text, shotId: null }],
     deps: [],
     urgentAt: null,
