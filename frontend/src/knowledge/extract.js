@@ -24,6 +24,10 @@ export function categoryFromHint(text) {
   return null;
 }
 
+const CORRECTIONS_HEAD = /⚠️\s*\**\s*(اصلاحات|هشدار)|^#{1,6}\s*.*(اصلاحات و هشدار|هشدارهای پیشنهادی|اصلاحاتِ پیشنهادی)/;
+const NOISE_LINE = /⚠️|\[مشکوک\]|\[ناخوانا\]|⟲|اطمینان\s*(کم|متوسط|بالا)/;
+// A «meaning» that is really a review note.
+const NOTE_WORDS = /غلط|اشتباه|باید\s|حرکت‌?گذاری|اعراب|تایپی|اطمینان|اصلاح|پیشنهاد|درستش|صحیح\s+آن/;
 const clean = (s) => String(s || '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
 const words = (s) => clean(s).split(' ').filter(Boolean).length;
 const byLength = (term) => (words(term) <= 2 ? 'vocabulary' : 'phrases');
@@ -35,11 +39,17 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
   let heading = '';
   let header = null; // { arCol, faCol, hint }
   const lines = String(text || '').split('\n');
+  let skipping = false; // inside a «⚠️ اصلاحات و هشدارها» block
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) { header = null; continue; }
     const h = line.match(/^#{1,6}\s+(.*)$/);
+    // The corrections/warnings block (smart upload, review) is ABOUT the text, not
+    // vocabulary: skip it up to the next heading or «---».
+    if (CORRECTIONS_HEAD.test(line)) { skipping = true; header = null; continue; }
+    if (skipping) { if (h || /^-{3,}$/.test(line)) skipping = false; else continue; }
     if (h) { heading = h[1]; header = null; continue; }
+    if (NOISE_LINE.test(line)) continue;
     // A short title line without separators (PDF headings: «صفات», «verbs») sets the tab hint too.
     if (line.length <= 40 && !/[|=:\t]/.test(raw) && categoryFromHint(line)) { heading = line; header = null; continue; }
     // Markdown tables, and tab-separated rows (what PDF/Excel text extraction gives).
@@ -69,7 +79,7 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
         if (ar && fa && !(langScore(ar) > langScore(fa) || header.arCol >= 0 || header.faCol >= 0)) { ar = null; fa = null; }
       }
       const pron = cells.find((c) => /^[A-Za-zāīūʿʾḥṣḍṭẓ'\s-]{2,}$/.test(c));
-      if (ar && fa) out.push({ term: ar, definition: fa, pronunciation: pron || '', category: header.hint || categoryFromHint(heading) || byLength(ar), from: 'table' });
+      if (ar && fa) out.push({ term: ar, definition: fa, pronunciation: pron || '', category: header.hint || categoryFromHint(heading) || byLength(ar), from: 'table', trusted: header.arCol >= 0 && header.faCol >= 0 });
       continue;
     }
     header = null;
@@ -81,9 +91,18 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
       if (ar && fa && ar.length <= 80 && fa.length <= 160) out.push({ term: ar, definition: fa, pronunciation: '', category: categoryFromHint(heading) || byLength(ar), from: 'line' });
     }
   }
+  // «مبسوط ، فرحان» = two words, not a phrase: split (meanings pairwise when they split the same way).
+  const split = [];
+  for (const c of out) {
+    const terms = c.term.split(/\s*[،,]\s*/).filter(Boolean);
+    if (terms.length >= 2 && terms.every((t) => words(t) <= 2)) {
+      const defs = c.definition.split(/\s*[،,]\s*/).filter(Boolean);
+      terms.forEach((t, k) => split.push({ ...c, term: t, definition: defs.length === terms.length ? defs[k] : c.definition, category: c.category === 'phrases' ? 'vocabulary' : c.category }));
+    } else split.push(c);
+  }
   // de-duplicate inside the lesson
   const seen = new Set();
-  return out.filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
+  return split.filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map((c) => ({ ...c, source: lessonTitle ? `درس: ${lessonTitle}` : '' }));
 }
 
@@ -132,4 +151,24 @@ export function addToKb(kb = {}, chosen, lesson, now = Date.now()) {
     }];
   });
   return next;
+}
+
+/**
+ * Conservative auto-tick: Lebanese/Arabic on the left (Arabic-only letters,
+ * harakat or a positive score, ≤ 6 words) and a Persian meaning on the right
+ * that is not a review note. Everything else is shown but unticked, with why.
+ */
+export function quality(c) {
+  const term = String(c.term || '');
+  const def = String(c.definition || '');
+  const arabicMarks = /[\u064B-\u0652يكةىإأ]/.test(term);
+  if (words(term) > 6) return { ok: false, reason: 'سمتِ چپ جملهٔ بلند است' };
+  // A table whose header names the Arabic and the Persian column is trusted for
+  // bare words («زعلان»); a loose «X : Y» line needs positive evidence.
+  const lebanese = arabicMarks || langScore(term) > 0 || (c.trusted && langScore(term) >= 0 && !/[پچژگ]/.test(term));
+  if (!lebanese) return { ok: false, reason: 'سمتِ چپ عربی/لبنانی به نظر نمی‌رسد' };
+  if (NOTE_WORDS.test(def)) return { ok: false, reason: 'معنی شبیهِ یادداشتِ اصلاح است' };
+  if (langScore(def) > 0 && !/[پچژگ]/.test(def)) return { ok: false, reason: 'معنی فارسی به نظر نمی‌رسد' };
+  if (words(def) > 14) return { ok: false, reason: 'معنی بیش از حد بلند است' };
+  return { ok: true, reason: '' };
 }

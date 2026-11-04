@@ -56,6 +56,11 @@ services:
         sync: false
       - key: TELEGRAM_ADMIN_IDS
         sync: false
+      # Google Drive copy of lesson files (docs/drive-setup.md). Secrets — set on Render only.
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
       # «نظارت و سرکشی» (docs/supervisor/README.md). Secrets — set on Render only.
       - key: SUPERVISOR_PASSWORD
         sync: false

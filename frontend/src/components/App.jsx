@@ -52,6 +52,7 @@ import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
 import KnowledgeExtract from '../knowledge/KnowledgeExtract.jsx';
 import DocCapacity from '../lessons/DocCapacity.jsx';
+import DrivePanel from '../lessons/DrivePanel.jsx';
 import { sectionsToWrite, mergeSection, hasInlineSections, applyLessonExtras, hasInlineLessonData } from '../lessons/sections.js';
 import { lessonExtrasOf, INLINE_NOTES_MAX } from '../lessons/lessonBodies.js';
 import ProgressInsights from '../progress/ProgressInsights.jsx';
@@ -1659,6 +1660,7 @@ function AdminPanel({ db, appId, currentUid, data, setData, externalize = true, 
         <div dir="rtl" className="max-w-4xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold text-slate-800">مدیریت کاربران</h1>
             {data && <DocCapacity data={data} />}
+            {data && <DrivePanel lessons={data.lessons} />}
             {data && setData && <LessonImportPanel data={data} setData={setData} externalize={externalize} persist={persist} />}
             {error && <div className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{error}</div>}
             <section className="space-y-3">

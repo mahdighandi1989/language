@@ -4,7 +4,7 @@
 // the knowledge center are unticked. Adds with lessonId + «درس: …» source.
 // The lesson text itself is never changed. Logic: ./extract.js.
 import React, { useMemo, useState } from 'react';
-import { extractLocal, verifyAiItems, markAgainstKb, mergeCandidates, addToKb, CATEGORIES } from './extract.js';
+import { extractLocal, verifyAiItems, markAgainstKb, mergeCandidates, addToKb, CATEGORIES, quality } from './extract.js';
 import { cleanForQuiz } from '../quiz/quizSource.js';
 
 const LABEL = { vocabulary: 'لغات', phrases: 'اصطلاحات', verbs: 'افعال', adjectives: 'صفات', pronouns: 'ضمایر', grammar: 'گرامر' };
@@ -18,7 +18,8 @@ export default function KnowledgeExtract({ lesson, data, setData, callAI, addJou
   const kbPending = (data?._sectionsPending || []).includes('knowledgeBase');
   const blocked = Boolean(lesson._bodyPending || lesson._bodyError || kbPending);
 
-  const withMarks = (cands) => markAgainstKb(cands, data?.knowledgeBase).map((c) => ({ ...c, pick: c.status === 'new' }));
+  // Ticked only when new AND clearly «Lebanese ⇒ Persian» (extract.quality).
+  const withMarks = (cands) => markAgainstKb(cands, data?.knowledgeBase).map((c) => { const q = quality(c); return { ...c, weak: q.ok ? '' : q.reason, pick: c.status === 'new' && q.ok }; });
   const runLocal = () => { setMsg(''); setRows(withMarks(extractLocal(lesson.archivedNotes, { lessonTitle: lesson.title }))); };
   const runAi = async () => {
     if (!callAI) return;
@@ -74,7 +75,7 @@ export default function KnowledgeExtract({ lesson, data, setData, callAI, addJou
       {rows && (
         rows.length === 0 ? <p className="text-sm text-slate-500">در این متن جدول یا سطرِ «عبارت : معنی» پیدا نشد؛ «تکمیل با Gemini» را امتحان کنید.</p> : (
           <>
-            <p className="text-xs text-slate-600">{rows.length} آیتم: {counts.new || 0} تازه، {counts.duplicate || 0} تکراری، {counts['other-meaning'] || 0} با معنیِ دیگر — {chosen.length} انتخاب‌شده.</p>
+            <p className="text-xs text-slate-600">{rows.length} آیتم: {counts.new || 0} تازه، {counts.duplicate || 0} تکراری، {counts['other-meaning'] || 0} با معنیِ دیگر، {rows.filter((r) => r.weak).length} نامطمئن — {chosen.length} انتخاب‌شده.</p>
             <div className="max-h-96 overflow-auto border rounded-lg">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 sticky top-0"><tr><th className="p-1"><input type="checkbox" aria-label="انتخابِ همه" checked={rows.every((r) => r.pick)} onChange={(e) => setRows((r) => r.map((x) => ({ ...x, pick: e.target.checked })))} /></th><th className="p-1 text-start">عبارت</th><th className="p-1 text-start">معنی</th><th className="p-1">تب</th><th className="p-1">وضعیت</th></tr></thead>
@@ -85,7 +86,7 @@ export default function KnowledgeExtract({ lesson, data, setData, callAI, addJou
                       <td className="p-1" dir="auto"><input value={r.term} onChange={(e) => patch(i, { term: e.target.value })} className="w-full bg-transparent" dir="auto" aria-label="عبارت" />{r.pronunciation && <span className="text-xs text-slate-400" dir="ltr">{r.pronunciation}</span>}</td>
                       <td className="p-1"><input value={r.definition} onChange={(e) => patch(i, { definition: e.target.value })} className="w-full bg-transparent" aria-label="معنی" />{r.existing && <span className="block text-xs text-amber-700">موجود: {r.existing}</span>}</td>
                       <td className="p-1"><select value={r.category} onChange={(e) => patch(i, { category: e.target.value })} className="border rounded p-0.5 text-xs" aria-label="تب">{CATEGORIES.map((c) => <option key={c} value={c}>{LABEL[c]}</option>)}</select></td>
-                      <td className="p-1 text-center"><span className={`text-xs px-2 rounded-full ${STATUS[r.status][1]}`}>{STATUS[r.status][0]}{r.from === 'ai' ? ' · AI' : ''}</span></td>
+                      <td className="p-1 text-center"><span className={`text-xs px-2 rounded-full ${STATUS[r.status][1]}`}>{STATUS[r.status][0]}{r.from === 'ai' ? ' · AI' : ''}</span>{r.weak && <span className="block text-xs text-amber-700" title={r.weak}>نامطمئن: {r.weak}</span>}</td>
                     </tr>
                   ))}
                 </tbody>

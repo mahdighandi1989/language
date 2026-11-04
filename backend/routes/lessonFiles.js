@@ -14,6 +14,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAuthIfConfigured } from '../middleware/firebaseAuth.js';
 import { extractLessonFile } from '../services/lessonFiles/pipeline.js';
+import { copyToDrive } from './drive.js';
 import { saveLessonFile, listLessonFiles, readLessonFile, updateLessonFile, storeInfo, saveLessonExtract, readLessonExtract } from '../services/lessonFiles/store.js';
 
 export const MAX_LESSON_FILE = 25 * 1024 * 1024;
@@ -66,6 +67,9 @@ lessonFilesRouter.post('/api/lesson-files/:lessonId', requireAuthIfConfigured, (
         await updateLessonFile(uid, lessonId, meta.id, (x) => Object.assign(x, done));
         results.push({ ...ex, file: { ...meta, ...done } });
       }
+      // A copy in the owner's Google Drive (if connected) — after the reply, best effort.
+      const lessonTitle = String(req.body?.lessonTitle || '').slice(0, 120);
+      setImmediate(async () => { for (const r of results) await copyToDrive(uid, lessonId, lessonTitle, r.file); });
       return res.json({ results, store: await storeInfo() });
     } catch (e) {
       console.error('lesson file upload failed:', e?.message);

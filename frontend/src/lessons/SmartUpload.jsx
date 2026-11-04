@@ -88,6 +88,7 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
         const form = new FormData();
         batches[b].files.forEach((f) => form.append('files', f, f.name));
         form.append('review', review ? '1' : '0');
+        form.append('lessonTitle', String(lesson.title || '')); // Drive folder name
         // eslint-disable-next-line no-await-in-loop
         const res = await fetchImpl(`/api/lesson-files/${lesson.id}`, { method: 'POST', body: form });
         // eslint-disable-next-line no-await-in-loop
@@ -111,7 +112,7 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
 
   const storedOf = (rs) => {
     const known = new Set((lesson.files || []).map((f) => String(f.id)));
-    return rs.filter((r) => r.file && !known.has(String(r.file.id))).map((r) => ({ id: r.file.id, name: r.file.name, type: r.file.type, size: r.file.size, stored: true, method: r.method }));
+    return rs.filter((r) => r.file && !known.has(String(r.file.id))).map((r) => ({ id: r.file.id, name: r.file.name, type: r.file.type, size: r.file.size, stored: true, method: r.method, ...(r.file.drive ? { drive: r.file.drive } : {}) }));
   };
   function attachFiles(rs, soFar = rs) {
     // `lesson` may be stale between batches: attach everything uploaded so far.

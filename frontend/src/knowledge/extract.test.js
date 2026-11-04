@@ -51,3 +51,35 @@ describe('tab-separated rows (PDF/Excel text)', () => {
     expect(c[0].category).toBe('adjectives');
   });
 });
+
+describe('owner feedback on «5 - ریتا»', async () => {
+  const { quality } = await import('./extract.js');
+  const notes = [
+    '| عربی | فارسی |', '|---|---|', '| زعلان | ناراحت |', '| مجنون | ديوانه |', '| تِعبان | خسته |',
+    '| مبسوط ، فرحان | خوشحال |', '| شاكر ، محمود | سپاسگزار ، ستوده |',
+    '',
+    '## ⚠️ اصلاحات و هشدارهای پیشنهادی',
+    '| متن | مشکل |', '|---|---|', '| مِعَدتی | حرکت‌گذاری نادرست: مَعِدَة |', '| تبنل | غلط تایپی / اطمینان متوسط |',
+    'حاقد عليّ : با ضمیر من باید علیّ باشد',
+    '---',
+    'توصیه خانم ریتا برای انجام تکالیف و ترجمه جملات : اول جملات را بنویسم ولو اینکه بلد نباشم',
+    'مثالی : کمال گرا',
+    'هو حاقد علی = اون از من کینه داره',
+  ].join('\n');
+  it('skips the corrections block, splits comma lists, and ticks only clear Lebanese ⇒ Persian rows', () => {
+    const c = extractLocal(notes);
+    const terms = c.map((x) => x.term);
+    expect(terms).not.toContain('مِعَدتی');
+    expect(terms).not.toContain('تبنل');
+    expect(terms).not.toContain('حاقد عليّ');
+    expect(c.filter((x) => ['مبسوط', 'فرحان'].includes(x.term)).map((x) => `${x.term}=${x.definition}=${x.category}`)).toEqual(['مبسوط=خوشحال=vocabulary', 'فرحان=خوشحال=vocabulary']);
+    expect(c.find((x) => x.term === 'محمود').definition).toBe('ستوده');
+    const ok = (t) => { const x = c.find((y) => y.term.startsWith(t)); return x ? quality(x).ok : false; }; // absent = not ticked either
+    expect(ok('زعلان')).toBe(true);
+    expect(ok('تِعبان')).toBe(true);
+    expect(ok('هو حاقد')).toBe(true);
+    expect(ok('توصیه خانم')).toBe(false);
+    expect(ok('مثالی')).toBe(false);
+    expect(quality({ term: 'مِعَدتی', definition: 'حرکت‌گذاری نادرست: مَعِدَة' }).ok).toBe(false);
+  });
+});
