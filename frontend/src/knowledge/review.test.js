@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeArabic, findDuplicates, qualityIssues, mergeGroup, undoMerge, moveItem } from './review.js';
+import { normalizeArabic, findDuplicates, findSimilar, qualityIssues, mergeGroup, undoMerge, moveItem } from './review.js';
 import { dueCards, gradeCard, buildQuiz } from './practice.js';
 
 const kb = {
@@ -13,11 +13,18 @@ const kb = {
 };
 
 describe('knowledge review', () => {
-  it('normalises Arabic and finds duplicates across tabs', () => {
+  it('certain duplicates = same written term AND same meaning; look-alikes are only «similar»', () => {
     expect(normalizeArabic('أَهْلاً')).toBe(normalizeArabic('اهلا'));
-    const d = findDuplicates(kb);
-    expect(d).toHaveLength(1);
-    expect(d[0].members.map((m) => m.id)).toEqual([1, 2, 5]);
+    const k = { verbs: [
+      { id: 1, term: 'وصل', definition: 'رسید' }, { id: 2, term: 'وصّل', definition: 'رساند' },
+      { id: 3, term: 'كيفك (مرد)', definition: 'حالت چطوره' }, { id: 4, term: 'كيفك (زن)', definition: 'حالت چطوره' },
+      { id: 5, term: 'بَيْت', definition: 'خانه' }, { id: 6, term: 'بَيْت ', definition: 'خانه.' }, { id: 7, term: 'بَيت', definition: 'خانه' },
+      { id: 8, term: 'یلّا', definition: 'بزن بریم' }, { id: 9, term: 'يلّا', definition: 'بزن  بریم' },
+    ] };
+    expect(findDuplicates(k).map((g) => g.members.map((m) => m.id))).toEqual([[5, 6], [8, 9]]);
+    const sim = findSimilar(k).map((g) => g.members.map((m) => m.id));
+    expect(sim).toEqual(expect.arrayContaining([[1, 2], [3, 4], [5, 6, 7]]));
+    expect(sim).not.toContainEqual([8, 9]);
   });
   it('flags quality problems and suggests categories', () => {
     const q = qualityIssues(kb);
@@ -27,16 +34,15 @@ describe('knowledge review', () => {
     expect(byId[6].suggest).toBe('vocabulary');
     expect(byId[1]).toBeUndefined();
   });
-  it('merges a group reversibly (definitions/sources/lessons kept)', () => {
-    const [g] = findDuplicates(kb);
-    const { kb: merged, log } = mergeGroup(kb, g, 'T');
-    expect(merged.vocabulary.map((i) => i.id)).toEqual([1, 3, 4]);
-    expect(merged.phrases.map((i) => i.id)).toEqual([6]);
-    expect(merged.vocabulary[0]).toMatchObject({ definition: 'خانه / منزل', lessonIds: ['1', '3'] });
+  it('merges a certain group reversibly (sources/lessons kept)', () => {
+    const k = { vocabulary: [{ id: 1, term: 'بَيْت', definition: 'خانه', source: 'درس: 1', lessonId: 1 }, { id: 3, term: 'x', definition: 'y' }], phrases: [{ id: 2, term: 'بَيْت', definition: 'خانه', source: 'درس: 3', lessonId: 3 }] };
+    const [g] = findDuplicates(k);
+    const { kb: merged, log } = mergeGroup(k, g, 'T');
+    expect(merged.vocabulary[0]).toMatchObject({ definition: 'خانه', source: 'درس: 1 ، درس: 3', lessonIds: ['1', '3'] });
+    expect(merged.phrases).toHaveLength(0);
     const back = undoMerge(merged, log);
-    expect(back.vocabulary.map((i) => i.id).sort()).toEqual([1, 2, 3, 4]);
-    expect(back.vocabulary.find((i) => i.id === 1).definition).toBe('خانه');
-    expect(back.phrases.map((i) => i.id).sort()).toEqual([5, 6]);
+    expect(back.vocabulary.find((i) => i.id === 1)).toEqual(k.vocabulary[0]);
+    expect(back.phrases).toEqual(k.phrases);
     expect(moveItem(kb, 'vocabulary', kb.vocabulary[2], 'phrases').phrases).toHaveLength(3);
   });
 });

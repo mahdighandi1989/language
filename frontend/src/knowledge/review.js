@@ -15,19 +15,51 @@ export function normalizeArabic(s) {
 
 const itemRef = (category, item, index) => ({ category, id: item.id ?? null, term: item.term, index });
 
-/** Groups of 2+ items whose normalised term is the same (across all tabs). */
-export function findDuplicates(kb = {}) {
+/**
+ * The term as written — harakat and shadda KEPT (وصل ≠ وصّل, كيفَك ≠ كيفِك);
+ * only invisible differences are removed: Unicode form, tatweel, spacing,
+ * Persian/Arabic keyboard variants of ي/ك, trailing punctuation.
+ */
+export function exactKey(s) {
+  return String(s || '').normalize('NFC')
+    .replace(/\u0640/g, '').replace(/ی/g, 'ي').replace(/ک/g, 'ك').replace(/\u200c/g, ' ')
+    .replace(/[\s.،,؛;!؟?]+$/g, '').replace(/^\s+/, '').replace(/\s+/g, ' ').toLowerCase();
+}
+
+function grouped(kb, keyOf) {
   const groups = new Map();
   for (const [category, items] of Object.entries(kb)) {
     if (!Array.isArray(items)) continue;
     items.forEach((it, index) => {
-      const k = normalizeArabic(it?.term);
+      const k = keyOf(it);
       if (!k) return;
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push({ ...itemRef(category, it, index), item: it });
     });
   }
   return [...groups.entries()].filter(([, g]) => g.length > 1).map(([key, members]) => ({ key, members }));
+}
+
+/**
+ * CERTAIN duplicates only: the same term as written (harakat/shadda kept) AND
+ * the same meaning. These are the only groups offered for merging.
+ */
+export function findDuplicates(kb = {}) {
+  return grouped(kb, (it) => {
+    const t = exactKey(it?.term);
+    const d = exactKey(it?.definition);
+    return t && d ? `${t}\u0000${d}` : '';
+  });
+}
+
+/**
+ * SIMILAR (look-alike) items: same letters without harakat/shadda but not a
+ * certain duplicate — e.g. وصل / وصّل, كيفك (مرد) / كيفك (زن). Shown for the
+ * owner to judge; never merged automatically.
+ */
+export function findSimilar(kb = {}) {
+  return grouped(kb, (it) => normalizeArabic(String(it?.term || '').replace(/\([^)]*\)/g, '')))
+    .filter((g) => new Set(g.members.map((m) => `${exactKey(m.item.term)}\u0000${exactKey(m.item.definition)}`)).size > 1);
 }
 
 const words = (s) => String(s || '').trim().split(/\s+/).filter(Boolean).length;
@@ -64,7 +96,11 @@ export function qualityIssues(kb = {}) {
 export function mergeGroup(kb, group, at = new Date().toISOString()) {
   const [keep, ...rest] = group.members;
   const next = { ...kb };
-  const distinct = (arr) => [...new Set(arr.map((s) => String(s || '').trim()).filter(Boolean))];
+  const distinct = (arr) => {
+    const seen = new Set(); const out = [];
+    for (const v of arr.map((x) => String(x ?? '').trim()).filter(Boolean)) { const k = exactKey(v); if (!seen.has(k)) { seen.add(k); out.push(v); } }
+    return out;
+  };
   const all = group.members.map((m) => m.item);
   const merged = {
     ...keep.item,

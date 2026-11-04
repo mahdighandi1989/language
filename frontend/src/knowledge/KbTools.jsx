@@ -2,7 +2,7 @@
 // with reversible merge, quality flags, category suggestions), «فلش‌کارت»
 // (Leitner, progress in data.kbReview) and «آزمونِ سریع» (local MCQ, no AI).
 import React, { useMemo, useState } from 'react';
-import { findDuplicates, qualityIssues, mergeGroup, undoMerge, moveItem } from './review.js';
+import { findDuplicates, findSimilar, qualityIssues, mergeGroup, undoMerge, moveItem } from './review.js';
 import { dueCards, gradeCard, buildQuiz, allItems } from './practice.js';
 import { categoryList } from './kb.js';
 
@@ -10,21 +10,25 @@ const PAGE = 30;
 
 function Review({ kb, labels, setData, log }) {
   const dups = useMemo(() => findDuplicates(kb), [kb]);
+  const similar = useMemo(() => findSimilar(kb), [kb]);
   const issues = useMemo(() => qualityIssues(kb), [kb]);
   const [showD, setShowD] = useState(PAGE);
+  const [showS, setShowS] = useState(10);
   const [showQ, setShowQ] = useState(PAGE);
   const [flag, setFlag] = useState('all');
+  const [preview, setPreview] = useState(false);
   const merge = (g) => setData((prev) => {
     const { kb: next, log: entry } = mergeGroup(prev.knowledgeBase, g);
     return { ...prev, knowledgeBase: next, kbMergeLog: [...(prev.kbMergeLog || []), entry] };
   });
+  // Only certain groups (same written term AND same meaning), after a preview.
   const mergeAll = () => {
-    if (!window.confirm(`${dups.length} گروهِ تکراری ادغام شود؟ (معنی‌ها و منبع‌ها نگه داشته می‌شوند؛ هر ادغام قابلِ برگشت است)`)) return;
     setData((prev) => {
       let k = prev.knowledgeBase; const entries = [];
       for (const g of findDuplicates(k)) { const r = mergeGroup(k, g); k = r.kb; entries.push(r.log); }
       return { ...prev, knowledgeBase: k, kbMergeLog: [...(prev.kbMergeLog || []), ...entries] };
     });
+    setPreview(false);
   };
   const undoLast = () => setData((prev) => {
     const l = [...(prev.kbMergeLog || [])]; const last = l.pop();
@@ -37,20 +41,37 @@ function Review({ kb, labels, setData, log }) {
   return (
     <div className="space-y-5 text-sm">
       <div className="p-3 rounded-lg bg-slate-50 border">
-        <b>{allItems(kb).length}</b> مورد با معنی · <b>{dups.length}</b> گروهِ تکراری · <b>{issues.length}</b> موردِ نیازمندِ بازبینی
+        <b>{allItems(kb).length}</b> مورد با معنی · <b>{dups.length}</b> گروهِ تکراریِ مطمئن · <b>{similar.length}</b> گروهِ شبیه · <b>{issues.length}</b> موردِ نیازمندِ بازبینی
         {log.length > 0 && <button onClick={undoLast} className="ms-3 text-teal-700 underline">↩ برگرداندنِ آخرین ادغام ({log.length})</button>}
       </div>
       <section className="space-y-2">
-        <div className="flex items-center justify-between"><h4 className="font-bold">🔁 تکراری‌ها (بی‌اعراب و با یکسان‌سازیِ املا)</h4>
-          {dups.length > 1 && <button onClick={mergeAll} className="px-3 py-1 rounded bg-teal-600 text-white">ادغامِ همه</button>}</div>
-        {dups.length === 0 && <p className="text-slate-500">تکراری پیدا نشد.</p>}
+        <div className="flex items-center justify-between"><h4 className="font-bold">🔁 تکراری‌های مطمئن (همان عبارت با همان اعراب و همان معنی)</h4>
+          {dups.length > 0 && !preview && <button onClick={() => setPreview(true)} className="px-3 py-1 rounded bg-teal-600 text-white">پیش‌نمایشِ ادغامِ همه</button>}</div>
+        {preview && (
+          <div className="p-3 rounded-lg border-2 border-teal-400 bg-teal-50 space-y-2" data-testid="merge-preview">
+            <p className="font-bold">{dups.length} گروه ادغام می‌شود ({dups.reduce((a, g) => a + g.members.length - 1, 0)} موردِ اضافه برداشته می‌شود؛ منبع‌ها و درس‌ها روی موردِ باقی‌مانده جمع می‌شوند؛ قابلِ برگشت):</p>
+            <ul className="max-h-60 overflow-y-auto space-y-1">{dups.map((g) => <li key={g.key}><b dir="auto">{g.members[0].item.term}</b> — {g.members[0].item.definition} <span className="text-xs text-slate-500">× {g.members.length} [{g.members.map((m) => labels[m.category] || m.category).join('، ')}]</span></li>)}</ul>
+            <div className="flex gap-2"><button onClick={mergeAll} className="px-3 py-1 rounded bg-teal-600 text-white">تأیید و ادغام</button><button onClick={() => setPreview(false)} className="px-3 py-1 rounded bg-slate-200">انصراف</button></div>
+          </div>
+        )}
+        {dups.length === 0 && <p className="text-slate-500">تکراریِ مطمئن پیدا نشد.</p>}
         {dups.slice(0, showD).map((g) => (
           <div key={g.key} className="p-2 border rounded-lg flex items-start justify-between gap-2">
-            <ul className="space-y-1 min-w-0">{g.members.map((m, i) => <li key={i} className="break-words"><b dir="auto">{m.item.term}</b> — {m.item.definition || <i className="text-red-600">بی‌معنی</i>} <span className="text-xs text-slate-400">[{labels[m.category] || m.category}{m.item.source ? ` · ${m.item.source}` : ''}]</span></li>)}</ul>
+            <ul className="space-y-1 min-w-0">{g.members.map((m, i) => <li key={i} className="break-words"><b dir="auto">{m.item.term}</b> — {m.item.definition} <span className="text-xs text-slate-400">[{labels[m.category] || m.category}{m.item.source ? ` · ${m.item.source}` : ''}]</span></li>)}</ul>
             <button onClick={() => merge(g)} className="shrink-0 px-2 py-1 rounded bg-slate-200 hover:bg-teal-100">ادغام</button>
           </div>
         ))}
         {dups.length > showD && <button onClick={() => setShowD((n) => n + PAGE)} className="text-teal-700">نمایشِ بیشتر ({dups.length - showD})</button>}
+      </section>
+      <section className="space-y-2" data-testid="similar">
+        <h4 className="font-bold">👀 شبیه ولی متفاوت ({similar.length}) — ادغام نمی‌شوند</h4>
+        <p className="text-xs text-slate-500">حروفِ یکسان با اعراب/تشدید یا معنای متفاوت (مثلِ وصل/وصّل، كيفَك/كيفِك). فقط برای بررسیِ شما؛ اگر واقعاً یکی‌اند، در «فهرست» ویرایش یا حذف کنید.</p>
+        {similar.slice(0, showS).map((g) => (
+          <div key={g.key} className="p-2 border border-dashed rounded-lg">
+            <ul className="space-y-1">{g.members.map((m, i) => <li key={i} className="break-words"><b dir="auto">{m.item.term}</b> — {m.item.definition || '—'} <span className="text-xs text-slate-400">[{labels[m.category] || m.category}]</span></li>)}</ul>
+          </div>
+        ))}
+        {similar.length > showS && <button onClick={() => setShowS((n) => n + PAGE)} className="text-teal-700">نمایشِ بیشتر ({similar.length - showS})</button>}
       </section>
       <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-2"><h4 className="font-bold">🩺 کیفیت و دسته‌بندی</h4>
