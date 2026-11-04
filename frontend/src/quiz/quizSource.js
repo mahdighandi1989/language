@@ -62,8 +62,11 @@ const lebanese = (t) => t.split("|").some((c) => isArabicText(c));
 export function sampleLessonText(lessons, budget = QUIZ_CHAR_BUDGET, rnd = Math.random) {
   const usable = lessons.filter(hasContent);
   if (!usable.length) return '';
-  const share = Math.floor(budget / usable.length);
+  // Transcription-only lessons get half the share of written handouts.
+  const weight = (l) => (typeof isTranscriptOnly === 'function' && isTranscriptOnly(l) ? 0.5 : 1);
+  const totalW = usable.reduce((n, l) => n + weight(l), 0);
   const parts = usable.map((l) => {
+    const share = Math.floor((budget * weight(l)) / totalW);
     const raw = String(l.archivedNotes);
     const head = `### ${l.title}\n`;
     if (raw.length + head.length <= share) return head + cleanForQuiz(raw);
@@ -93,3 +96,74 @@ export function sampleLessonText(lessons, budget = QUIZ_CHAR_BUDGET, rnd = Math.
   });
   return parts.join('\n\n');
 }
+
+// ---- Quality: prefer real handouts, and ground questions in the knowledge center ----
+
+const TRANSCRIPT_LINE = /⚠️|\[مشکوک\]|\[ناخوانا\]|⟲|^\s*\[?\(?\d{1,2}:\d{2}/;
+
+/** True when (most of) the lesson is an AI audio transcription rather than a written handout. */
+export function isTranscriptOnly(lesson) {
+  const lines = String(lesson?.archivedNotes || '').split('\n').filter((l) => l.trim()).slice(0, 400);
+  if (!lines.length) return false;
+  const t = lines.filter((l) => TRANSCRIPT_LINE.test(l)).length;
+  return t / lines.length > 0.3;
+}
+
+/** Knowledge-center items of a lesson (lessonId/lessonIds or «درس: <title>» source). */
+export function lessonKnowledge(kb = {}, lesson) {
+  const id = String(lesson?.id);
+  const title = String(lesson?.title || '\u0000');
+  const out = [];
+  for (const [category, items] of Object.entries(kb || {})) {
+    if (!Array.isArray(items)) continue;
+    for (const it of items) {
+      if (!it?.term || !it?.definition) continue;
+      const ids = [it.lessonId, ...(it.lessonIds || [])].filter((x) => x != null).map(String);
+      if (ids.includes(id) || String(it.source || '').includes(title)) out.push({ ...it, category });
+    }
+  }
+  return out;
+}
+
+/**
+ * Default quiz lessons: recent ones, but handouts and lessons with knowledge
+ * items first; transcription-only lessons only to fill up.
+ */
+export function pickQuizLessons(lessons = [], kb = {}, n = 5) {
+  const recent = recentLessons(lessons, Math.max(n * 4, 20));
+  const good = recent.filter((l) => !isTranscriptOnly(l) || lessonKnowledge(kb, l).length > 0);
+  const rest = recent.filter((l) => !good.includes(l));
+  return [...good, ...rest].slice(0, n);
+}
+
+/**
+ * Up to `max` verified knowledge items as «term — meaning» lines: first those
+ * of the chosen lessons, then random others (distractor material), Lebanese terms only.
+ */
+export function glossaryFor(lessons, kb = {}, max = 60, rnd = Math.random) {
+  const own = lessons.flatMap((l) => lessonKnowledge(kb, l));
+  const all = Object.values(kb || {}).filter(Array.isArray).flat().filter((i) => i?.term && i?.definition);
+  const pool = [...own];
+  const seen = new Set(own.map((i) => i.term));
+  const others = all.filter((i) => !seen.has(i.term));
+  for (let k = others.length - 1; k > 0; k -= 1) { const j = Math.floor(rnd() * (k + 1)); [others[k], others[j]] = [others[j], others[k]]; }
+  pool.push(...others);
+  const out = [];
+  const used = new Set();
+  for (const i of pool) {
+    if (out.length >= max) break;
+    const term = String(i.term).trim();
+    if (used.has(term) || term.length > 60 || !isArabicText(term)) continue;
+    used.add(term);
+    out.push(`${term} — ${String(i.definition).trim().slice(0, 80)}`);
+  }
+  return out;
+}
+
+/** Fixed rules appended to every quiz prompt (on top of the owner's editable prompts). */
+export const LEBANESE_QUIZ_RULES = `قواعدِ لهجه (الزامی):
+- همهٔ عبارت‌های عربیِ سؤال و گزینه‌ها به **لهجهٔ لبنانیِ عامیانه** باشند، نه عربیِ فصیح (مثلاً «شو» نه «ماذا»، «بدّي» نه «أريد»، «هيك» نه «هكذا»، «كتير» نه «كثيراً»).
+- عربی را با نوشتارِ عربی (با حروفِ عربی) بنویس.
+- در فیلدِ «explanation» برای هر سؤال، تلفظِ لاتین (مثلاً kīfak) و توضیحِ کوتاهِ فارسی بیاور.
+- هیچ کلمه‌ای نساز: هر کلمهٔ عربی در سؤال، گزینه یا پاسخ باید یا عیناً در «محتوای درس» آمده باشد یا در «واژه‌نامهٔ تأییدشده». گزینه‌های غلط را هم از همین واژه‌نامه بردار.
+- واژه‌نامهٔ تأییدشده را بر متنِ درس ترجیح بده؛ متنِ رونویسیِ صوتی ممکن است غلطِ املایی داشته باشد.`;

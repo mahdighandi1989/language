@@ -27,8 +27,11 @@ export function langScore(s) {
     const w = norm(raw);
     if (!w) continue;
     if (AR_WORDS.has(w)) score += 1;
-    if (FA_WORDS.has(w)) score -= 1.5;
-    if (/^(می|نمی)[^\s]{2,}/.test(w)) score -= 1.5;
+    // A word written with Arabic-only letters or harakat (مَيّ «water») is not the
+    // Persian word it normalises to (می).
+    const arabicForm = /[\u064B-\u0652يكةى]/.test(raw);
+    if (FA_WORDS.has(w) && !arabicForm) score -= 1.5;
+    if (/^(می|نمی)[^\s]{2,}/.test(w) && !arabicForm) score -= 1.5;
     if (/^ال[^\s]{2,}/.test(w)) score += 1;
   }
   return score;

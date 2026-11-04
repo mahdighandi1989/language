@@ -59,7 +59,7 @@ import { download as downloadBlob } from '../exports/exports.js';
 import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
 import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
 import { normalizeQuiz, parseQuizResponse } from '../quiz/normalizeQuiz.js';
-import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET, QUIZ_MAX_QUESTIONS } from '../quiz/quizSource.js';
+import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET, QUIZ_MAX_QUESTIONS, pickQuizLessons, glossaryFor, LEBANESE_QUIZ_RULES } from '../quiz/quizSource.js';
 
 // Module-level singleton: one tracker for the app's chat activity. Analytics is
 // strictly best-effort and must never affect the chat UX.
@@ -274,7 +274,7 @@ Only add feedback for actual Arabic practice attempts, not for questions or Pers
 ⚡ خروجی نهایی باید شامل 100% موارد قبلی + موارد جدید باشد.`,
 
   // Quiz prompts
-  quizSystem: `تو یک سازنده آزمون عربی لبنانی هستی.`,
+  quizSystem: `تو یک سازندهٔ آزمونِ لهجهٔ لبنانیِ عامیانه (نه عربیِ فصیح) برای فارسی‌زبانان هستی.`,
   quizQuestionTypes: `انواع سوالات:
 - mcq: چهارگزینه‌ای
 - fill_in_blank: جای خالی
@@ -3783,7 +3783,8 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
         // Imported lessons have string ids — compare as strings.
         const isRecent = selectedLessonId === 'recent';
         const lesson = isRecent ? null : lessons.find(l => String(l.id) === String(selectedLessonId));
-        const sources = isRecent ? recentLessons(lessons, 5) : (lesson ? [lesson] : []);
+        // Default set: recent lessons, handouts / lessons with knowledge items first.
+        const sources = isRecent ? pickQuizLessons(lessons, data?.knowledgeBase, 5) : (lesson ? [lesson] : []);
 
         if (!sources.length) {
             setModalConfig({ title: "خطا", message: isRecent ? "هنوز درسی با محتوا نیست (یا متنِ درس‌ها در حالِ بارگذاری از فضای ابری است)." : "لطفاً یک درس انتخاب کنید." });
@@ -3799,6 +3800,9 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
         }
         // A fixed budget (~24k characters) sampled from the lesson(s), different each time.
         const lessonContent = sampleLessonText(sources, QUIZ_CHAR_BUDGET);
+        // Verified vocabulary (knowledge center) to ground answers and distractors.
+        const glossary = glossaryFor(sources, data?.knowledgeBase, 60);
+        const glossaryBlock = glossary.length ? `\n\nواژه‌نامهٔ تأییدشده (از مرکزِ دانش):\n${glossary.join('\n')}` : '';
 
         addJournalEntry(`ایجاد آزمون ${difficultyLabels[difficulty].label} برای ${isRecent ? `${sources.length} درسِ اخیر` : `درس "${lesson.title}"`}`);
 
@@ -3868,8 +3872,10 @@ ${quizInstructions}
   }
 ]
 
+${LEBANESE_QUIZ_RULES}
+
 محتوای درس:
-${lessonContent}`;
+${lessonContent}${glossaryBlock}`;
 
         const schema = {
             type: "ARRAY",
@@ -3881,7 +3887,8 @@ ${lessonContent}`;
                     options: { type: "ARRAY", items: { type: "STRING" } },
                     correctAnswer: { type: "STRING" },
                     words: { type: "ARRAY", items: { type: "STRING" } },
-                    pairs: { type: "ARRAY", items: { type: "OBJECT", properties: { arabic: { type: "STRING" }, persian: { type: "STRING" } } } }
+                    pairs: { type: "ARRAY", items: { type: "OBJECT", properties: { arabic: { type: "STRING" }, persian: { type: "STRING" } } } },
+                    explanation: { type: "STRING" }
                 }
             }
         };
@@ -3908,14 +3915,16 @@ ${lessonContent}`;
                 const simple = Math.min(5, questionCount);
                 const simplePrompt = `${quizSystemPrompt} بر اساسِ متنِ درسِ زیر دقیقاً ${simple} سؤالِ چهارگزینه‌ای بساز (هر سؤال یک پاسخِ درست که عیناً یکی از ۴ گزینه است). فقط آرایهٔ JSON.
 
+${LEBANESE_QUIZ_RULES}
+
 محتوای درس:
-${lessonContent.slice(0, 8000)}`;
+${lessonContent.slice(0, 8000)}${glossaryBlock}`;
                 validQuiz = parseQuizResponse(await callGeminiAPI({
                     contents: [{ parts: [{ text: "آزمون بساز" }] }],
                     systemInstruction: { parts: [{ text: simplePrompt }] },
                     generationConfig: {
                         responseMimeType: "application/json", temperature: 0.1, ...fast,
-                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING" }, question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, correctAnswer: { type: "STRING" } }, required: ["question", "options", "correctAnswer"] } },
+                        responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { type: { type: "STRING" }, question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, correctAnswer: { type: "STRING" }, explanation: { type: "STRING" } }, required: ["question", "options", "correctAnswer"] } },
                     },
                 }, 1, 1000, controller.signal).then((t) => {
                     // the simple schema may omit «type»
@@ -4342,6 +4351,7 @@ ${lessonContent.slice(0, 8000)}`;
                                 {submitted && q.correctAnswer && (
                                     <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                                         <p className="text-green-700 font-medium">✅ پاسخ صحیح: {q.correctAnswer}</p>
+                                        {q.explanation && <p className="text-sm text-slate-600 mt-1" dir="auto">💡 {q.explanation}</p>}
                                     </div>
                                 )}
                             </div>

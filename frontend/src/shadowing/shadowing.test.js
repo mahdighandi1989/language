@@ -33,6 +33,8 @@ describe('shadowing logic', () => {
     expect(isArabicText('یک خطِ فارسی')).toBe(false);
     expect(isArabicText('توضیحِ فارسیِ 2')).toBe(false);
     expect(isArabicText('مِعَدتی عم توجعنی')).toBe(true);
+    expect(isArabicText('مَيّ')).toBe(true); // water — not Persian «می»
+    expect(isArabicText('می خواهم')).toBe(false);
   });
   it('records attempts with best/last and computes stats', () => {
     let sh = recordAttempt({}, 7, 'كيفك', 60, 't1');

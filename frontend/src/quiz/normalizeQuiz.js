@@ -27,7 +27,7 @@ export function normalizeQuiz(raw) {
   for (const q of raw) {
     if (!q || typeof q !== 'object') continue;
     const type = normalizeType(q.type);
-    const item = { type, question: str(q.question), correctAnswer: str(q.correctAnswer) };
+    const item = { type, question: str(q.question), correctAnswer: str(q.correctAnswer), ...(q.explanation ? { explanation: str(q.explanation).slice(0, 400) } : {}) };
     if (type === 'mcq') {
       item.options = (Array.isArray(q.options) ? q.options : []).map(str).filter(Boolean);
       // A numeric answer may be an index into the options.
