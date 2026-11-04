@@ -59,6 +59,7 @@ import { download as downloadBlob } from '../exports/exports.js';
 import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
 import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
 import { normalizeQuiz } from '../quiz/normalizeQuiz.js';
+import { recentLessons, sampleLessonText, QUIZ_CHAR_BUDGET } from '../quiz/quizSource.js';
 
 // Module-level singleton: one tracker for the app's chat activity. Analytics is
 // strictly best-effort and must never affect the chat UX.
@@ -3723,7 +3724,10 @@ ${analyzedContent}
 }
 
 function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data }) {
-    const [selectedLessonId, setSelectedLessonId] = useState(lessons[0]?.id?.toString() || '');
+    // Default: the 5 most recent lessons with content (sampled), not lessons[0]
+    // — the first lesson can be huge and the whole text made the request hang.
+    const [selectedLessonId, setSelectedLessonId] = useState('recent');
+    const quizAbortRef = useRef(null);
     const [quiz, setQuiz] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [userAnswers, setUserAnswers] = useState({});
@@ -3777,20 +3781,26 @@ function QuizCenter({ lessons, addJournalEntry, setModalConfig, setData, data })
         setIsLoading(true); setQuiz(null); setUserAnswers({}); setMatchingAnswers({}); setSubmitted(false); clearTimeout(timerRef.current);
 
         // Imported lessons have string ids — compare as strings.
-        const lesson = lessons.find(l => String(l.id) === String(selectedLessonId));
-        const lessonId = lesson?.id;
+        const isRecent = selectedLessonId === 'recent';
+        const lesson = isRecent ? null : lessons.find(l => String(l.id) === String(selectedLessonId));
+        const sources = isRecent ? recentLessons(lessons, 5) : (lesson ? [lesson] : []);
 
-        if (!lesson) {
-            setModalConfig({ title: "خطا", message: "لطفاً یک درس انتخاب کنید." });
+        if (!sources.length) {
+            setModalConfig({ title: "خطا", message: isRecent ? "هنوز درسی با محتوا نیست (یا متنِ درس‌ها در حالِ بارگذاری از فضای ابری است)." : "لطفاً یک درس انتخاب کنید." });
             setIsLoading(false); return;
         }
-
-        if (!lesson.archivedNotes?.trim() || lesson.archivedNotes.length < 50) {
+        if (sources.some(l => l._bodyPending)) {
+            setModalConfig({ title: "کمی صبر کنید", message: "متنِ درس هنوز از فضای ابری بارگذاری نشده است؛ چند ثانیهٔ دیگر دوباره امتحان کنید." });
+            setIsLoading(false); return;
+        }
+        if (!isRecent && (!lesson.archivedNotes?.trim() || lesson.archivedNotes.length < 50)) {
             setModalConfig({ title: "خطا", message: "محتوای این درس برای ساخت آزمون کافی نیست. حداقل باید چند لغت و عبارت در درس وجود داشته باشد." });
             setIsLoading(false); return;
         }
+        // A fixed budget (~24k characters) sampled from the lesson(s), different each time.
+        const lessonContent = sampleLessonText(sources, QUIZ_CHAR_BUDGET);
 
-        addJournalEntry(`ایجاد آزمون ${difficultyLabels[difficulty].label} برای درس "${lesson.title}"`);
+        addJournalEntry(`ایجاد آزمون ${difficultyLabels[difficulty].label} برای ${isRecent ? `${sources.length} درسِ اخیر` : `درس "${lesson.title}"`}`);
 
         const typeDescriptions = {
             mcq: 'سوال چهارگزینه‌ای با یک پاسخ صحیح',
@@ -3859,7 +3869,7 @@ ${quizInstructions}
 ]
 
 محتوای درس:
-${lesson.archivedNotes}`;
+${lessonContent}`;
 
         const schema = {
             type: "ARRAY",
@@ -3882,8 +3892,13 @@ ${lesson.archivedNotes}`;
             generationConfig: { responseMimeType: "application/json", responseSchema: schema }
         };
 
+        // Never wait forever: 75s timeout, «لغو» aborts at once.
+        const controller = new AbortController();
+        quizAbortRef.current = controller;
+        let timedOut = false;
+        const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 75000);
         try {
-            const response = await callGeminiAPI(payload);
+            const response = await callGeminiAPI(payload, 3, 1000, controller.signal);
             let generatedQuiz;
 
             try {
@@ -3916,11 +3931,22 @@ ${lesson.archivedNotes}`;
 
         } catch (error) {
             console.error('Quiz generation error:', error);
-            setModalConfig({ title: "خطا", message: "خطا در ساخت آزمون. لطفاً دوباره تلاش کنید یا محتوای بیشتری به درس اضافه کنید." });
+            const aborted = error?.name === 'AbortError';
+            if (aborted && !timedOut) return; // cancelled by the user
+            const message = aborted ? 'ساختِ آزمون بیش از ۷۵ ثانیه طول کشید و متوقف شد. دوباره امتحان کنید یا تعدادِ سؤال‌ها را کمتر کنید.'
+                : error?.status === 401 || error?.status === 403 ? 'دسترسی رد شد؛ یک بار خارج و دوباره وارد شوید.'
+                : error?.status === 429 ? 'سهمیهٔ Gemini موقتاً پر است؛ یک دقیقهٔ دیگر دوباره امتحان کنید.'
+                : error?.status >= 500 ? `سرور پاسخ نداد (کد ${error.status}). دوباره امتحان کنید.`
+                : 'پاسخِ مدل قابلِ استفاده نبود. دوباره تلاش کنید یا محتوای بیشتری به درس اضافه کنید.';
+            setModalConfig({ title: "ساختِ آزمون ناموفق بود", message });
         } finally {
+            clearTimeout(timer);
+            if (quizAbortRef.current === controller) quizAbortRef.current = null;
             setIsLoading(false);
         }
     };
+    const cancelQuiz = () => { quizAbortRef.current?.abort(); setIsLoading(false); };
+    useEffect(() => () => quizAbortRef.current?.abort(), []);
 
     const handleAnswer = (qIndex, answer) => setUserAnswers(prev => ({...prev, [qIndex]: answer}));
 
@@ -4166,6 +4192,7 @@ ${lesson.archivedNotes}`;
                             onChange={(e) => setSelectedLessonId(e.target.value)}
                             className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-teal-500"
                         >
+                            <option value="recent">🕒 ۵ درسِ اخیر (نمونه‌ای از متنِ آن‌ها)</option>
                             {lessons.length === 0 ? (
                                 <option value="">هیچ درسی وجود ندارد</option>
                             ) : (
@@ -4265,6 +4292,7 @@ ${lesson.archivedNotes}`;
                 <div className="text-center p-10">
                     <Loader className="animate-spin inline-block text-teal-500" size={48}/>
                     <p className="mt-4 text-slate-600">در حال ساخت سوالات...</p>
+                    <button onClick={cancelQuiz} className="mt-3 px-4 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-sm">لغو</button>
                 </div>
             )}
 
@@ -4274,7 +4302,7 @@ ${lesson.archivedNotes}`;
                     <div className="flex justify-between items-center mb-6 p-4 bg-slate-100 rounded-xl">
                         <div>
                             <h3 className="text-2xl font-bold text-slate-800">
-                                📝 آزمون: {lessons.find(l => String(l.id) === String(selectedLessonId))?.title}
+                                📝 آزمون: {selectedLessonId === 'recent' ? '۵ درسِ اخیر' : lessons.find(l => String(l.id) === String(selectedLessonId))?.title}
                             </h3>
                             <p className="text-sm text-slate-500 mt-1">
                                 {quiz.length} سوال | سطح {difficultyLabels[difficulty].label}

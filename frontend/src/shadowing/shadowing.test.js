@@ -31,6 +31,8 @@ describe('shadowing logic', () => {
       { text: 'ما فیکی تجیبی البنطلون معک؟', meaning: '' },
     ]);
     expect(isArabicText('یک خطِ فارسی')).toBe(false);
+    expect(isArabicText('توضیحِ فارسیِ 2')).toBe(false);
+    expect(isArabicText('مِعَدتی عم توجعنی')).toBe(true);
   });
   it('records attempts with best/last and computes stats', () => {
     let sh = recordAttempt({}, 7, 'كيفك', 60, 't1');

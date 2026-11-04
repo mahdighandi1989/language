@@ -18,7 +18,8 @@ export function langScore(s) {
   const t = String(s || '');
   if (!ARABIC_SCRIPT.test(t)) return 0;
   let score = 0;
-  if (HARAKAT.test(t)) score += 1; // weak: Persian ezafe uses kasra too
+  // Harakat count, except a word-final kasra: that is the Persian ezafe (توضیحِ فارسیِ).
+  if (HARAKAT.test(t.replace(/\u0650(?=[\s،,.:؛!؟?)\]|]|$)/g, ''))) score += 1;
   if (ARABIC_LETTERS.test(t)) score += 2;
   if (PERSIAN_LETTERS.test(t)) score -= 3;
   if (/\u200c/.test(t)) score -= 2; // ZWNJ (نیم‌فاصله) is Persian typing
