@@ -102,7 +102,10 @@ export default function LessonImportPanel({ data, setData, externalize = true, d
         فایلِ JSON با <code>format: "{IMPORT_FORMAT}"</code> و <code>version: {IMPORT_VERSION}</code>. ادغامی و تکرارناپذیر: درسی که
         sourceKey اش قبلاً آمده رد می‌شود؛ درس‌های موجود هرگز بازنویسی یا حذف نمی‌شوند. پیش از اعمال، پشتیبانِ JSON ِ وضعیتِ فعلی دانلود می‌شود.
       </p>
-      <input type="file" accept=".json,application/json" onChange={onFile} className="text-sm" aria-label="فایلِ ایمپورت" />
+      <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 cursor-pointer text-sm font-medium">
+        📂 انتخابِ فایلِ JSON
+        <input type="file" accept=".json,application/json" onChange={onFile} className="sr-only" aria-label="فایلِ ایمپورت" />
+      </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       {plan && !plan.valid && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-800">

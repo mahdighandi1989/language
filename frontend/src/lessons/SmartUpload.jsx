@@ -55,8 +55,13 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
         استخراج می‌شوند؛ عکس/صوت/ویدیو/PDF ِ اسکن‌شده <b>دو بار مستقل</b> رونویسی و مقایسه می‌شوند و سطرهای ناهم‌خوان «⚠️ مشکوک» علامت می‌خورند.
         پیشنهادهای اعراب و معنا جدا نگه داشته می‌شوند و متن را عوض نمی‌کنند.
       </p>
-      <input type="file" multiple aria-label="فایل‌های درس" accept="audio/*,video/*,image/*,application/pdf,text/*,.docx,.xlsx,.pptx,.odt,.ods,.odp,.epub,.zip,.srt,.vtt,.md,.csv,.json"
-        onChange={(e) => setFiles(Array.from(e.target.files || []))} className="text-sm" />
+      {/* Native picker text is in the browser's language («Choose Files») — a Persian label instead. */}
+      <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 cursor-pointer text-sm font-medium">
+        📎 انتخابِ فایل‌ها
+        <input type="file" multiple aria-label="فایل‌های درس" accept="audio/*,video/*,image/*,application/pdf,text/*,.docx,.xlsx,.pptx,.odt,.ods,.odp,.epub,.zip,.srt,.vtt,.md,.csv,.json"
+          onChange={(e) => setFiles(Array.from(e.target.files || []))} className="sr-only" />
+      </label>
+      {!files.length && <span className="text-xs text-slate-400 ms-2">فایلی انتخاب نشده</span>}
       {files.length > 0 && <p className="text-xs text-slate-500">{files.length} فایل: {files.map((f) => f.name).join('، ')}</p>}
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={review} onChange={(e) => setReview(e.target.checked)} /> بازبینیِ اعراب و معنا (فهرستِ جدا)

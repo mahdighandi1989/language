@@ -50,6 +50,7 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
 import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
 import { normalizeQuiz } from '../quiz/normalizeQuiz.js';
 
@@ -496,6 +497,8 @@ export default function App() {
   }
   const [activeView, setActiveView] = useState(initialRoute?.view || 'dashboard');
   const [viewRetry, setViewRetry] = useState(0);
+  const [themeState, setThemeState] = useState(() => resolveTheme());
+  useEffect(() => { applyTheme(themeState); }, [themeState]);
   const [data, setData] = useState(initialData);
   const [selectedLessonId, setSelectedLessonId] = useState(
     initialRoute?.view === 'lesson' && initialRoute.id ? (Number(initialRoute.id) || initialRoute.id) : null
@@ -1274,7 +1277,7 @@ export default function App() {
         <InspectorBridge />
         <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
-            <Sidebar navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} showInspection={inspectionEnabled} />
+            <Sidebar themeState={themeState} setThemeState={setThemeState} navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} showInspection={inspectionEnabled} />
             <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">
               {bodyProgress && (
                 <div role="status" className="mb-4 bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-2 text-sm">
@@ -1293,7 +1296,7 @@ export default function App() {
             <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} data={data} navigateTo={navigateTo} />
             {modalConfig && <Modal config={modalConfig} onClose={() => setModalConfig(null)} />}
             {canAccess(accessRecord, 'assistant') && (
-              <button onClick={() => setIsAssistantOpen(true)} className="fixed bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
+              <button onClick={() => setIsAssistantOpen(true)} aria-label="دستیارِ هوش مصنوعی" title="دستیارِ هوش مصنوعی" className="fixed bottom-6 left-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 transition-transform hover:scale-110 z-40">
                 <Sparkles size={28} />
               </button>
             )}
@@ -1342,7 +1345,7 @@ export default function App() {
 
 // --- Components ---
 
-function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick, accessRecord, onSignOut, userEmail, showInspection = false }) {
+function Sidebar({ themeState, setThemeState, navigateTo, activeView, exportData, importData, onSearchClick, accessRecord, onSignOut, userEmail, showInspection = false }) {
     const fileInputRef = useRef(null);
     const [mobileOpen, setMobileOpen] = useState(false);
     const handleImportClick = () => fileInputRef.current.click();
@@ -1402,6 +1405,7 @@ function Sidebar({ navigateTo, activeView, exportData, importData, onSearchClick
                 {canAccess(accessRecord, 'settings') && (
                     <button onClick={() => { navigateTo('settings'); setMobileOpen(false); }} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Settings size={20} /><span>تنظیمات و شخصی‌سازی</span></button>
                 )}
+                <button onClick={() => setThemeState(setTheme(themeState === 'dark' ? 'light' : 'dark'))} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><span className="w-5 text-center">{themeState === 'dark' ? '☀️' : '🌙'}</span><span>{themeState === 'dark' ? 'حالتِ روشن' : 'حالتِ تیره'}</span></button>
                 <button onClick={exportData} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Download size={20} /><span>خروجی (JSON)</span></button>
                 <button onClick={handleImportClick} className="w-full flex items-center gap-3 py-2 px-4 rounded-lg text-right transition-colors text-slate-400 hover:bg-slate-700 hover:text-white"><Upload size={20} /><span>بارگذاری (JSON)</span></button>
                 <input type="file" ref={fileInputRef} onChange={importData} className="hidden" accept=".json" />
@@ -2870,7 +2874,7 @@ function CustomVoiceCreator({ customVoices, setCustomVoices, setModalConfig }) {
                     <select value={gender} onChange={e => setGender(e.target.value)} className="w-full p-2 border rounded"><option value="male">مرد</option><option value="female">زن</option></select>
                      <select value={age} onChange={e => setAge(e.target.value)} className="w-full p-2 border rounded"><option value="young">جوان</option><option value="adult">بزرگسال</option><option value="senior">سالمند</option></select>
                 </div>
-                <input type="file" onChange={e => setFile(e.target.files[0])} accept="audio/*" className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"/>
+                <input type="file" aria-label="فایلِ صوتی" onChange={e => setFile(e.target.files[0])} accept="audio/*" className="w-full text-sm file:ml-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"/>
                 <button onClick={handleAddVoice} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 font-bold">افزودن صدا</button>
             </div>
             {customVoices.length > 0 && (
@@ -3569,51 +3573,7 @@ ${analyzedContent}
       <div className="flex items-center gap-2 text-slate-600 mb-6"><p className="text-lg">{lesson.summary}</p><TTSButton textToSpeak={lesson.summary} /></div>
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 xl:gap-8">
         <div className="xl:col-span-3 space-y-8 min-w-0">
-           <SmartUpload lesson={lesson} updateLesson={updateLesson} />
-           <Card title="افزودن و تحلیل محتوا">
-               <div className="p-6 border-dashed border-2 border-slate-300 rounded-xl text-center mb-4 hover:border-teal-500 transition-colors">
-                   <input type="file" multiple onChange={handleFileChange} id="file-upload" className="hidden" accept="audio/*,video/*,image/*,.pdf,.txt,.json" />
-                   <label htmlFor="file-upload" className="cursor-pointer">
-                     <span className="text-teal-600 font-bold block">برای آپلود فایل کلیک کنید</span>
-                     <span className="text-slate-500 text-sm block mt-1">صوت، ویدیو، تصویر، PDF، متن (تا 500MB)</span>
-                   </label>
-               </div>
-               {(lesson.files || []).length > 0 && (
-                 <ul className="mb-4 space-y-2">
-                   {lesson.files.map(file => (
-                     <li key={file.id} className="flex items-center justify-between p-3 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
-                       <div className="flex items-center gap-2">
-                         <span className="text-xl">{getFileIcon(file.type)}</span>
-                         <div>
-                           <span className="font-medium">{file.name}</span>
-                           {file.size && <span className="text-slate-500 text-sm mr-2">({formatFileSize(file.size)})</span>}
-                         </div>
-                       </div>
-                       <div className="flex items-center gap-1">
-                         <button onClick={() => downloadFile(file)} disabled={!file.stored} className="p-1 hover:bg-teal-100 rounded-full text-teal-700 disabled:opacity-30" title={file.stored ? 'دانلودِ اصلِ فایل' : 'اصلِ این فایل ذخیره نشده بود (فقط «آپلودِ هوشمند» اصلِ فایل را نگه می‌دارد)'} aria-label="دانلودِ فایل">
-                           <Download size={16}/>
-                         </button>
-                         <button onClick={() => removeFile(file.id)} className="p-1 hover:bg-red-100 rounded-full text-red-500" title="برداشتن از درس" aria-label="برداشتنِ فایل">
-                           <Trash2 size={16}/>
-                         </button>
-                       </div>
-                     </li>
-                   ))}
-                 </ul>
-               )}
-               <textarea value={pastedText} onChange={(e) => setPastedText(e.target.value)} rows="4" className="w-full p-3 border rounded-xl mb-2" placeholder="متن/جزوه خود را برای تحلیل و تصحیح اینجا پیست کنید... (سیستم اشتباهات عربی لبنانی را تصحیح می‌کند)"></textarea>
-               {processingStatus && <div className="text-center text-teal-600 mb-2 flex items-center justify-center gap-2"><Loader className="animate-spin" size={16}/>{processingStatus}</div>}
-               <button onClick={handleAnalysis} disabled={isProcessing || (uploadedFiles.length === 0 && !pastedText.trim())} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold"><Sparkles size={18} />{analysisButtonText()}</button>
-           </Card>
-            {analyzedContent && (
-                <Card title="نتایج تحلیل">
-                    <MarkdownRenderer text={analyzedContent} />
-                    <div className="flex justify-end gap-3 mt-4">
-                        <button onClick={() => setAnalyzedContent(null)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300">نادیده گرفتن</button>
-                        <button onClick={addAnalyzedContentToLesson} disabled={isProcessing} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-400">{isProcessing ? 'در حال پردازش...' : 'افزودن به نکات و مرکز دانش'}</button>
-                    </div>
-                </Card>
-            )}
+           {/* Notes first: they are what the learner opens the lesson for (visual audit B). */}
             <CorrectionsPanel corrections={lesson.corrections} />
             <Card
                 title="📝 نکات ذخیره شده درس"
@@ -3674,6 +3634,51 @@ ${analyzedContent}
                     </div>
                 )}
             </Card>
+           <SmartUpload lesson={lesson} updateLesson={updateLesson} />
+           <Card title="افزودن و تحلیل محتوا">
+               <div className="p-6 border-dashed border-2 border-slate-300 rounded-xl text-center mb-4 hover:border-teal-500 transition-colors">
+                   <input type="file" multiple onChange={handleFileChange} id="file-upload" className="hidden" accept="audio/*,video/*,image/*,.pdf,.txt,.json" />
+                   <label htmlFor="file-upload" className="cursor-pointer">
+                     <span className="text-teal-600 font-bold block">برای آپلود فایل کلیک کنید</span>
+                     <span className="text-slate-500 text-sm block mt-1">صوت، ویدیو، تصویر، PDF، متن (تا 500MB)</span>
+                   </label>
+               </div>
+               {(lesson.files || []).length > 0 && (
+                 <ul className="mb-4 space-y-2">
+                   {lesson.files.map(file => (
+                     <li key={file.id} className="flex items-center justify-between p-3 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors">
+                       <div className="flex items-center gap-2">
+                         <span className="text-xl">{getFileIcon(file.type)}</span>
+                         <div>
+                           <span className="font-medium">{file.name}</span>
+                           {file.size && <span className="text-slate-500 text-sm mr-2">({formatFileSize(file.size)})</span>}
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-1">
+                         <button onClick={() => downloadFile(file)} disabled={!file.stored} className="p-1 hover:bg-teal-100 rounded-full text-teal-700 disabled:opacity-30" title={file.stored ? 'دانلودِ اصلِ فایل' : 'اصلِ این فایل ذخیره نشده بود (فقط «آپلودِ هوشمند» اصلِ فایل را نگه می‌دارد)'} aria-label="دانلودِ فایل">
+                           <Download size={16}/>
+                         </button>
+                         <button onClick={() => removeFile(file.id)} className="p-1 hover:bg-red-100 rounded-full text-red-500" title="برداشتن از درس" aria-label="برداشتنِ فایل">
+                           <Trash2 size={16}/>
+                         </button>
+                       </div>
+                     </li>
+                   ))}
+                 </ul>
+               )}
+               <textarea value={pastedText} onChange={(e) => setPastedText(e.target.value)} rows="4" className="w-full p-3 border rounded-xl mb-2" placeholder="متن/جزوه خود را برای تحلیل و تصحیح اینجا پیست کنید... (سیستم اشتباهات عربی لبنانی را تصحیح می‌کند)"></textarea>
+               {processingStatus && <div className="text-center text-teal-600 mb-2 flex items-center justify-center gap-2"><Loader className="animate-spin" size={16}/>{processingStatus}</div>}
+               <button onClick={handleAnalysis} disabled={isProcessing || (uploadedFiles.length === 0 && !pastedText.trim())} className="w-full bg-teal-500 text-white px-4 py-3 rounded-xl hover:bg-teal-600 disabled:bg-slate-400 flex items-center justify-center gap-2 font-bold"><Sparkles size={18} />{analysisButtonText()}</button>
+           </Card>
+            {analyzedContent && (
+                <Card title="نتایج تحلیل">
+                    <MarkdownRenderer text={analyzedContent} />
+                    <div className="flex justify-end gap-3 mt-4">
+                        <button onClick={() => setAnalyzedContent(null)} className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300">نادیده گرفتن</button>
+                        <button onClick={addAnalyzedContentToLesson} disabled={isProcessing} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-400">{isProcessing ? 'در حال پردازش...' : 'افزودن به نکات و مرکز دانش'}</button>
+                    </div>
+                </Card>
+            )}
             {(lesson.mediaItems || []).length > 0 && (
               <Card title="رسانه‌های استخراج شده">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -6764,7 +6769,7 @@ function FloatingVoiceConvWidget() {
 
   return (
     <div
-      className="fixed bottom-24 right-6 z-50"
+      className="fixed bottom-24 left-6 z-50"
       style={{ animation: 'slideIn 0.3s ease-out' }}
     >
       <style>{`
@@ -6899,7 +6904,7 @@ function FloatingLiveChatWidget() {
 
   return (
     <div
-      className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-4 duration-300"
+      className="fixed bottom-24 left-6 z-50 animate-in slide-in-from-bottom-4 duration-300"
       style={{ animation: 'slideIn 0.3s ease-out' }}
     >
       <style>{`
