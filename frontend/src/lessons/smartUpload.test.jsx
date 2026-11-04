@@ -83,3 +83,33 @@ describe('SmartUpload restore', () => {
     expect(patch.appliedExtracts).toEqual(['f1', 'old']);
   });
 });
+
+describe('SmartUpload long recordings', () => {
+  it('splits a 20MB mp3 at frame boundaries and uploads the parts in ≤9MB requests', async () => {
+    const { render: r, screen: sc, fireEvent: fe, waitFor: wf } = await import('@testing-library/react');
+    const frames = Math.ceil((20 * 1024 * 1024) / 417);
+    const u8 = new Uint8Array(frames * 417);
+    for (let i = 0; i < frames; i += 1) u8.set([0xff, 0xfb, 0x90, 0x00], i * 417);
+    const big = new File([u8], '25 - ریتا.mp3', { type: 'audio/mpeg' });
+    let n = 0;
+    const fetchImpl = vi.fn(async (url, opts) => {
+      if (opts?.method !== 'POST') return { ok: false, json: async () => ({}) };
+      const f = opts.body.getAll('files');
+      n += 1;
+      return { ok: true, json: async () => ({ results: f.map((x, i) => ({ filename: x.name, method: 'ai-verified', status: 'ok', text: `بخش ${n}`, markedText: `بخش ${n}`, corrections: [], notes: [], file: { id: `p${n}-${i}`, name: x.name, type: x.type, size: x.size } })) }) };
+    });
+    const updateLesson = vi.fn();
+    r(<SmartUpload lesson={{ id: 25, archivedNotes: '', files: [] }} updateLesson={updateLesson} fetchImpl={fetchImpl} />);
+    fe.change(sc.getByLabelText('فایل‌های درس'), { target: { files: [big] } });
+    fe.click(sc.getByText('استخراجِ دقیق'));
+    await wf(() => expect(sc.getByTestId('smart-results')).toBeTruthy(), { timeout: 10000 });
+    const posts = fetchImpl.mock.calls.filter((c) => c[1]?.method === 'POST');
+    expect(posts.length).toBe(3);
+    for (const p of posts) {
+      const size = p[1].body.getAll('files').reduce((a, f) => a + f.size, 0);
+      expect(size).toBeLessThanOrEqual(9 * 1024 * 1024);
+    }
+    expect(posts[0][1].body.getAll('files')[0].name).toBe('25 - ریتا - بخش 1 از 3.mp3');
+    expect(updateLesson.mock.calls.at(-1)[1].files).toHaveLength(3);
+  }, 20000);
+});

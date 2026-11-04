@@ -21,8 +21,29 @@ test('verification: confirmed vs suspect lines, normalisation ignores diacritics
   const cmp = compareTranscripts('مرحبا كيفك\nشو اسمك؟\nبدّي قهوة', 'مَرحبا كيفك\nشو اسمك\nبدي شاي');
   assert.deepEqual(cmp.lines.map((l) => l.confirmed), [true, true, false]);
   assert.equal(cmp.suspectCount, 1);
-  assert.equal(cmp.agreement, 0.67);
+  assert.equal(cmp.agreement, 0.83); // word-level: 5 of 6 words confirmed
   assert.match(markSuspect(cmp), /⚠️ \[مشکوک\] بدّي قهوة/);
+});
+
+test('verification: different line breaks and timestamp styles do NOT make a correct transcript «suspect»', () => {
+  // Pass 1 (one sentence per line, [mm:ss]) vs pass 2 (merged lines, other timestamp style) — the real Rita 25 failure.
+  const p1 = '[00:00] لازم تكتب فروضتك\n[00:04] ما لازم\n[00:06] بس للأسف لازم\n[00:09] شو عملت اليوم بالمدرسة؟\n[00:13] رحت عند رفيقي وأكلنا سوا';
+  const p2 = '(0:00 - 0:05) لازم تكتب فروضَك، ما لازم.\n00:06 بس للأسف لازم! شو عملت اليوم بالمدرسة\n**[00:13]** رحت لعند رفيقي و أكلنا سوا';
+  const cmp = compareTranscripts(p1, p2);
+  assert.equal(cmp.suspectCount, 0, JSON.stringify(cmp.lines));
+  assert.ok(cmp.agreement >= 0.85, String(cmp.agreement));
+  // A real difference in meaning is still caught.
+  const diff = compareTranscripts('بدي قهوة هلق\nرايح عالبيت', 'بدي شاي هلق رايح عالبيت');
+  assert.deepEqual(diff.lines.map((l) => l.confirmed), [false, true]);
+});
+
+test('verification: an hour-long transcript aligns fast', () => {
+  const words = 'لازم تكتب فروضك ما لازم بس للأسف شو عملت اليوم بالمدرسة رحت عند رفيقي'.split(' ');
+  const lines = Array.from({ length: 2000 }, (_, i) => `[${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}] ${words.slice(i % 5, (i % 5) + 7).join(' ')} ${i}`);
+  const t0 = Date.now();
+  const cmp = compareTranscripts(lines.join('\n'), lines.map((l) => l.replace(/^\[[^\]]+\] /, '')).join(' '));
+  assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0}ms`);
+  assert.equal(cmp.suspectCount, 0);
 });
 
 test('pipeline: text files are exact (no AI), media is double-transcribed, corrections are separate', async () => {

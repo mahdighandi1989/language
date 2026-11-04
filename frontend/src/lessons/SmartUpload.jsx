@@ -7,6 +7,10 @@
 import React, { useEffect, useState } from 'react';
 import { buildUnifiedNotes, appendUnified, collectCorrections, methodLabel } from './unifiedNotes.js';
 import { MarkdownRenderer } from './markdown.jsx';
+import { splitAudioFile, PART_BYTES } from './splitAudio.js';
+
+const SERVER_MAX = 25 * 1024 * 1024;
+const REQUEST_MAX = 9 * 1024 * 1024;
 
 export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) => fetch(...a) }) {
   const [files, setFiles] = useState([]);
@@ -56,24 +60,52 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
     }
   };
 
+  const [progress, setProgress] = useState('');
   const run = async () => {
     setBusy(true); setError(null); setDone(null); setResults(null);
+    const all = [];
+    const problems = [];
     try {
-      const form = new FormData();
-      files.forEach((f) => form.append('files', f, f.name));
-      form.append('review', review ? '1' : '0');
-      const res = await fetchImpl(`/api/lesson-files/${lesson.id}`, { method: 'POST', body: form });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `خطای ${res.status}`);
-      setResults(body.results || []);
-      // The originals are already stored on the server: attach them to the lesson
-      // now, even when no text came out (failed transcription) — so they can be
-      // played and downloaded. «افزودن به جزوه» then only adds text.
-      attachFiles(body.results || []);
+      // 1) Long recordings are split here (MP3 at frame boundaries, WAV with
+      //    new headers): each part fits one request and is extracted on its own.
+      const expanded = [];
+      for (const f of files) {
+        // eslint-disable-next-line no-await-in-loop
+        const parts = f.size > PART_BYTES && /^audio\/|\.(mp3|wav)$/i.test(f.type || f.name) ? await splitAudioFile(f) : [f];
+        if (!parts) {
+          if (f.size > SERVER_MAX) { problems.push(`«${f.name}» بزرگ‌تر از ۲۵MB است و این قالب خودکار تقسیم نمی‌شود — آن را به mp3 تبدیل کنید یا کوتاه کنید.`); continue; }
+          expanded.push(f);
+        } else expanded.push(...parts);
+      }
+      // 2) Requests of ≤ ~9MB, one after another; results kept as they arrive.
+      const batches = [];
+      for (const f of expanded) {
+        const last = batches[batches.length - 1];
+        if (last && last.size + f.size <= REQUEST_MAX) { last.files.push(f); last.size += f.size; } else batches.push({ files: [f], size: f.size });
+      }
+      for (let b = 0; b < batches.length; b += 1) {
+        setProgress(batches.length > 1 ? `ارسال و استخراجِ بخش ${b + 1} از ${batches.length} (${batches[b].files.map((f) => f.name).join('، ')})…` : '');
+        const form = new FormData();
+        batches[b].files.forEach((f) => form.append('files', f, f.name));
+        form.append('review', review ? '1' : '0');
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetchImpl(`/api/lesson-files/${lesson.id}`, { method: 'POST', body: form });
+        // eslint-disable-next-line no-await-in-loop
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) { problems.push(`${batches[b].files.map((f) => f.name).join('، ')}: ${body.error || `خطای ${res.status}`}`); continue; }
+        all.push(...(body.results || []));
+        // The originals are already stored on the server: attach them to the lesson
+        // now, even when no text came out (failed transcription) — so they can be
+        // played and downloaded. «افزودن به جزوه» then only adds text.
+        attachFiles(body.results || [], all);
+      }
+      if (all.length) setResults(all);
+      if (problems.length) setError(problems.join(' | '));
     } catch (e) {
       setError(e.message);
     } finally {
       setBusy(false);
+      setProgress('');
     }
   };
 
@@ -81,8 +113,9 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
     const known = new Set((lesson.files || []).map((f) => String(f.id)));
     return rs.filter((r) => r.file && !known.has(String(r.file.id))).map((r) => ({ id: r.file.id, name: r.file.name, type: r.file.type, size: r.file.size, stored: true, method: r.method }));
   };
-  function attachFiles(rs) {
-    const add = storedOf(rs);
+  function attachFiles(rs, soFar = rs) {
+    // `lesson` may be stale between batches: attach everything uploaded so far.
+    const add = storedOf(soFar);
     if (add.length) updateLesson(lesson.id, { files: [...(lesson.files || []), ...add] });
   }
   const unified = results ? buildUnifiedNotes(results) : '';
@@ -104,7 +137,7 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
       <p className="text-xs text-slate-600">
         چند فایل با هم: صوت، ویدیو، PDF، عکس، متن، Word، Excel. اصلِ هر فایل نگه داشته می‌شود. Word/PDF ِ متنی/Excel <b>عیناً</b> و بی‌هوشِ مصنوعی
         استخراج می‌شوند؛ عکس/صوت/ویدیو/PDF ِ اسکن‌شده <b>دو بار مستقل</b> رونویسی و مقایسه می‌شوند و سطرهای ناهم‌خوان «⚠️ مشکوک» علامت می‌خورند.
-        پیشنهادهای اعراب و معنا جدا نگه داشته می‌شوند و متن را عوض نمی‌کنند.
+        پیشنهادهای اعراب و معنا جدا نگه داشته می‌شوند و متن را عوض نمی‌کنند. صوتِ بلندِ کلاس (mp3/wav) خودکار به بخش‌های حدودِ ۸MB (بی‌افتِ کیفیت) تقسیم و بخش‌به‌بخش فرستاده می‌شود.
       </p>
       {/* Native picker text is in the browser's language («Choose Files») — a Persian label instead. */}
       <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 cursor-pointer text-sm font-medium">
@@ -126,6 +159,7 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
           <button onClick={restore} disabled={busy || blocked} className="px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-50">بازیابی و پیش‌نمایش</button>
         </div>
       )}
+      {progress && <p role="status" className="text-sm text-teal-700">⏳ {progress}</p>}
       {blocked && <p className="text-xs text-amber-700">متنِ این درس هنوز از فضای ابری بارگذاری نشده است.</p>}
       {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {done && <p role="status" className="text-sm text-emerald-700">✅ {done}</p>}
