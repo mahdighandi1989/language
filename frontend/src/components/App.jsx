@@ -50,6 +50,7 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import KnowledgeExtract from '../knowledge/KnowledgeExtract.jsx';
 import DocCapacity from '../lessons/DocCapacity.jsx';
 import { sectionsToWrite, mergeSection, hasInlineSections, applyLessonExtras, hasInlineLessonData } from '../lessons/sections.js';
 import { lessonExtrasOf, INLINE_NOTES_MAX } from '../lessons/lessonBodies.js';
@@ -3720,6 +3721,7 @@ ${analyzedContent}
                 )}
             </Card>
            <LessonMedia lesson={lesson} updateLesson={updateLesson} />
+           <KnowledgeExtract lesson={lesson} data={data} setData={setData} callAI={callGeminiAPI} addJournalEntry={addJournalEntry} />
            <Shadowing lesson={lesson} data={data} setData={setData} callAI={callGeminiAPI} tts={callGeminiTTS} toWavUrl={getWavUrl} voice={data?.defaultChatSettings?.aiVoice || 'Charon'} setModalConfig={setModalConfig} />
            <SmartUpload lesson={lesson} updateLesson={updateLesson} />
            <Card title="افزودن و تحلیل محتوا">
