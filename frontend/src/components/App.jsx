@@ -3580,7 +3580,7 @@ ${analyzedContent}
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 xl:gap-8">
         <div className="xl:col-span-3 space-y-8 min-w-0">
            {/* Notes first: they are what the learner opens the lesson for (visual audit B). */}
-            <CorrectionsPanel corrections={lesson.corrections} />
+            <CorrectionsPanel corrections={lesson.corrections} onChange={(next) => updateLesson(lesson.id, { corrections: next })} lessonText={lesson.archivedNotes || ''} />
             <Card
                 title="📝 نکات ذخیره شده درس"
                 actionButton={

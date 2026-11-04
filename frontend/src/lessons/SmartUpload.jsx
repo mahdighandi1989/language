@@ -101,21 +101,70 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
 }
 
 /** Separate section: corrections and warnings (diacritics / meaning / suspect lines). */
-export function CorrectionsPanel({ corrections }) {
-  if (!corrections?.length) return null;
+const KINDS = ['اعراب', 'معنا', 'املا', 'تلفظ', 'دیگر'];
+
+/**
+ * «اصلاحات و هشدارهای اعراب/معنا» — a separate section per lesson. Findings
+ * from smart upload AND entries typed by the owner/reviewer; the lesson text
+ * itself is never edited. Entries can be marked done (never silently deleted;
+ * «حذف» needs a confirm). `onChange(nextCorrections)` saves (lesson.corrections).
+ */
+export function CorrectionsPanel({ corrections, onChange, lessonText = '', author = '' }) {
+  const list = corrections || [];
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ quote: '', kind: 'اعراب', issue: '', suggestion: '' });
+  const [filter, setFilter] = useState('open');
+  const editable = typeof onChange === 'function';
+  if (!list.length && !editable) return null;
+  const shown = list.map((c, i) => ({ c, i })).filter(({ c }) => filter === 'all' || (filter === 'open' ? !c.resolved : c.resolved));
+  const add = () => {
+    if (!form.quote.trim() || !form.issue.trim()) return;
+    const quote = form.quote.trim();
+    onChange([...list, { ...form, quote, issue: form.issue.trim(), suggestion: form.suggestion.trim(), verifiedQuote: lessonText.includes(quote), source: 'manual', author, at: new Date().toISOString() }]);
+    setForm({ quote: '', kind: form.kind, issue: '', suggestion: '' });
+  };
+  const patch = (i, p) => onChange(list.map((c, j) => (j === i ? { ...c, ...p } : c)));
+  const remove = (i) => { if (window.confirm('این مورد از فهرستِ اصلاحات حذف شود؟')) onChange(list.filter((_, j) => j !== i)); };
   return (
     <section dir="rtl" className="bg-amber-50 border border-amber-200 p-4 rounded-2xl space-y-2" data-testid="corrections">
-      <h3 className="font-bold text-amber-900">⚠️ اصلاحات و هشدارهای اعراب و معنا ({corrections.length})</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-bold text-amber-900">⚠️ اصلاحات و هشدارهای اعراب و معنا ({list.filter((c) => !c.resolved).length} باز از {list.length})</h3>
+        <div className="flex gap-2 text-xs">
+          {list.length > 0 && <select value={filter} onChange={(e) => setFilter(e.target.value)} className="p-1 border rounded" aria-label="فیلترِ اصلاحات"><option value="open">باز</option><option value="done">انجام‌شده</option><option value="all">همه</option></select>}
+          {editable && <button onClick={() => setOpen((v) => !v)} className="px-2 py-1 rounded bg-amber-600 text-white">{open ? 'بستن' : '➕ افزودنِ مورد'}</button>}
+        </div>
+      </div>
       <p className="text-xs text-amber-800">پیشنهاد است، نه تغییر: متنِ جزوه دست‌نخورده می‌ماند. «نقلِ نایافته» یعنی این تکه عیناً در متن نبود — با احتیاط.</p>
+      {open && editable && (
+        <div className="bg-white rounded-lg p-3 space-y-2 text-sm">
+          <input value={form.quote} onChange={(e) => setForm({ ...form, quote: e.target.value })} placeholder="تکهٔ دقیقِ متن (همان‌طور که در جزوه است)" className="w-full p-2 border rounded" dir="auto" aria-label="تکهٔ متن" />
+          <div className="flex gap-2">
+            <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} className="p-2 border rounded" aria-label="نوع">{KINDS.map((k) => <option key={k}>{k}</option>)}</select>
+            <input value={form.issue} onChange={(e) => setForm({ ...form, issue: e.target.value })} placeholder="مشکل چیست؟" className="flex-1 p-2 border rounded" aria-label="مشکل" />
+          </div>
+          <input value={form.suggestion} onChange={(e) => setForm({ ...form, suggestion: e.target.value })} placeholder="شکلِ درست (اختیاری)" className="w-full p-2 border rounded" dir="auto" aria-label="پیشنهاد" />
+          {form.quote.trim() && !lessonText.includes(form.quote.trim()) && <p className="text-xs text-red-600">این تکه عیناً در متنِ درس پیدا نشد (با «نقلِ نایافته» ثبت می‌شود).</p>}
+          <button onClick={add} disabled={!form.quote.trim() || !form.issue.trim()} className="px-4 py-1.5 rounded bg-amber-600 text-white disabled:opacity-50">ثبت</button>
+        </div>
+      )}
       <ul className="space-y-1 max-h-96 overflow-y-auto text-sm">
-        {corrections.map((c, i) => (
-          <li key={i} className="bg-white rounded-lg p-2">
-            <span className="text-xs px-1.5 rounded bg-amber-100 text-amber-900 ml-1">{c.kind || 'هشدار'}</span>
-            <span dir="auto" className="font-medium">«{c.quote}»</span>
-            {c.verifiedQuote === false && <span className="text-xs text-red-600"> (نقلِ نایافته)</span>}
-            <span className="text-slate-700"> — {c.issue}</span>
-            {c.suggestion && <span dir="auto" className="text-emerald-800"> ⇐ {c.suggestion}</span>}
-            {c.fileName && <span className="text-xs text-slate-400"> · {c.fileName}</span>}
+        {shown.map(({ c, i }) => (
+          <li key={i} className={`bg-white rounded-lg p-2 flex items-start gap-2 ${c.resolved ? 'opacity-60' : ''}`}>
+            <div className="flex-1 min-w-0">
+              <span className="text-xs px-1.5 rounded bg-amber-100 text-amber-900 ml-1">{c.kind || 'هشدار'}</span>
+              <span dir="auto" className="font-medium">«{c.quote}»</span>
+              {c.verifiedQuote === false && <span className="text-xs text-red-600"> (نقلِ نایافته)</span>}
+              <span className="text-slate-700"> — {c.issue}</span>
+              {c.suggestion && <span dir="auto" className="text-emerald-800"> ⇐ {c.suggestion}</span>}
+              {c.fileName && <span className="text-xs text-slate-400"> · {c.fileName}</span>}
+              {c.source === 'manual' && <span className="text-xs text-slate-400"> · دستی{c.author ? ` (${c.author})` : ''}</span>}
+            </div>
+            {editable && (
+              <div className="flex gap-1 shrink-0 text-xs">
+                <button onClick={() => patch(i, { resolved: !c.resolved, resolvedAt: c.resolved ? null : new Date().toISOString() })} className="px-2 py-0.5 rounded bg-slate-100 hover:bg-emerald-100">{c.resolved ? '↩ باز' : '✓ انجام شد'}</button>
+                <button onClick={() => remove(i)} className="px-2 py-0.5 rounded bg-slate-100 hover:bg-red-100 text-red-700" aria-label="حذفِ مورد">🗑️</button>
+              </div>
+            )}
           </li>
         ))}
       </ul>
