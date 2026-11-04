@@ -50,6 +50,8 @@ import { routeFromHash, hashFor } from '../inspection/geometry.js';
 // measured (see src/analytics.js and backend/services/analyticsService.js).
 import AnalyticsTracker from '../analytics.js';
 import ErrorBoundary from './ErrorBoundary.jsx';
+import ExportMenu from '../exports/ExportMenu.jsx';
+import { download as downloadBlob } from '../exports/exports.js';
 import { resolveTheme, applyTheme, setTheme } from '../utils/theme.js';
 import KnowledgeCenter from '../knowledge/KnowledgeCenter.jsx';
 import { normalizeQuiz } from '../quiz/normalizeQuiz.js';
@@ -1077,11 +1079,8 @@ export default function App() {
   };
 
   const exportData = () => {
-    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data))}`;
-    const link = document.createElement("a");
-    link.href = jsonString;
-    link.download = "lebanese_learning_data.json";
-    link.click();
+    // Blob, not a data: URI — multi-MB data URIs fail silently in some browsers.
+    downloadBlob("lebanese_learning_data.json", JSON.stringify(data), "application/json");
     addJournalEntry("داده‌ها به صورت فایل JSON خروجی گرفته شد.");
   };
 
@@ -2935,7 +2934,7 @@ function Dashboard({ stats, navigateTo, lessons, addLesson, addJournalEntry, kno
   );
 }
 
-function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }) {
+function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson, data, setModalConfig }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('course');
     const [filterBy, setFilterBy] = useState('all'); // all, withContent, empty
@@ -3104,8 +3103,10 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson }
             </div>
 
             {/* Fixed Footer with count */}
-            <div className="bg-slate-50 px-4 py-2 border-t text-sm text-slate-500 text-center">
-                نمایش {filteredAndSortedLessons.length} از {lessons.length} درس
+            <div className="bg-slate-50 px-4 py-2 border-t text-sm text-slate-500 flex flex-wrap items-center justify-between gap-2">
+                <span>نمایش {filteredAndSortedLessons.length} از {lessons.length} درس</span>
+                {/* Course/selection export: whatever the filters currently show. */}
+                <ExportMenu compact title={courseFilter !== 'all' ? `دورهٔ ${courseFilter}` : 'همهٔ درس‌ها'} lessons={filteredAndSortedLessons} knowledgeBase={data?.knowledgeBase} setModalConfig={setModalConfig} />
             </div>
         </div>
     );
@@ -3570,7 +3571,8 @@ ${analyzedContent}
   return (
     <div className="space-y-8">
       <h2 className="text-4xl font-bold mb-2 text-slate-800">{lesson.title}</h2>
-      <div className="flex items-center gap-2 text-slate-600 mb-6"><p className="text-lg">{lesson.summary}</p><TTSButton textToSpeak={lesson.summary} /></div>
+      <div className="flex items-center gap-2 text-slate-600 mb-2"><p className="text-lg">{lesson.summary}</p><TTSButton textToSpeak={lesson.summary} /></div>
+      <div className="mb-6"><ExportMenu title={lesson.title} lessons={[lesson]} knowledgeBase={knowledgeBase} setModalConfig={setModalConfig} /></div>
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 xl:gap-8">
         <div className="xl:col-span-3 space-y-8 min-w-0">
            {/* Notes first: they are what the learner opens the lesson for (visual audit B). */}
