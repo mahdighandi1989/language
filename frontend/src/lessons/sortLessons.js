@@ -28,18 +28,31 @@ export function naturalCompare(a, b) {
 // Same course whatever the keyboard: ي/ی، ك/ک، diacritics, ZWNJ and spaces don't split a course.
 const normCourse = (c) => String(c || '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\u200c/g, ' ').replace(/\s+/g, ' ').trim();
 
+// «مسلسل لو - قسمت 9», «Lo - part 9»: the part comes AFTER the dash.
+const PART_WORD = /^(قسمت|بخش|جلسه|درس|حلقه|الحلقة|حلقة|part|episode|ep\.?|session|lesson)\s*[\d۰-۹]+/i;
+
 export function courseOf(lesson) {
   if (lesson?.course) return normCourse(lesson.course);
   const t = String(lesson?.title || '');
   const i = t.lastIndexOf(' - ');
-  return i >= 0 ? normCourse(t.slice(i + 3)) : '';
+  if (i < 0) return '';
+  const after = t.slice(i + 3).trim();
+  return normCourse(PART_WORD.test(after) ? t.slice(0, i) : after);
 }
 
-/** Explicit order, else the leading number of the title («21 - ریتا» ⇒ 21). */
+/** The number written in the title: after «قسمت/part/جلسه…», else at its start («21 - ریتا» ⇒ 21). */
+export function titleNumber(lesson) {
+  const t = String(lesson?.title || '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const part = t.match(/(?:قسمت|بخش|جلسه|حلقه|الحلقة|حلقة|part|episode|ep\.?|session|lesson)\s*(\d+(?:\.\d+)?)/i);
+  if (part) return Number(part[1]);
+  const lead = t.match(/^\s*(\d+(?:\.\d+)?)/);
+  return lead ? Number(lead[1]) : null;
+}
+
+/** Explicit order, else the number in the title. */
 export function lessonNumber(lesson) {
   if (Number.isFinite(lesson?.order)) return lesson.order;
-  const m = String(lesson?.title || '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).match(/^\s*(\d+(?:\.\d+)?)/);
-  return m ? Number(m[1]) : null;
+  return titleNumber(lesson);
 }
 
 /** Sort by course, then explicit order, then natural title. */
@@ -73,10 +86,14 @@ export function lessonSearchText(lesson) {
 
 /** Missing numbers in a course (1..max) — e.g. a series part that was never imported. */
 export function courseGaps(lessons, course) {
-  const nums = new Set((lessons || []).filter((l) => courseOf(l) === course).map(lessonNumber).filter((n) => Number.isInteger(n) && n > 0));
+  // The number the owner SEES (title first: «قسمت 9»), not an import order index.
+  const nums = new Set((lessons || []).filter((l) => courseOf(l) === course).map((l) => titleNumber(l) ?? lessonNumber(l)).filter((n) => Number.isInteger(n) && n > 0));
   if (nums.size < 3) return [];
+  const min = Math.min(...nums);
   const max = Math.max(...nums);
+  // Only inside the present range, and not when most numbers are missing (not a numbered series).
+  if (max - min + 1 > nums.size * 2) return [];
   const gaps = [];
-  for (let n = 1; n <= max; n += 1) if (!nums.has(n)) gaps.push(n);
+  for (let n = min; n <= max; n += 1) if (!nums.has(n)) gaps.push(n);
   return gaps;
 }

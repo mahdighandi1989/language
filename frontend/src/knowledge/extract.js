@@ -30,7 +30,7 @@ const CORRECTIONS_WORD = /اصلاح|هشدار|تصحیح|غلط‌?\s?نامه
 const CORRECTIONS_HEAD = /^(#{1,6}\s+.*|\*\*.*\*\*|⚠️.*)$/;
 // A table header that describes problems, not vocabulary.
 const CORRECTIONS_COLS = /مشکل|ایراد|پیشنهاد|اصلاح|نوعِ?\s*خطا|اطمینان|توضیحِ?\s*خطا|issue|suggestion|confidence/i;
-const NOISE_LINE = /⚠️|\[مشکوک\]|\[ناخوانا\]|⟲|اطمینان\s*(کم|متوسط|بالا)/;
+const NOISE_LINE = /⚠️|\[مشکوک\]|\[ناخوانا\]|⟲|اطمینان\s*(کم|متوسط|بالا)|^\s*[[(]?\s*\d{1,2}:\d{2}/;
 // A «meaning» that is really a review note (starts with, or is about, harakat/typos).
 const NOTE_START = /^\s*(حرکت‌?\s?گذاری|اعراب|غلط|تایپ|اشتباه|املا|اصلاح|پیشنهاد|درست(ش)?\s|صحیح|نادرست|با ضمیر|باید)/;
 const NOTE_WORDS = /غلط|اشتباه|باید\s|حرکت‌?گذاری|اعراب|تایپی|اطمینان|اصلاح|پیشنهاد|درستش|صحیح\s+آن|نادرست/;
@@ -183,12 +183,45 @@ const isPersianLine = (l) => ARABIC_SCRIPT.test(l) && (langScore(l) < 0 || /[پ�
 const isArabicLine = (l) => ARABIC_SCRIPT.test(l) && !isPersianLine(l);
 const NOTE_START_LINE = /^\s*(note|notes|نکته|توجه|یادداشت)\b\s*[:：-]?/i;
 
+const TIMESTAMP_LINE = /^\s*[[(]?\s*\d{1,2}:\d{2}(?::\d{2})?\s*[\])]?/;
+const GENDER_LINE = /^[()\s]*(مذکر|مونث|مؤنث|masc\.?|fem\.?)[()\s]*$/i;
+const ENDS_SENTENCE = /[.?!؟؛:"'»)\]]\s*$/;
+
+/**
+ * Normalise PDF text before looking for blocks: lines are kept with ALL their
+ * original indices. Timestamped transcript lines are dropped; an English line
+ * that wraps («She drinks coffee in the» + «morning.») is joined; a lone
+ * «(مذکر)/(مؤنث)» (even as «)مونث(») is attached to the line before it.
+ */
+export function normalizeBlockLines(all) {
+  const out = []; // { l, idxs, blankBefore }
+  let blank = true;
+  for (let i = 0; i < all.length; i += 1) {
+    const l = clean(all[i]);
+    if (!l) { blank = true; continue; }
+    if (TIMESTAMP_LINE.test(l)) { out.push({ l: '', idxs: [i], drop: true, blankBefore: blank }); blank = true; continue; }
+    const prev = out[out.length - 1];
+    if (prev && !prev.drop && !blank && GENDER_LINE.test(l)) {
+      const g = l.replace(/[()\s]/g, '').replace('مونث', 'مؤنث');
+      prev.l = `${prev.l} (${g})`; prev.idxs.push(i); continue;
+    }
+    if (prev && !prev.drop && !blank && isLatinLine(prev.l) && isLatinLine(l) && !ENDS_SENTENCE.test(prev.l) && /^[a-z]/.test(l) && !isTranslit(l)) {
+      prev.l = `${prev.l} ${l}`; prev.idxs.push(i); continue;
+    }
+    out.push({ l, idxs: [i], blankBefore: blank });
+    blank = false;
+  }
+  return out;
+}
+
 /** Lines that form example blocks, and «Note …» paragraphs joined across wrapped lines. */
 export function exampleBlocks(text) {
   const all = String(text || '').split('\n');
   const used = new Set();
   const items = [];
   const notes = [];
+  // Timestamped transcript lines never become items (here or in the line pass).
+  all.forEach((l, i) => { if (TIMESTAMP_LINE.test(l.trim())) used.add(i); });
   // Notes: a «Note» line plus following lines until a blank line or a new block start.
   for (let i = 0; i < all.length; i += 1) {
     if (!NOTE_START_LINE.test(all[i].trim())) continue;
@@ -199,46 +232,46 @@ export function exampleBlocks(text) {
     notes.push(parts.join(' '));
     i = j - 1;
   }
-  const idx = all.map((l, i) => ({ l: clean(l), i })).filter((x) => x.l && !used.has(x.i) && !x.l.startsWith('|'));
+  const norm = normalizeBlockLines(all.map((l, i) => (used.has(i) ? '' : l))).filter((x) => !x.drop && !x.l.startsWith('|'));
   let heading = '';
-  for (let k = 0; k < idx.length; k += 1) {
-    const h = idx[k].l.match(/^#{1,6}\s+(.*)$/);
+  for (let k = 0; k < norm.length; k += 1) {
+    const h = norm[k].l.match(/^#{1,6}\s+(.*)$/);
     if (h) { heading = h[1]; continue; }
-    // 4 lines: one Arabic, one Persian, two Latin (translit + English), in any order
-    const w4 = idx.slice(k, k + 4);
-    if (w4.length === 4 && consecutive(w4)) {
-      const ar = w4.filter((x) => isArabicLine(x.l));
-      const fa = w4.filter((x) => isPersianLine(x.l));
+    // 4 lines (no blank inside): two in Arabic script, two Latin (translit + English).
+    const w4 = norm.slice(k, k + 4);
+    if (w4.length === 4 && w4.slice(1).every((x) => !x.blankBefore)) {
+      const scripted = w4.filter((x) => ARABIC_SCRIPT.test(x.l));
       const lat = w4.filter((x) => isLatinLine(x.l));
-      if (ar.length === 1 && fa.length === 1 && lat.length === 2) {
+      if (scripted.length === 2 && lat.length === 2) {
+        // The Lebanese line: higher score; on a tie, the earlier one (the sentence leads the block).
+        const [x1, x2] = scripted;
+        const s1 = langScore(x1.l); const s2 = langScore(x2.l);
+        const ar = s2 > s1 ? x2 : x1;
+        const fa = ar === x1 ? x2 : x1;
         const tr = lat.find((x) => isTranslit(x.l)) || lat[0];
         const en = lat.find((x) => x !== tr);
-        items.push({ term: ar[0].l, pronunciation: tr.l, english: en.l, definition: fa[0].l, from: 'block', trusted: true, heading });
-        w4.forEach((x) => used.add(x.i));
-        k += 3;
-        continue;
+        // A gender/number note alone is not a sentence: skip such misaligned windows.
+        if (langScore(ar.l) >= 0 && !GENDER_LINE.test(ar.l) && !GENDER_LINE.test(fa.l) && words(ar.l) >= 1) {
+          items.push({ term: ar.l, pronunciation: tr.l, english: en.l, definition: fa.l, from: 'block', trusted: true, heading });
+          w4.forEach((x) => x.idxs.forEach((i) => used.add(i)));
+          k += 3;
+          continue;
+        }
       }
     }
-    // 3 lines without the Arabic script: translit / English / Persian ⇒ shown, unticked
-    const w3 = idx.slice(k, k + 3);
-    if (w3.length === 3 && consecutive(w3)) {
-      const fa = w3.filter((x) => isPersianLine(x.l));
+    // 3 lines without the Arabic script (translit / English / Persian): not an item —
+    // a term must be Arabic. Their lines are consumed so they don't leak as junk.
+    const w3 = norm.slice(k, k + 3);
+    if (w3.length === 3 && w3.slice(1).every((x) => !x.blankBefore)) {
+      const fa = w3.filter((x) => ARABIC_SCRIPT.test(x.l));
       const lat = w3.filter((x) => isLatinLine(x.l));
       if (fa.length === 1 && lat.length === 2 && lat.some((x) => isTranslit(x.l))) {
-        const tr = lat.find((x) => isTranslit(x.l));
-        const en = lat.find((x) => x !== tr);
-        items.push({ term: tr.l, pronunciation: tr.l, english: en.l, definition: fa[0].l, from: 'block-latin', heading });
-        w3.forEach((x) => used.add(x.i));
+        w3.forEach((x) => x.idxs.forEach((i) => used.add(i)));
         k += 2;
       }
     }
   }
   return { items, used, notes };
-}
-function consecutive(win) {
-  // no blank-line gap inside the window (lines are adjacent in the original text)
-  for (let t = 1; t < win.length; t += 1) if (win[t].i !== win[t - 1].i + 1) return false;
-  return true;
 }
 
 export const CATEGORIES = ['vocabulary', 'phrases', 'verbs', 'adjectives', 'pronouns', 'grammar'];

@@ -177,11 +177,39 @@ describe('«VERBS in Lebanese» example blocks (lesson 15)', async () => {
     expect(exampleBlocks(verbs).notes).toEqual(['Note: ymash-she = to walk something or someone (causative form of mesh-e)']);
     expect(c.some((x) => /ymash|walk something/.test(x.term + x.definition))).toBe(false);
   });
-  it('a block without the Arabic line is shown but unticked; the item keeps the English', () => {
-    const c = extractLocal(['Huwwe 3am ymash-she el-kaleb', 'He is walking the dog', 'او دارد سگ را راه می‌برد'].join('\n'));
-    expect(c).toHaveLength(1);
-    expect(quality(c[0]).ok).toBe(false);
+  it('a block without the Arabic line is NOT an item (tester: ghost items «(Ana)», «tisma3/tisma3e?»); the item keeps the English', () => {
+    const c = extractLocal(['Huwwe 3am ymash-she el-kaleb', 'He is walking the dog', 'او دارد سگ را راه می‌برد', '', '(Ana)', 'tisma3/tisma3e?', 'musii2a.'].join('\n'));
+    expect(c).toHaveLength(0);
     const next = addToKb({}, [{ term: 'أنا بحبّ القهوة', definition: 'من قهوه را دوست دارم', english: 'I love coffee', category: 'phrases' }], { id: 15, title: '15 - ریتا' }, 1);
     expect(next.phrases[0].english).toBe('I love coffee');
+  });
+});
+
+describe('tester report on d7fa53f (lesson 15)', async () => {
+  const { quality, normalizeBlockLines } = await import('./extract.js');
+  const text = [
+    '[3:15] كسره بري',
+    '[3:19] i',
+    'هي بتشرب قهوة الصبح',
+    'Hiyye btishrab ahwe l-sob7',
+    'She drinks coffee in the',
+    'morning.',
+    'او صبح قهوه می‌نوشد',
+    ')مونث(',
+    '',
+    'إنتَ بتسمع موسيقى؟',
+    'Enta btisma3 musii2a?',
+    'Do you listen to music?',
+    'تو موسیقی گوش می‌دهی؟',
+    '(مذکر)',
+  ].join('\n');
+  it('drops [m:ss] lines, joins the wrapped English line, attaches (مذکر)/(مؤنث) to the Persian line', () => {
+    const c = extractLocal(text);
+    expect(c.map((x) => x.term)).toEqual(['هي بتشرب قهوة الصبح', 'إنتَ بتسمع موسيقى؟']);
+    expect(c[0]).toMatchObject({ english: 'She drinks coffee in the morning.', definition: 'او صبح قهوه می‌نوشد (مؤنث)' });
+    expect(c[1].definition).toBe('تو موسیقی گوش می‌دهی؟ (مذکر)');
+    expect(c.every((x) => quality(x).ok)).toBe(true);
+    for (const junk of ['كسره بري', 'i', ')مونث(', '(مذکر)', 'قهوه']) expect(c.some((x) => x.term === junk)).toBe(false);
+    expect(normalizeBlockLines(['She drinks coffee in the', 'morning.']).map((x) => x.l)).toEqual(['She drinks coffee in the morning.']);
   });
 });
