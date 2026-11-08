@@ -107,6 +107,31 @@ lessonFilesRouter.get('/api/lesson-files/:lessonId/:fileId/extract', requireAuth
   return res.json({ file: meta, extract });
 });
 
+/**
+ * «🔁 رونویسیِ دوباره»: extract a stored original again (with the language hint)
+ * and keep the new result as the file's extract. The lesson notes are NOT
+ * changed here — the page offers it through «بازیابی و پیش‌نمایش» (appends).
+ */
+lessonFilesRouter.post('/api/lesson-files/:lessonId/:fileId/reextract', requireAuthIfConfigured, async (req, res) => {
+  const uid = uidOf(req);
+  const lessonId = lessonIdOf(req);
+  const list = await listLessonFiles(uid, lessonId);
+  const meta = list.find((f) => f.id === req.params.fileId && !f.removedAt);
+  if (!meta) return res.status(404).json({ error: 'فایل پیدا نشد' });
+  const bytes = await readLessonFile(meta.id);
+  if (!bytes) return res.status(410).json({ error: 'بایت‌های فایل در دسترس نیست' });
+  try {
+    const ex = await extractLessonFile({ buffer: bytes, filename: meta.name, mime: meta.type }, { ai: aiOverride || undefined, review: req.body?.review !== false });
+    const done = { method: ex.method, status: ex.status, agreement: ex.agreement, suspectCount: ex.suspectCount, textChars: ex.text.length, extractedAt: new Date().toISOString(), reextractedAt: new Date().toISOString(), hasExtract: true, extractVersion: (meta.extractVersion || 1) + 1 };
+    await saveLessonExtract(meta.id, { text: ex.text, markedText: ex.markedText, corrections: ex.corrections, notes: ex.notes, suspectLines: ex.suspectLines, method: ex.method, status: ex.status, agreement: ex.agreement });
+    const file = await updateLessonFile(uid, lessonId, meta.id, (x) => Object.assign(x, done));
+    return res.json({ result: { ...ex, file } });
+  } catch (e) {
+    console.error('reextract failed:', e?.message);
+    return res.status(500).json({ error: 'رونویسیِ دوباره ناموفق بود' });
+  }
+});
+
 lessonFilesRouter.post('/api/lesson-files/:lessonId/:fileId/remove', requireAuthIfConfigured, async (req, res) => {
   const f = await updateLessonFile(uidOf(req), lessonIdOf(req), String(req.params.fileId), (x) => { x.removedAt = new Date().toISOString(); });
   if (!f) return res.status(404).json({ error: 'فایل پیدا نشد' });

@@ -25,11 +25,21 @@ export function naturalCompare(a, b) {
 }
 
 /** The course of a lesson: explicit `course`, else the part after the last « - ». */
+// Same course whatever the keyboard: ي/ی، ك/ک، diacritics, ZWNJ and spaces don't split a course.
+const normCourse = (c) => String(c || '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\u200c/g, ' ').replace(/\s+/g, ' ').trim();
+
 export function courseOf(lesson) {
-  if (lesson?.course) return String(lesson.course).trim();
+  if (lesson?.course) return normCourse(lesson.course);
   const t = String(lesson?.title || '');
   const i = t.lastIndexOf(' - ');
-  return i >= 0 ? t.slice(i + 3).trim() : '';
+  return i >= 0 ? normCourse(t.slice(i + 3)) : '';
+}
+
+/** Explicit order, else the leading number of the title («21 - ریتا» ⇒ 21). */
+export function lessonNumber(lesson) {
+  if (Number.isFinite(lesson?.order)) return lesson.order;
+  const m = String(lesson?.title || '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).match(/^\s*(\d+(?:\.\d+)?)/);
+  return m ? Number(m[1]) : null;
 }
 
 /** Sort by course, then explicit order, then natural title. */
@@ -37,8 +47,8 @@ export function compareLessons(a, b) {
   const ca = courseOf(a);
   const cb = courseOf(b);
   if (ca !== cb) return naturalCompare(ca, cb);
-  const oa = Number.isFinite(a.order) ? a.order : null;
-  const ob = Number.isFinite(b.order) ? b.order : null;
+  const oa = lessonNumber(a);
+  const ob = lessonNumber(b);
   if (oa !== null && ob !== null && oa !== ob) return oa - ob;
   return naturalCompare(a.title, b.title);
 }
@@ -59,4 +69,14 @@ export function lessonSearchText(lesson) {
     searchMemo.set(lesson, v);
   }
   return v;
+}
+
+/** Missing numbers in a course (1..max) — e.g. a series part that was never imported. */
+export function courseGaps(lessons, course) {
+  const nums = new Set((lessons || []).filter((l) => courseOf(l) === course).map(lessonNumber).filter((n) => Number.isInteger(n) && n > 0));
+  if (nums.size < 3) return [];
+  const max = Math.max(...nums);
+  const gaps = [];
+  for (let n = 1; n <= max; n += 1) if (!nums.has(n)) gaps.push(n);
+  return gaps;
 }

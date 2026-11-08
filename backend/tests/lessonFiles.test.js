@@ -188,3 +188,29 @@ test('pipeline: when retry is impossible (m4a) the loop is still collapsed and r
   assert.equal(r.text.split('\n').length, 4);
   assert.match(r.notes.join(' '), /حلقهٔ تکرار/);
 });
+
+test('a mostly Arabic transcript: Latin-letter lines («Good. Marhaba Mahdi») are flagged; prompts carry the language hint', async () => {
+  const { flagLatinLines, LANGUAGE_HINT_FA } = await import('../services/lessonFiles/pipeline.js');
+  const cmp = compareTranscripts('Good. Marhaba Mahdi\nكيفك اليوم\nلازم تكتب فروضك\nok', 'Good. Marhaba Mahdi\nكيفك اليوم\nلازم تكتب فروضك\nok');
+  const f = flagLatinLines(cmp);
+  assert.equal(f.latinFlagged, 1); // «ok» is one word: not flagged
+  assert.equal(f.lines[0].confirmed, false);
+  assert.equal(f.suspectCount, 1);
+  assert.match(LANGUAGE_HINT_FA, /عربیِ لبنانی و فارسی/);
+  const en = flagLatinLines(compareTranscripts('Hello there\nHow are you', 'Hello there\nHow are you'));
+  assert.equal(en.latinFlagged, 0); // an English recording is not «wrong language»
+});
+
+test('API: re-extract a stored file keeps the new result as its extract (notes untouched)', async () => {
+  const form = new FormData();
+  form.append('files', new Blob([Buffer.from([5, 5])], { type: 'audio/mpeg' }), '15.mp3');
+  form.append('review', '0');
+  const up = await (await fetch(`${base}/api/lesson-files/1515`, { method: 'POST', body: form })).json();
+  const id = up.results[0].file.id;
+  const r = await fetch(`${base}/api/lesson-files/1515/${id}/reextract`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review: false }) });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.result.file.extractVersion, 2);
+  assert.ok(body.result.file.reextractedAt);
+  assert.equal((await fetch(`${base}/api/lesson-files/9999/${id}/reextract`, { method: 'POST' })).status, 404);
+});

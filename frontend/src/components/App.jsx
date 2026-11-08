@@ -21,7 +21,7 @@ import { serializeForSync, shouldSaveToCloud } from '../storage/sync.js';
 // Lessons at scale: separate body store (1 MiB cap), list helpers, markdown, admin import.
 import { toCloudDoc, bodiesToWrite, mergeCachedBodies, createBodyStore, writeCloudDoc } from '../lessons/lessonBodies.js';
 import { MarkdownRenderer as LessonMarkdown } from '../lessons/markdown.jsx';
-import { compareLessons, courseOf, courseList, naturalCompare, searchKey, lessonSearchText } from '../lessons/sortLessons.js';
+import { compareLessons, courseOf, courseList, naturalCompare, searchKey, lessonSearchText, courseGaps } from '../lessons/sortLessons.js';
 import LessonImportPanel from '../lessons/LessonImportPanel.jsx';
 import SmartUpload, { CorrectionsPanel } from '../lessons/SmartUpload.jsx';
 import { createBodyLoader } from '../lessons/bodyLoader.js';
@@ -3191,7 +3191,11 @@ function LessonList({ lessons, navigateTo, deleteLesson, editLesson, addLesson, 
 
             {/* Fixed Footer with count */}
             <div className="bg-slate-50 px-4 py-2 border-t text-sm text-slate-500 flex flex-wrap items-center justify-between gap-2">
-                <span>نمایش {filteredAndSortedLessons.length} از {lessons.length} درس</span>
+                <span>نمایش {filteredAndSortedLessons.length} از {lessons.length} درس
+                  {courseFilter !== 'all' && courseGaps(lessons, courseFilter).length > 0 && (
+                    <span className="block text-amber-700" title="شماره‌هایی از ۱ تا بیشترین شماره که در این دوره درسی ندارند">⚠ شماره‌های غایب در «{courseFilter}»: {courseGaps(lessons, courseFilter).slice(0, 30).join('، ')}{courseGaps(lessons, courseFilter).length > 30 ? '…' : ''}</span>
+                  )}
+                </span>
                 {/* Course/selection export: whatever the filters currently show. */}
                 <ExportMenu compact title={courseFilter !== 'all' ? `دورهٔ ${courseFilter}` : 'همهٔ درس‌ها'} lessons={filteredAndSortedLessons} knowledgeBase={data?.knowledgeBase} setModalConfig={setModalConfig} />
             </div>
@@ -3351,6 +3355,27 @@ function LessonDetail({ lesson, addJournalEntry, updateLesson, updateKnowledgeBa
   // metadata only — their bytes were never stored).
   // Drive copies (link / error) of this lesson's stored files — shown next to each file.
   const driveLinks = useDriveLinks(lesson.id, (lesson.files || []).filter((f) => f.stored).length);
+  // «🔁 رونویسیِ دوباره»: the server re-transcribes the stored original (language hint
+  // fa/ar) and keeps it as the file's extract; the notes change only through
+  // «بازیابی و پیش‌نمایش» in the smart upload (appended, never replaced).
+  const [reextracting, setReextracting] = useState(null);
+  const reextractFile = async (file) => {
+      if (!window.confirm(`«${file.name}» دوباره رونویسی شود؟ (چند دقیقه؛ متنِ فعلیِ درس دست نمی‌خورد)`)) return;
+      setReextracting(file.id);
+      try {
+          const res = await fetch(`/api/lesson-files/${lesson.id}/${file.id}/reextract`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ review: true }) });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || `خطای ${res.status}`);
+          updateLesson(lesson.id, { appliedExtracts: (lesson.appliedExtracts || []).filter((x) => String(x) !== String(file.id)) });
+          const r = body.result || {};
+          setModalConfig({ title: 'رونویسیِ تازه آماده است', message: `توافقِ دو رونویسی ${Math.round((r.agreement ?? 0) * 100)}٪، ${r.suspectCount || 0} سطرِ مشکوک. برای افزودن به جزوه، در «📥 آپلودِ هوشمند» روی «بازیابی و پیش‌نمایش» بزنید.${(r.notes || []).length ? `\n${r.notes.join('\n')}` : ''}` });
+      } catch (e) {
+          setModalConfig({ title: 'رونویسیِ دوباره ناموفق بود', message: e.message });
+      } finally {
+          setReextracting(null);
+      }
+  };
+
   const downloadFile = async (file) => {
       try {
           const res = await fetch(`/api/lesson-files/${lesson.id}/${file.id}/raw`);
@@ -3751,6 +3776,9 @@ ${analyzedContent}
                        <div className="flex items-center gap-1">
                          {driveLinks[file.id]?.link && <a href={driveLinks[file.id].link} target="_blank" rel="noopener noreferrer" className="p-1 hover:bg-teal-100 rounded-full text-teal-700 text-sm" title="نسخهٔ این فایل در Google Drive" aria-label="بازکردن در Google Drive">☁️</a>}
                          {!driveLinks[file.id]?.link && driveLinks[file.id]?.error && <span className="p-1 text-amber-600 text-sm" title={`در Drive کپی نشد: ${driveLinks[file.id].error}`} aria-label="کپی در Drive ناموفق">⚠☁️</span>}
+                         {file.stored && /^(audio|video|image)\//.test(file.type || '') && (
+                           <button onClick={() => reextractFile(file)} disabled={reextracting === file.id} className="p-1 hover:bg-indigo-100 rounded-full text-indigo-700 text-sm disabled:opacity-40" title="رونویسیِ دوباره با راهنمای زبانِ عربی/فارسی (متنِ فعلیِ درس دست نمی‌خورد)" aria-label="رونویسیِ دوباره">{reextracting === file.id ? '⏳' : '🔁'}</button>
+                         )}
                          <button onClick={() => downloadFile(file)} disabled={!file.stored} className="p-1 hover:bg-teal-100 rounded-full text-teal-700 disabled:opacity-30" title={file.stored ? 'دانلودِ اصلِ فایل' : 'اصلِ این فایل ذخیره نشده بود (فقط «آپلودِ هوشمند» اصلِ فایل را نگه می‌دارد)'} aria-label="دانلودِ فایل">
                            <Download size={16}/>
                          </button>
@@ -4307,7 +4335,8 @@ ${lessonContent.slice(0, 8000)}${glossaryBlock}`;
                             {lessons.length === 0 ? (
                                 <option value="">هیچ درسی وجود ندارد</option>
                             ) : (
-                                lessons.map(l => (
+                                // Course, then lesson number (natural order: «21 - ریتا» before «24 - ریتا»).
+                                [...lessons].sort(compareLessons).map(l => (
                                     <option key={l.id} value={l.id.toString()}>
                                         {l.title} {l.archivedNotes?.length > 50 ? '✅' : '⚠️'}
                                     </option>

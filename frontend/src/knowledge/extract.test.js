@@ -150,3 +150,38 @@ describe('ain/ghain typos and conjugation tables', async () => {
     expect(c.map((x) => x.term)).toEqual(['خِفِت', 'بْخاف', 'خاف', 'بيْخاف']);
   });
 });
+
+describe('«VERBS in Lebanese» example blocks (lesson 15)', async () => {
+  const { quality, exampleBlocks } = await import('./extract.js');
+  const verbs = [
+    'VERBS in Lebanese',
+    '',
+    'هوّي عم يمشّي الكلب',
+    'Huwwe 3am ymash-she el-kaleb',
+    'He is walking the dog',
+    'او دارد سگ را راه می‌برد',
+    '',
+    'Note: ymash-she = to walk something or',
+    'someone (causative form of mesh-e)',
+    '',
+    'أنا بحبّ القهوة',
+    'Ana b7ebb el-ahwe',
+    'I love coffee',
+    'من قهوه را دوست دارم',
+  ].join('\n');
+  it('one item per 4-line block (Arabic, translit, English, Persian); wrapped Note lines joined and not items', () => {
+    const c = extractLocal(verbs, { lessonTitle: '15 - ریتا' });
+    expect(c.map((x) => x.term)).toEqual(['هوّي عم يمشّي الكلب', 'أنا بحبّ القهوة']);
+    expect(c[0]).toMatchObject({ pronunciation: 'Huwwe 3am ymash-she el-kaleb', english: 'He is walking the dog', definition: 'او دارد سگ را راه می‌برد', category: 'phrases' });
+    expect(c.every((x) => quality(x).ok)).toBe(true);
+    expect(exampleBlocks(verbs).notes).toEqual(['Note: ymash-she = to walk something or someone (causative form of mesh-e)']);
+    expect(c.some((x) => /ymash|walk something/.test(x.term + x.definition))).toBe(false);
+  });
+  it('a block without the Arabic line is shown but unticked; the item keeps the English', () => {
+    const c = extractLocal(['Huwwe 3am ymash-she el-kaleb', 'He is walking the dog', 'او دارد سگ را راه می‌برد'].join('\n'));
+    expect(c).toHaveLength(1);
+    expect(quality(c[0]).ok).toBe(false);
+    const next = addToKb({}, [{ term: 'أنا بحبّ القهوة', definition: 'من قهوه را دوست دارم', english: 'I love coffee', category: 'phrases' }], { id: 15, title: '15 - ریتا' }, 1);
+    expect(next.phrases[0].english).toBe('I love coffee');
+  });
+});

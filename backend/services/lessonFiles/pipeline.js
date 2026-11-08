@@ -28,6 +28,10 @@ export const INLINE_MAX = 15 * 1024 * 1024;
 const REVIEW_CHUNK = 20000;
 const REVIEW_MAX_CHUNKS = 15;
 
+// The speech in these classes is Lebanese Arabic + Persian (+ a little English/French).
+// Saying so stops the model from writing Arabic/Persian in Latin letters or as English.
+export const LANGUAGE_HINT_FA = 'زبانِ گفتار عمدتاً عربیِ لبنانی و فارسی است (گاهی انگلیسی/فرانسوی). عربی را با حروفِ عربی و فارسی را با حروفِ فارسی بنویس — هرگز با حروفِ لاتین؛ فقط جمله‌ای را که واقعاً انگلیسی گفته شده به انگلیسی بنویس. ';
+export const LANGUAGE_HINT_EN = 'The speech is mostly Lebanese Arabic and Persian (sometimes English/French). Write Arabic in Arabic script and Persian in Persian script — never romanised; only sentences actually spoken in English are written in English. ';
 const PROMPT_A = 'متنِ این فایل را کلمه‌به‌کلمه و کامل رونویسی کن. هیچ خلاصه، ترجمه، اصلاح یا توضیحی نده. هر کلمه یا جمله را فقط به تعدادی که واقعاً گفته شده بنویس و هرگز تکرار نکن؛ سکوت یا صدای نامفهومِ طولانی را یک بار با [ناخوانا] مشخص کن. اعراب، املا و ترتیبِ سطرها را همان‌طور که هست نگه دار. جای ناخوانا یا نامفهوم را دقیقاً با [ناخوانا] مشخص کن. برای صوت/ویدیو هر جمله را با برچسبِ زمان [mm:ss] در سطرِ جدا بنویس و نوشته‌های روی تصویر را هم جدا بیاور.';
 const PROMPT_B = 'Transcribe this file verbatim, line by line, exactly as written or spoken — no summary, no translation, no corrections, keep all diacritics and spelling. Write each word only as many times as it is actually spoken — never loop or repeat; mark long silence or unclear noise once as [ناخوانا]. Mark anything unreadable or unclear as [ناخوانا]. For audio/video put each sentence on its own line with a [mm:ss] timestamp; include on-screen text.';
 
@@ -40,7 +44,7 @@ export function geminiAi() {
   return {
     async transcribe(buffer, mime, filename, variant) {
       const g = await import('../geminiService.js');
-      const prompt = variant === 'b' ? PROMPT_B : PROMPT_A;
+      const prompt = variant === 'b' ? LANGUAGE_HINT_EN + PROMPT_B : LANGUAGE_HINT_FA + PROMPT_A;
       // Verbatim transcription: no «thinking» (it spends the output budget) and
       // the largest output budget, so a 30–60 minute class is not cut short.
       let finish = null;
@@ -120,6 +124,23 @@ function splitForRetry(buffer, mime, filename) {
   return null;
 }
 
+/**
+ * In a mostly Arabic-script transcript, a Latin-letter line of 2+ words is
+ * likely a wrong-language guess («Good. Marhaba Mahdi») ⇒ marked suspect too.
+ */
+export function flagLatinLines(cmp) {
+  const real = cmp.lines.filter((l) => !l.blank);
+  const arabicShare = real.length ? real.filter((l) => /[\u0600-\u06FF]/.test(l.text)).length / real.length : 0;
+  if (arabicShare < 0.5) return { ...cmp, latinFlagged: 0 };
+  let n = 0;
+  const lines = cmp.lines.map((l) => {
+    const t = String(l.text).replace(/\[[^\]]*\]/g, ' ').trim();
+    if (!l.blank && l.confirmed && /[A-Za-z]/.test(t) && !/[\u0600-\u06FF]/.test(t) && t.split(/\s+/).filter(Boolean).length >= 2) { n += 1; return { ...l, confirmed: false, latin: true }; }
+    return l;
+  });
+  return { ...cmp, lines, suspectCount: lines.filter((l) => !l.blank && !l.confirmed).length, latinFlagged: n };
+}
+
 function chunks(text, size) {
   const out = [];
   for (let i = 0; i < text.length && out.length < REVIEW_MAX_CHUNKS; i += size) out.push(text.slice(i, i + size));
@@ -155,7 +176,9 @@ export async function extractLessonFile({ buffer, filename = '', mime = '' }, { 
           result.notes.push('این قالب را نمی‌شود بی‌رمزگشایی تکه کرد؛ برای رونویسیِ بهتر mp3 بفرستید');
         }
       }
-      const { a, cmp } = best;
+      const { a } = best;
+      const cmp = flagLatinLines(best.cmp);
+      if (cmp.latinFlagged) result.notes.push(`⚠️ ${cmp.latinFlagged} سطر با حروفِ لاتین در میانِ گفتارِ عربی/فارسی — احتمالاً زبان اشتباه تشخیص داده شده؛ «🔁 رونویسیِ دوباره» را امتحان کنید`);
       if (best.loops) result.notes.push(`⟲ ${best.loops} «حلقهٔ تکرارِ» ماشینی در رونویسی پیدا و حذف شد (${best.loopSample}) — جای آن در متن علامت دارد`);
       if (best.finish.includes('MAX_TOKENS')) result.notes.push('⚠️ رونویسی به سقفِ خروجیِ Gemini رسید و انتهایش ممکن است بریده باشد؛ فایل را به بخش‌های کوتاه‌تر (حدودِ ۲۰ دقیقه) تقسیم کنید');
       const odd = best.finish.find((f) => f && !['STOP', 'MAX_TOKENS'].includes(f));

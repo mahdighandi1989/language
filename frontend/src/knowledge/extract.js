@@ -47,7 +47,12 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
   const out = [];
   let heading = '';
   let header = null; // { arCol, faCol, hint }
-  const lines = String(text || '').split('\n');
+  // Example-sentence blocks (Arabic / transliteration / English / Persian) are read
+  // first; their lines and «Note …» paragraphs (which wrap over several lines) are
+  // then skipped by the line-by-line pass below.
+  const pre = exampleBlocks(text);
+  out.push(...pre.items.map(({ heading: _h, ...it }) => ({ ...it, category: 'phrases' }))); // example sentences ⇒ اصطلاحات/جمله‌ها
+  const lines = String(text || '').split('\n').map((l, i) => (pre.used.has(i) ? '' : l));
   let skipping = false; // inside a «⚠️ اصلاحات و هشدارها» block
   for (const raw of lines) {
     const line = raw.trim();
@@ -105,7 +110,8 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
       const [a, b] = parts;
       const sa = langScore(a); const sb = langScore(b);
       const [ar, fa] = sa > sb && sb <= 0 ? [a, b] : sb > sa && sa <= 0 ? [b, a] : [null, null];
-      if (ar && fa && ar.length <= 80 && fa.length <= 160) out.push({ term: ar, definition: fa, pronunciation: '', category: categoryFromHint(heading) || byLength(ar), from: 'line' });
+      // A term must be written in Arabic script («ymash-she = to walk…» is not one).
+      if (ar && fa && ARABIC_SCRIPT.test(ar) && ARABIC_SCRIPT.test(fa) && ar.length <= 80 && fa.length <= 160) out.push({ term: ar, definition: fa, pronunciation: '', category: categoryFromHint(heading) || byLength(ar), from: 'line' });
     }
   }
   // «مبسوط ، فرحان» = two words, not a phrase: split (meanings pairwise when they split the same way).
@@ -169,6 +175,72 @@ function conjugationRow(cells, conj, heading) {
   return out;
 }
 
+// ---- example-sentence blocks (e.g. «VERBS in Lebanese»): Arabic / translit / English / Persian ----
+const LATIN = /[A-Za-z]/;
+const isLatinLine = (l) => LATIN.test(l) && !ARABIC_SCRIPT.test(l);
+const isTranslit = (l) => isLatinLine(l) && (/[A-Za-z][2378]|[2378][A-Za-z]|-[a-z]|\b(3am|3a|el|il|ana|enta|enti|huwwe|hiyye|ne7na|nehna|ma|mesh|shu|ktir|bi|baddi|fi)\b|[āīūʿʾḥṣ]/i.test(l));
+const isPersianLine = (l) => ARABIC_SCRIPT.test(l) && (langScore(l) < 0 || /[پچژگ]|\u200c/.test(l));
+const isArabicLine = (l) => ARABIC_SCRIPT.test(l) && !isPersianLine(l);
+const NOTE_START_LINE = /^\s*(note|notes|نکته|توجه|یادداشت)\b\s*[:：-]?/i;
+
+/** Lines that form example blocks, and «Note …» paragraphs joined across wrapped lines. */
+export function exampleBlocks(text) {
+  const all = String(text || '').split('\n');
+  const used = new Set();
+  const items = [];
+  const notes = [];
+  // Notes: a «Note» line plus following lines until a blank line or a new block start.
+  for (let i = 0; i < all.length; i += 1) {
+    if (!NOTE_START_LINE.test(all[i].trim())) continue;
+    const parts = [all[i].trim()];
+    used.add(i);
+    let j = i + 1;
+    while (j < all.length && all[j].trim() && !isArabicLine(all[j].trim()) && !NOTE_START_LINE.test(all[j].trim()) && !/^#{1,6}\s/.test(all[j].trim())) { parts.push(all[j].trim()); used.add(j); j += 1; }
+    notes.push(parts.join(' '));
+    i = j - 1;
+  }
+  const idx = all.map((l, i) => ({ l: clean(l), i })).filter((x) => x.l && !used.has(x.i) && !x.l.startsWith('|'));
+  let heading = '';
+  for (let k = 0; k < idx.length; k += 1) {
+    const h = idx[k].l.match(/^#{1,6}\s+(.*)$/);
+    if (h) { heading = h[1]; continue; }
+    // 4 lines: one Arabic, one Persian, two Latin (translit + English), in any order
+    const w4 = idx.slice(k, k + 4);
+    if (w4.length === 4 && consecutive(w4)) {
+      const ar = w4.filter((x) => isArabicLine(x.l));
+      const fa = w4.filter((x) => isPersianLine(x.l));
+      const lat = w4.filter((x) => isLatinLine(x.l));
+      if (ar.length === 1 && fa.length === 1 && lat.length === 2) {
+        const tr = lat.find((x) => isTranslit(x.l)) || lat[0];
+        const en = lat.find((x) => x !== tr);
+        items.push({ term: ar[0].l, pronunciation: tr.l, english: en.l, definition: fa[0].l, from: 'block', trusted: true, heading });
+        w4.forEach((x) => used.add(x.i));
+        k += 3;
+        continue;
+      }
+    }
+    // 3 lines without the Arabic script: translit / English / Persian ⇒ shown, unticked
+    const w3 = idx.slice(k, k + 3);
+    if (w3.length === 3 && consecutive(w3)) {
+      const fa = w3.filter((x) => isPersianLine(x.l));
+      const lat = w3.filter((x) => isLatinLine(x.l));
+      if (fa.length === 1 && lat.length === 2 && lat.some((x) => isTranslit(x.l))) {
+        const tr = lat.find((x) => isTranslit(x.l));
+        const en = lat.find((x) => x !== tr);
+        items.push({ term: tr.l, pronunciation: tr.l, english: en.l, definition: fa[0].l, from: 'block-latin', heading });
+        w3.forEach((x) => used.add(x.i));
+        k += 2;
+      }
+    }
+  }
+  return { items, used, notes };
+}
+function consecutive(win) {
+  // no blank-line gap inside the window (lines are adjacent in the original text)
+  for (let t = 1; t < win.length; t += 1) if (win[t].i !== win[t - 1].i + 1) return false;
+  return true;
+}
+
 export const CATEGORIES = ['vocabulary', 'phrases', 'verbs', 'adjectives', 'pronouns', 'grammar'];
 
 /** Keep only AI items whose term is literally in the lesson text (anti-hallucination). */
@@ -210,6 +282,7 @@ export function addToKb(kb = {}, chosen, lesson, now = Date.now()) {
     next[cat] = [...(next[cat] || []), {
       id: `${now}-${i}`, term: c.term, definition: c.definition,
       ...(c.pronunciation ? { pronunciation: c.pronunciation } : {}),
+      ...(c.english ? { english: c.english } : {}),
       source: `درس: ${lesson.title}`, lessonId: lesson.id, extractedAt: new Date(now).toISOString(),
     }];
   });

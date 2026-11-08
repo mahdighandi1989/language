@@ -32,7 +32,9 @@ export default function SmartUpload({ lesson, updateLesson, fetchImpl = (...a) =
         const body = await res.json();
         // Text not yet in the notes: never applied, and not a failed/empty extraction.
         const applied = new Set((lesson.appliedExtracts || []).map(String));
-        const legacy = new Set((lesson.files || []).filter((f) => f.stored && !(lesson.appliedExtracts || []).length).map((f) => String(f.id)));
+        // Lessons from before appliedExtracts existed: their stored files count as applied.
+        // Once the list exists (even empty, e.g. after a re-extraction) it is the truth.
+        const legacy = new Set(lesson.appliedExtracts === undefined ? (lesson.files || []).filter((f) => f.stored).map((f) => String(f.id)) : []);
         if (live) setOrphans((body.files || []).filter((f) => f.hasExtract && f.status === 'ok' && !applied.has(String(f.id)) && !legacy.has(String(f.id))));
       } catch { /* offline or old server: nothing to restore */ }
     })();
