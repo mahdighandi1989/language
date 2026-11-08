@@ -213,3 +213,40 @@ describe('tester report on d7fa53f (lesson 15)', async () => {
     expect(normalizeBlockLines(['She drinks coffee in the', 'morning.']).map((x) => x.l)).toEqual(['She drinks coffee in the morning.']);
   });
 });
+
+describe('tester report on 7454234 (real lesson 15)', async () => {
+  const { quality } = await import('./extract.js');
+  it('broken PDF glyphs inside Persian ⇒ kept, unticked as unreliable', () => {
+    const q = quality({ term: 'هي بتاكل', definition: '(او دارد خوا\u1D57ش \u1BA4 برد.)', from: 'block', trusted: true });
+    expect(q.ok).toBe(false);
+    expect(q.reason).toMatch(/غیرقابلِ‌اعتماد/);
+    expect(quality({ term: 'هو بيحب', definition: 'او دوست دارد \u1587خورد' }).ok).toBe(false);
+    expect(quality({ term: 'هيّ قاعدة عالصوفا', definition: 'او روی مبل نشسته است', pronunciation: 'Hiyye 2a3de 3-şşofa' }).ok).toBe(true); // ş is fine
+  });
+  it('joins a wrapped Arabic sentence and a wrapped transliteration before reading blocks', () => {
+    const text = [
+      'هوّي بياكل برغر',
+      '.كل ويكند',
+      'Huwwe b-yekol berger kil weekend.',
+      'He eats a burger every weekend.',
+      'او هر آخرِ هفته برگر می‌خورد',
+      '',
+      'هيّ بتطبخ سمك يوم',
+      'الأحد.',
+      'Hiyye b-tiţbu5 samak yom el-',
+      '2a7ad.',
+      'She cooks fish on Sunday.',
+      'او یکشنبه ماهی می‌پزد',
+    ].join('\n');
+    const c = extractLocal(text);
+    expect(c.map((x) => x.term)).toEqual(['هوّي بياكل برغر كل ويكند.', 'هيّ بتطبخ سمك يوم الأحد.']);
+    expect(c[0].definition).toBe('او هر آخرِ هفته برگر می‌خورد');
+    expect(c[1].pronunciation).toBe('Hiyye b-tiţbu5 samak yom el- 2a7ad.');
+    expect(c.every((x) => quality(x).ok)).toBe(true);
+  });
+  it('exercise tables: placeholders «.....» ⇒ uncertain; Latin-only terms are not items', () => {
+    expect(quality({ term: 'أنا ..... بالمدرسة', definition: 'من ..... در مدرسه' }).ok).toBe(false);
+    const c = extractLocal('| El-basar | السّمع |\n| Smell | بویایی |');
+    expect(c.some((x) => /El-basar|Smell/.test(x.term))).toBe(false);
+  });
+});

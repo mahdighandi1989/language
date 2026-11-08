@@ -37,6 +37,9 @@ const NOTE_WORDS = /غلط|اشتباه|باید\s|حرکت‌?گذاری|اعر
 // A grammar/usage explanation rather than a meaning.
 const EXPLANATION = /(استفاده\s*می|به\s*کار\s*می|به‌کار\s*می|یعنی\s|فرق\s|تفاوت\s|برای\s+گفتن|توصیه|تکلیف|تمرین\s*کن)/;
 export const MAX_ITEM_CHARS = 150;
+// Anything outside Arabic/Persian, Latin (with diacritics: ţ ş ā), digits, punctuation and
+// joiners — e.g. U+1587, U+18E4, U+1D57 inside a Persian word — is a broken PDF glyph.
+const FOREIGN_CHARS = /[^\u0000-\u024F\u0300-\u036F\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u1E00-\u1EFF\u2000-\u206F\u20A0-\u20CF\u2190-\u21FF\uFB50-\uFDFF\uFE70-\uFEFF\s]/u;
 const clean = (s) => String(s || '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
 const words = (s) => clean(s).split(' ').filter(Boolean).length;
 const byLength = (term) => (words(term) <= 2 ? 'vocabulary' : 'phrases');
@@ -125,7 +128,7 @@ export function extractLocal(text, { lessonTitle = '' } = {}) {
   }
   // de-duplicate inside the lesson; a «row» holding a whole table (pipes, very long) is not an item
   const seen = new Set();
-  return split.filter((c) => !/\|/.test(c.term + c.definition) && c.term.length + c.definition.length <= MAX_ITEM_CHARS * 3).filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
+  return split.filter((c) => ARABIC_SCRIPT.test(c.term)).filter((c) => !/\|/.test(c.term + c.definition) && c.term.length + c.definition.length <= MAX_ITEM_CHARS * 3).filter((c) => { const k = `${exactKey(c.term)}\u0000${exactKey(c.definition)}`; if (seen.has(k)) return false; seen.add(k); return true; })
     .map((c) => ({ ...c, source: lessonTitle ? `درس: ${lessonTitle}` : '' }));
 }
 
@@ -178,7 +181,7 @@ function conjugationRow(cells, conj, heading) {
 // ---- example-sentence blocks (e.g. «VERBS in Lebanese»): Arabic / translit / English / Persian ----
 const LATIN = /[A-Za-z]/;
 const isLatinLine = (l) => LATIN.test(l) && !ARABIC_SCRIPT.test(l);
-const isTranslit = (l) => isLatinLine(l) && (/[A-Za-z][2378]|[2378][A-Za-z]|-[a-z]|\b(3am|3a|el|il|ana|enta|enti|huwwe|hiyye|ne7na|nehna|ma|mesh|shu|ktir|bi|baddi|fi)\b|[āīūʿʾḥṣ]/i.test(l));
+const isTranslit = (l) => isLatinLine(l) && (/[A-Za-z][2378]|[2378][A-Za-z]|-[a-z]|\b(3am|3a|el|il|ana|enta|enti|huwwe|hiyye|ne7na|nehna|ma|mesh|shu|ktir|bi|baddi|fi)\b|[āīūʿʾḥṣţşčğ]|\d/i.test(l));
 const isPersianLine = (l) => ARABIC_SCRIPT.test(l) && (langScore(l) < 0 || /[پچژگ]|\u200c/.test(l));
 const isArabicLine = (l) => ARABIC_SCRIPT.test(l) && !isPersianLine(l);
 const NOTE_START_LINE = /^\s*(note|notes|نکته|توجه|یادداشت)\b\s*[:：-]?/i;
@@ -205,11 +208,35 @@ export function normalizeBlockLines(all) {
       const g = l.replace(/[()\s]/g, '').replace('مونث', 'مؤنث');
       prev.l = `${prev.l} (${g})`; prev.idxs.push(i); continue;
     }
-    if (prev && !prev.drop && !blank && isLatinLine(prev.l) && isLatinLine(l) && !ENDS_SENTENCE.test(prev.l) && /^[a-z]/.test(l) && !isTranslit(l)) {
+    // A Latin line cut mid-sentence («Hiyye b-tiţbu5 samak yom el-» / «She drinks coffee in the»):
+    // joined when it ends with «-», or does not end a sentence and the next starts in lowercase/digit.
+    if (prev && !prev.drop && !blank && isLatinLine(prev.l) && isLatinLine(l) && !ENDS_SENTENCE.test(prev.l) && (/-$/.test(prev.l) || /^[a-z0-9ţş]/.test(l))) {
       prev.l = `${prev.l} ${l}`; prev.idxs.push(i); continue;
     }
     out.push({ l, idxs: [i], blankBefore: blank });
     blank = false;
+  }
+  return out;
+}
+
+/**
+ * An Arabic sentence that wrapped in the PDF: «هوّي بياكل برغر» + «.كل ويكند» then the
+ * transliteration. When the Arabic line has fewer words than the transliteration
+ * after it and the next line is a short Arabic-script piece, the two are one line.
+ * (RTL extraction often puts the final «.» first: «.كل ويكند» ⇒ «كل ويكند.».)
+ */
+export function joinArabicTails(norm) {
+  const out = [];
+  for (let k = 0; k < norm.length; k += 1) {
+    const a = norm[k]; const b = norm[k + 1]; const c = norm[k + 2];
+    if (b && c && !b.blankBefore && !c.blankBefore && isArabicLine(a.l) && ARABIC_SCRIPT.test(b.l) && !isPersianLine(b.l) && words(b.l) <= 4 && isTranslit(c.l)
+      && words(a.l) < words(c.l) && words(a.l) + words(b.l) <= words(c.l) + 2) {
+      const tail = b.l.replace(/^([.،؟?!]+)\s*(.*)$/, '$2$1');
+      out.push({ ...a, l: `${a.l} ${tail}`, idxs: [...a.idxs, ...b.idxs] });
+      k += 1;
+      continue;
+    }
+    out.push(a);
   }
   return out;
 }
@@ -232,7 +259,7 @@ export function exampleBlocks(text) {
     notes.push(parts.join(' '));
     i = j - 1;
   }
-  const norm = normalizeBlockLines(all.map((l, i) => (used.has(i) ? '' : l))).filter((x) => !x.drop && !x.l.startsWith('|'));
+  const norm = joinArabicTails(normalizeBlockLines(all.map((l, i) => (used.has(i) ? '' : l))).filter((x) => !x.drop && !x.l.startsWith('|')));
   let heading = '';
   for (let k = 0; k < norm.length; k += 1) {
     const h = norm[k].l.match(/^#{1,6}\s+(.*)$/);
@@ -332,6 +359,8 @@ export function quality(c) {
   const def = String(c.definition || '');
   const arabicMarks = /[\u064B-\u0652يكةىإأ]/.test(term);
   if (term.length > MAX_ITEM_CHARS || def.length > MAX_ITEM_CHARS) return { ok: false, reason: 'بیش از ۱۵۰ نویسه' };
+  if (FOREIGN_CHARS.test(term + def)) return { ok: false, reason: 'متنِ غیرقابلِ‌اعتماد (نویسه‌های بیگانه از استخراجِ PDF) — دستی اصلاح کنید' };
+  if (/\.{4,}|…{2,}|\[\s*[^\]]*\.{3,}/.test(`${term} ${def} ${c.english || ''}`)) return { ok: false, reason: 'جای‌خالیِ تمرین («.....»)، نه جملهٔ مثال' };
   if (words(term) > 6) return { ok: false, reason: 'سمتِ چپ جملهٔ بلند است' };
   if (NOTE_START.test(def)) return { ok: false, reason: 'معنی یادداشتِ اعراب/املاست' };
   if (EXPLANATION.test(term) || (EXPLANATION.test(def) && words(def) > 5)) return { ok: false, reason: 'توضیح/توصیه است نه معنی' };
