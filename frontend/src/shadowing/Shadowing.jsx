@@ -3,7 +3,7 @@
 // hear yourself, get a Gemini score + Persian tips, progress saved per lesson
 // in data.shadowing. AI/TTS are injected (App.jsx passes its helpers).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { extractPracticeSentences, recordAttempt, lessonShadowStats, parseVerdict, verdictPrompt, VERDICT_SCHEMA, sentenceKey } from './shadowing.js';
+import { extractPracticeSentences, stripTimestamp, recordAttempt, lessonShadowStats, parseVerdict, verdictPrompt, VERDICT_SCHEMA, sentenceKey } from './shadowing.js';
 
 const blobToBase64 = (blob) => new Promise((resolve, reject) => {
   const r = new FileReader();
@@ -26,7 +26,9 @@ export default function Shadowing({ lesson, data, setData, callAI, tts, toWavUrl
   const audioRef = useRef(null);
   const blobRef = useRef(null);
 
-  const target = custom.trim() || sentences[index]?.text || '';
+  // Never a timestamp in what is shown, spoken or compared (also for a pasted sentence).
+  const target = stripTimestamp(custom) || sentences[index]?.text || '';
+  const time = custom.trim() ? '' : sentences[index]?.time || '';
   const meaning = custom.trim() ? '' : sentences[index]?.meaning || '';
   const progress = data?.shadowing?.[String(lesson.id)] || {};
   const row = target ? progress[sentenceKey(target)] : null;
@@ -130,7 +132,7 @@ export default function Shadowing({ lesson, data, setData, callAI, tts, toWavUrl
           <select value={index} onChange={(e) => { setCustom(''); setIndex(Number(e.target.value)); }} className="flex-1 min-w-0 p-2 border rounded-lg text-sm" aria-label="انتخابِ جمله">
             {sentences.map((s, i) => {
               const r = progress[sentenceKey(s.text)];
-              return <option key={i} value={i}>{i + 1}. {s.text}{r ? ` — ${r.best}` : ''}</option>;
+              return <option key={i} value={i}>{i + 1}. {s.text}{s.time ? ` (${s.time})` : ''}{r ? ` — ${r.best}` : ''}</option>;
             })}
           </select>
           <button onClick={() => go(1)} disabled={index >= sentences.length - 1 || !!custom} className="px-3 py-1 rounded-lg bg-slate-100 disabled:opacity-40" aria-label="جملهٔ بعدی">←</button>
@@ -141,6 +143,7 @@ export default function Shadowing({ lesson, data, setData, callAI, tts, toWavUrl
         <div className="p-4 rounded-xl bg-slate-50 border text-center space-y-1">
           <p className="text-2xl leading-loose" dir="rtl" lang="ar" style={{ fontFamily: "'Noto Naskh Arabic','Vazirmatn',serif" }}>{target}</p>
           {meaning && <p className="text-sm text-slate-600">{meaning}</p>}
+          {time && <p className="text-xs text-slate-400" dir="ltr">⏱ {time}</p>}
           {row && <p className="text-xs text-slate-500">{row.attempts} تلاش · بهترین {row.best} · آخرین {row.last}</p>}
         </div>
       )}

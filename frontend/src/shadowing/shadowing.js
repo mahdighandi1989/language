@@ -49,18 +49,33 @@ const clean = (s) => String(s || '').replace(/\*\*|__|~~|`/g, '').replace(/^[#>\
  * the first Arabic cell, with the first Persian cell as meaning. Other lines:
  * Arabic segments split on «:», «=», «—», « - » or parentheses.
  */
+// «[0:15]», «[00:00]», «[1:02:03]», «(0:15)», «0:15 -» at the start of a line.
+export const LEADING_TIMESTAMP = /^[[(]?\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[\])]?\s*[-–—:]?\s*/;
+
+/** A sentence without its leading timestamp (also used before TTS / scoring). */
+export function stripTimestamp(s) {
+  return String(s || '').trim().replace(LEADING_TIMESTAMP, '').trim();
+}
+
 export function extractPracticeSentences(text, max = 300) {
   const out = [];
   const seen = new Set();
+  let time = '';
   const push = (arabic, meaning = '') => {
     const a = clean(arabic);
     if (a.length < 2 || a.length > 160 || !isArabicText(a) || seen.has(a)) return;
     seen.add(a);
-    out.push({ text: a, meaning: clean(meaning).slice(0, 160) });
+    out.push({ text: a, meaning: clean(meaning).slice(0, 160), ...(time ? { time } : {}) });
   };
   for (const raw of String(text || '').split('\n')) {
     if (out.length >= max) break;
-    const line = raw.trim();
+    // Transcript lines: «[00:00] الحمد لله.» — the timestamp is only a label (kept apart),
+    // never part of the sentence shown, spoken by the teacher or compared. Taken off
+    // BEFORE splitting on «:». Suspect/unreadable lines are not practice material.
+    if (/⚠️|\[مشکوک\]|\[ناخوانا\]|⟲/.test(raw)) continue;
+    const ts = raw.trim().match(LEADING_TIMESTAMP);
+    time = ts ? ts[1] : '';
+    const line = ts ? raw.trim().slice(ts[0].length).trim() : raw.trim();
     if (!line || /^\|?\s*:?-{2,}/.test(line)) continue;
     if (line.startsWith('|')) {
       const cells = line.split('|').slice(1, -1).map((c) => c.trim());

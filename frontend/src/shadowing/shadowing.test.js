@@ -51,3 +51,17 @@ describe('shadowing logic', () => {
     expect(parseVerdict({ score: 'x' })).toBeNull();
   });
 });
+
+describe('transcript timestamps (lesson 25)', async () => {
+  const { stripTimestamp } = await import('./shadowing.js');
+  it('the sentence has no «[m:ss]»; the time is kept apart; suspect lines are skipped', () => {
+    const s = extractPracticeSentences(['[00:00] الحمد لله.', '[1:02:03] كيفك اليوم؟', '(0:15) بدّي روح عالبيت : می‌خواهم بروم خانه', '⚠️ [مشکوک] [00:20] شي ما بينفهم'].join('\n'));
+    expect(s).toEqual([
+      { text: 'الحمد لله.', meaning: '', time: '00:00' },
+      { text: 'كيفك اليوم؟', meaning: '', time: '1:02:03' },
+      { text: 'بدّي روح عالبيت', meaning: 'می‌خواهم بروم خانه', time: '0:15' },
+    ]);
+    expect(stripTimestamp('[00:00] الحمد لله.')).toBe('الحمد لله.');
+    expect(stripTimestamp('الحمد لله.')).toBe('الحمد لله.');
+  });
+});
