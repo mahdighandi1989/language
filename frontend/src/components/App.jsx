@@ -1360,7 +1360,7 @@ export default function App() {
         <div data-testid="app-root" className="bg-slate-50 text-slate-800" dir="rtl" onMouseUp={handleGlobalMouseUp}>
           <div className="flex flex-col md:flex-row min-h-screen">
             <Sidebar themeState={themeState} setThemeState={setThemeState} navigateTo={navigateTo} activeView={activeView} exportData={exportData} importData={importData} onSearchClick={() => setIsSearchOpen(true)} accessRecord={accessRecord} onSignOut={handleSignOut} userEmail={authUser?.email} showInspection={inspectionEnabled} />
-            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 bg-slate-100">
+            <main className="flex-1 p-4 sm:p-6 md:p-8 pb-32 md:pb-32 bg-slate-100">
               {bodyProgress && (
                 <div role="status" className="mb-4 bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-2 text-sm">
                   ⏳ در حالِ بارگذاریِ متنِ درس‌ها: {bodyProgress.done.toLocaleString('fa-IR')} از {bodyProgress.total.toLocaleString('fa-IR')}
