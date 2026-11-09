@@ -36,3 +36,10 @@
 - production: `prod_check` بی‌یافته (health/SPA ‏۲۰۰، inspection بی‌توکن ۴۰۱، ورودِ ناظر ۲۰۰ و ذخیره‌سازِ Firestore ماندگار)؛ `deploys.py` کدِ ۰، live = main = `42ec533`.
 - نرفته: Chromium روی صفحه‌ها و ورودِ واقعیِ گوگل/Live سنجیده نشد (بک‌لاگ: OPEN_ITEMS ۶). دستورِ `inspection.py round` در ابزار وجود ندارد؛ `urgent` به‌جایش سرزدن را ثبت کرد.
 > **امضا:** `ناظرِ خودکار (Claude Code routine)`
+
+## 2026-11-09 02:30 UTC — دورِ کامل (روتین)
+- وضعیت: سبز. تنها برگهٔ باز (۳) از قبل `answered/partial` است و مالک پاسخِ تازه ننوشته؛ کارِ تازه‌ای نبود.
+- اجرا: node ‏۱۹۱ ✓، backend pytest ‏۱۱ ✓، root pytest ‏۶۹ ✓، vitest ‏۲۲۷ ✓، build ✓ (فقط هشدارِ اندازهٔ chunk).
+- production: `prod_check` بی‌یافته (ورودِ ناظر ۲۰۰، Firestore ماندگار)؛ `deploys.py` کدِ ۰، live = main = `9898174`.
+- نرفته: Chromium روی صفحه‌ها و ورودِ واقعیِ گوگل/Live سنجیده نشد (OPEN_ITEMS ۶).
+> **امضا:** `ناظرِ خودکار (Claude Code routine)`
