@@ -101,3 +101,4 @@
 | 3 | هشدارِ «Payment failed» ِ Render از API دیده نمی‌شود | بررسیِ مالک در داشبورد |
 | 5 | `FIREBASE_PROJECT_ID`، `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT` روی Render (نظارت) | مالک — تنظیم از نشست رد شد |
 | 4 | محدودکردنِ کلیدِ وبِ Firebase به دامنه (`docs/security.md` §۶، TO-DO مالک) | مالک |
+| 9 | رمزِ ناظر در محیطِ روتین با `SUPERVISOR_PASSWORD` ِ Render یکی نیست ⇒ ناظر وارد کارتابل نمی‌شود (OPEN_ITEMS ۱۰، 2026-11-12) | مالک |

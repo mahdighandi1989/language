@@ -43,3 +43,16 @@
 - production: `prod_check` بی‌یافته (ورودِ ناظر ۲۰۰، Firestore ماندگار)؛ `deploys.py` کدِ ۰، live = main = `9898174`.
 - نرفته: Chromium روی صفحه‌ها و ورودِ واقعیِ گوگل/Live سنجیده نشد (OPEN_ITEMS ۶).
 > **امضا:** `ناظرِ خودکار (Claude Code routine)`
+
+## 2026-11-12 02:30 UTC — دورِ کامل (روتین)
+- وضعیت: **زرد** — محصول سالم است ولی ناظر **وارد کارتابل نشد**: `whoami` کدِ ۳، «ورودِ ناظر ناموفق (HTTP 401): رمزِ ناظر نادرست است».
+  رمز طبقِ دستورِ تازهٔ مالک فقط از متغیرِ `SUPERVISOR_PASSWORD` ِ محیطِ روتین خوانده شد (نه از Render API)؛ مقدار خوش‌شکل است
+  (≥۱۶ نویسه، بی‌فاصله/نقل‌قول/خطِ نو) ولی با مقدارِ سرویسِ `language` یکی نیست ⇒ OPEN_ITEMS ۱۰ (P1، کارِ مالک).
+- برگه‌ها: **دیده نشد** (نه «صفِ خالی»). `file`/`pull`/`answer`/`round` اجرا نشد؛ «سرزدن» ثبت نشد. فقط ۲ تلاشِ ورود (whoami + prod_check)؛ بیشتر نه.
+- اجرا: node ‏۱۹۱ ✓، backend pytest ‏۱۱ ✓، root pytest ‏۶۹ ✓، vitest ‏۲۲۷ ✓، build ✓ (فقط هشدارِ اندازهٔ chunk).
+- Chromium محلی (۱۰ نما: dashboard، lessons، planner، journal، stats، settings، cultural، quiz، archivedConversations، inspection): همه بی‌خطای کنسول؛
+  سه تصویر (dashboard، lessons، settings) با چشم دیده شد — چیدمانِ RTL سالم. با دادهٔ خالی؛ جریان‌های درونِ درس/آزمون سنجیده نشد.
+- production: health ‏۲۰۰، SPA ‏۲۰۰، inspection بی‌توکن ۴۰۱، Gemini با توکنِ جعلی ۴۰۱؛ `deploys.py` کدِ ۰، live = main = `ac73c53`.
+  ماندگاریِ ذخیره‌ساز و هر چیزِ پشتِ ورودِ ناظر **سنجیده نشد**. ورودِ گوگل/Live هم نه (OPEN_ITEMS ۶).
+- روند: تست‌ها ۴۹۸ (بی‌تغییر)؛ کدی تغییر نکرد.
+> **امضا:** `ناظرِ خودکار (Claude Code routine)`
