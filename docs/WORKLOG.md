@@ -843,3 +843,9 @@
 - **[VERIFY]** node ۱۹۱، pytest ۱۱+۶۹، vitest ۲۲۷، build سبز؛ ۱۰ نما در Chromium بی‌خطای کنسول؛ production: health/SPA ۲۰۰، ناشناس ۴۰۱، دیپلوی live = main.
 - **[BLOCKED]** برگه‌ها تا هم‌خوان‌شدنِ رمز (کارِ مالک).
 > **امضا:** `ناظرِ خودکار (Claude Code routine)` · 2026-11-12 · تست‌ها، build، Chromium محلی، prod_check و deploys.py اجرا شد
+
+## 2026-11-16 — ناظرِ خودکار: دورِ کامل بی‌تغییرِ کد؛ ورودِ ناظر باز هم رد شد
+- **[FINDING]** (P1، تکرار) `whoami` با رمزِ محیطِ روتین ⇒ ۴۰۱. کارتابل دیده نشد. OPEN_ITEMS ۱۰ همچنان کارِ مالک است.
+- **[DECISION]** همان تصمیمِ 2026-11-12: نه خواندن از Render API، نه تغییرِ `client.py`، نه تلاشِ مکرر (فقط یک ورود).
+- **[VERIFY]** node ۱۹۱، pytest ۱۱+۶۹، vitest ۲۲۷، build سبز؛ ۴ نما در Chromium بی‌خطای کنسول؛ production: health/SPA ۲۰۰، ناشناس ۴۰۱، live = main.
+> **امضا:** `ناظرِ خودکار (Claude Code routine)` · 2026-11-16 · تست‌ها، build، Chromium محلی و deploys.py اجرا شد
