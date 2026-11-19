@@ -6,6 +6,8 @@
 // Upstream: html2canvas (loaded lazily — it is big), the DOM. Downstream:
 // InspectionLayer.jsx (form preview + submit), backend stores `shot` and `env`.
 
+import { recentConsole } from './consoleTap.js';
+
 const MAX_DATA_URL = 5 * 1024 * 1024; // server cap is 6MB of decoded bytes
 
 /** Plain, bounded facts about the browser at the moment of filing. */
@@ -21,6 +23,7 @@ export function captureEnv(win = window) {
     scroll: { x: win.scrollX || 0, y: win.scrollY || 0 },
     theme: win.document?.documentElement?.classList?.contains('dark') ? 'dark' : 'light',
     capturedAt: new Date().toISOString(),
+    console: recentConsole(),
   };
 }
 
@@ -36,6 +39,12 @@ export function describeGeometry(g) {
     rows.push(['جای کادر داخلِ گره', `x=${g.anchor.fx} y=${g.anchor.fy} w=${g.anchor.fw} h=${g.anchor.fh}`]);
   }
   return rows;
+}
+
+/** Rows for the recorded console errors/warnings (env.console). */
+export function describeConsole(env) {
+  const list = Array.isArray(env?.console) ? env.console : [];
+  return list.map((e, i) => [`کنسول ${i + 1} (${e.level})`, String(e.text || '')]);
 }
 
 /**

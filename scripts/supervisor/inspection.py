@@ -108,6 +108,8 @@ def render_sheet(s: dict) -> str:
     if s.get("env"):
         e = s["env"]
         out.append(f"- محیطِ مرورگر: {e.get('url')} · پنجره {e.get('viewport')} · صفحه {e.get('screen')} · dpr {e.get('dpr')} · تم {e.get('theme')} · {e.get('userAgent')}")
+        for c in (e.get("console") or [])[:8]:
+            out.append(f"- کنسول ({c.get('level')}): `{str(c.get('text', ''))[:200]}`")
     if s.get("domPath"):
         out.append(f"- عنصر: `{s['domPath']}`")
     if s.get("coveredText"):

@@ -66,3 +66,12 @@
 - production: health ‏۲۰۰، SPA ‏۲۰۰، inspection بی‌توکن ۴۰۱؛ `deploys.py` بی‌مشکل، live = main = `f3de2b5`. پشتِ ورودِ ناظر و ورودِ گوگل/Live سنجیده نشد.
 - روند: تست‌ها ۴۹۸ (بی‌تغییر)؛ کدی تغییر نکرد.
 > **امضا:** `ناظرِ خودکار (Claude Code routine)`
+
+## 2026-11-19 02:2x UTC — دورِ کامل (روتین)
+- وضعیت: سبز. `whoami` کدِ ۰ (رمزِ محیطِ روتین حالا درست است ⇒ OPEN_ITEMS ۱۰ بسته). `file` ⇒ ۰ بایگانی؛ `urgent` خالی؛ `pull` ⇒ ۱ برگه (۳، `partial`).
+- برگهٔ ۳: افزودنِ ۸ خطا/هشدارِ آخرِ کنسول به برگه (`consoleTap.js`) + سقفِ env ‏۸۰۰۰؛ عکسِ «بعد» از خودِ کامپوننت در Chromium (هارنسِ موقت). جواب `partial` (خوانشِ «خیلی چیزا» هنوز فرضِ من است).
+- اجرا: node ‏۱۹۲ ✓، backend pytest ‏۱۱ ✓، root pytest ‏۶۹ ✓، vitest ‏۲۳۱ ✓، build ✓ (فقط هشدارِ اندازهٔ chunk).
+- production: `prod_check` بی‌یافته (ورودِ ناظر ۲۰۰، Firestore ماندگار، ناشناس ۴۰۱)؛ `deploys.py` کدِ ۰، live = main = `baa98e9` پیش از این ارسال.
+- نرفته: ورودِ گوگل/Live و فرم روی production (OPEN_ITEMS ۶).
+- روند: تست‌ها ۴۹۸ ⇒ ۵۰۳.
+> **امضا:** `ناظرِ خودکار (Claude Code routine)`

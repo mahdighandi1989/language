@@ -84,6 +84,8 @@
 [`../supervisor/README.md`](../supervisor/README.md)؛ دستورِ ناظر: [`../supervisor/PROMPT.md`](../supervisor/PROMPT.md).
 - وضعیتِ گفت‌وگو (`pending/open/answered/approved/filed/declined`) جدا از نتیجهٔ واقعی (`fixed/partial/not-done/needs-owner`).
 - رنگ از نتیجه مشتق می‌شود؛ «سبز» فقط `fixed` با تصویرِ بعد.
+- هر برگه خودکار ثبت می‌کند: مختصات (سند/پنجره/گره)، اسکرین‌شاتِ صفحه با کادر (`capture.js`، html2canvas)، محیطِ مرورگر و
+  **۸ خطا/هشدارِ آخرِ کنسول** (`inspection/consoleTap.js` در `main.jsx`؛ هر کدام ≤۲۰۰ نویسه؛ سقفِ `env` در سرور ۸۰۰۰). فرم، کارتابل و `pull` نشانشان می‌دهند.
 - **محدودیتِ فعلی:** تا `FIREBASE_SERVICE_ACCOUNT` تنظیم نشود، ذخیره موقت است (OPEN_ITEMS ۱)؛ تا `FIREBASE_PROJECT_ID` و
   `SUPERVISOR_PASSWORD` تنظیم نشوند، مالک/ناظر وارد نمی‌شوند (OPEN_ITEMS ۴).
 
@@ -101,4 +103,4 @@
 | 3 | هشدارِ «Payment failed» ِ Render از API دیده نمی‌شود | بررسیِ مالک در داشبورد |
 | 5 | `FIREBASE_PROJECT_ID`، `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT` روی Render (نظارت) | مالک — تنظیم از نشست رد شد |
 | 4 | محدودکردنِ کلیدِ وبِ Firebase به دامنه (`docs/security.md` §۶، TO-DO مالک) | مالک |
-| 9 | رمزِ ناظر در محیطِ روتین با `SUPERVISOR_PASSWORD` ِ Render یکی نیست ⇒ ناظر وارد کارتابل نمی‌شود (OPEN_ITEMS ۱۰، 2026-11-12؛ هنوز باز در 2026-11-16) | مالک |
+| 9 | ~~رمزِ ناظر در محیطِ روتین با Render یکی نیست~~ — **حل شد 2026-11-19** (ورودِ ناظر ۲۰۰؛ OPEN_ITEMS ۱۰ بسته) | — |

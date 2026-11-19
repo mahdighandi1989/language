@@ -101,12 +101,12 @@ function geometryOf(body) {
   return json.length > 8000 ? null : JSON.parse(json);
 }
 
-/** Browser snapshot sent with a sheet (url, viewport, UA…) — plain bounded JSON. */
+/** Browser snapshot sent with a sheet (url, viewport, UA, last console errors…) — plain bounded JSON. */
 export function envOf(body) {
   const e = body?.env;
   if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
   const json = JSON.stringify(e);
-  return json.length > 3000 ? null : JSON.parse(json);
+  return json.length > 8000 ? null : JSON.parse(json);
 }
 
 async function loadVisible(store, actor, id) {

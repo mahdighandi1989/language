@@ -408,3 +408,14 @@ test('API: general request, edit, decline with reason + mail record, detach (not
   const acc = await call('POST', `/api/inspection/${u2}/triage`, tokens.owner, { decision: 'accept', note: '' });
   assert.equal(acc.body.sheet.mail[0].for, 'open');
 });
+
+// env carries up to 8 console errors/warnings (≤200 chars each) — must not be dropped.
+import { envOf } from '../routes/inspection.js';
+test('envOf keeps an env with a full console buffer and rejects oversized/odd ones', () => {
+  const env = { url: 'https://x/'.padEnd(400, 'a'), userAgent: 'u'.repeat(300), viewport: { w: 1, h: 2 },
+    console: Array.from({ length: 8 }, () => ({ level: 'error', text: 'z'.repeat(200), at: new Date().toISOString() })) };
+  assert.equal(envOf({ env }).console.length, 8);
+  assert.equal(envOf({ env: { big: 'q'.repeat(9000) } }), null);
+  assert.equal(envOf({ env: [1] }), null);
+  assert.equal(envOf({}), null);
+});

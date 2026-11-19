@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { captureGeometry, coveredText, rectFromPoints, resolveRect, buildSelector } from './geometry.js';
 import { takeFocus } from './focus.js';
-import { captureEnv, captureViewportShot, describeGeometry } from './capture.js';
+import { captureEnv, captureViewportShot, describeConsole, describeGeometry } from './capture.js';
 
 export const TONE_COLOR = {
   open: '#f97316', pending: '#f59e0b', stale: '#f97316',
@@ -50,6 +50,10 @@ function SheetForm({ isOwner, draft, autoShot, shotPending, onCancel, onSubmit, 
             <dl className="mt-1 space-y-0.5">
               {describeGeometry(draft.geometry).map(([k, v]) => <div key={k} className="flex gap-2"><dt className="font-medium shrink-0">{k}:</dt><dd className="break-all" dir="ltr">{v}</dd></div>)}
               <div className="flex gap-2"><dt className="font-medium shrink-0">مسیر:</dt><dd className="break-all" dir="ltr">{draft.reopen}</dd></div>
+              {draft.env && <div className="flex gap-2"><dt className="font-medium shrink-0">مرورگر:</dt><dd className="break-all" dir="ltr">{draft.env.viewport?.w}×{draft.env.viewport?.h} · صفحه {draft.env.screen?.w}×{draft.env.screen?.h} · {draft.env.theme} · {draft.env.language}</dd></div>}
+              {describeConsole(draft.env).length === 0
+                ? <div className="flex gap-2" data-testid="inspection-console-empty"><dt className="font-medium shrink-0">کنسول:</dt><dd>خطا/هشداری ثبت نشده</dd></div>
+                : describeConsole(draft.env).map(([k, v]) => <div key={k} className="flex gap-2 text-red-700" data-testid="inspection-console"><dt className="font-medium shrink-0">{k}:</dt><dd className="break-all" dir="ltr">{v}</dd></div>)}
             </dl>
           </details>
         )}

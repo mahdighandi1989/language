@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TONE_COLOR } from './InspectionLayer.jsx';
 import { localClock, humanGap, minutesUntil, rushMessage, fa } from './nextRound.js';
 import { requestFocus } from './focus.js';
-import { describeGeometry } from './capture.js';
+import { describeConsole, describeGeometry } from './capture.js';
 
 const TABS = [
   { key: 'active', label: 'فعال', match: (s) => ['open', 'answered', 'approved'].includes(s.status) },
@@ -146,6 +146,7 @@ function SheetCard({ api, sheet, isOwner, me, rounds, onChanged, onReopenPage, o
           <dl className="mt-1 space-y-0.5">
             {describeGeometry(sheet.geometry).map(([k, v]) => <div key={k} className="flex gap-2"><dt className="font-medium shrink-0">{k}:</dt><dd className="break-all" dir="ltr">{v}</dd></div>)}
             {sheet.env && <div className="flex gap-2"><dt className="font-medium shrink-0">مرورگر:</dt><dd className="break-all" dir="ltr">{sheet.env.viewport?.w}×{sheet.env.viewport?.h} · dpr {sheet.env.dpr} · {sheet.env.theme} · {sheet.env.language}</dd></div>}
+            {describeConsole(sheet.env).map(([k, v]) => <div key={k} className="flex gap-2 text-red-700"><dt className="font-medium shrink-0">{k}:</dt><dd className="break-all" dir="ltr">{v}</dd></div>)}
           </dl>
         </details>
       )}
