@@ -75,3 +75,14 @@
 - نرفته: ورودِ گوگل/Live و فرم روی production (OPEN_ITEMS ۶).
 - روند: تست‌ها ۴۹۸ ⇒ ۵۰۳.
 > **امضا:** `ناظرِ خودکار (Claude Code routine)`
+
+## 2026-11-23 02:2x UTC — دورِ کامل (روتین)
+- وضعیت: **زرد** — محصول سالم؛ ناظر **وارد کارتابل نشد**: `whoami` کدِ ۳، ۴۰۱ «رمزِ ناظر نادرست است» (رمز از `SUPERVISOR_PASSWORD` ِ محیطِ روتین، نگاشته به
+  `LANG_SUPERVISOR_PASSWORD`). در 2026-11-19 همین مسیر ۲۰۰ داد ⇒ رمزِ یکی از دو طرف از آن پس عوض شده. OPEN_ITEMS ۱۰ بازگشایی شد (کارِ مالک). اعلانِ فوری فرستاده شد.
+- برگه‌ها: **دیده نشد** (نه «صفِ خالی»). فقط یک تلاشِ ورود؛ `file`/`pull`/`urgent`/`answer`/`round` و `prod_check` (که خودش وارد می‌شود) اجرا نشد ⇒ «سرزدن» ثبت نشد.
+- اجرا: node ‏۱۹۲ ✓، backend pytest ‏۱۱ ✓، root pytest ‏۶۹ ✓، vitest ‏۲۳۱ ✓، build ✓ (فقط هشدارِ اندازهٔ chunk).
+- Chromium محلی: dashboard، lessons، settings، inspection، planner بی‌خطای کنسول؛ dashboard با چشم دیده شد (RTL سالم، دادهٔ خالی).
+- production (دستی، فقط GET): health ‏۲۰۰، SPA ‏۲۰۰ با CSP/HSTS/X-Frame، `/api/inspection/items|rounds` بی‌توکن ۴۰۱، `/api/gemini/status` با توکنِ جعلی ۴۰۱، `/api/list-models` ناشناس ۴۰۱؛
+  `deploys.py` کدِ ۰، live = main = `fbf9175`. ماندگاریِ ذخیره‌ساز، پشتِ ورودِ ناظر و ورودِ گوگل/Live سنجیده نشد (OPEN_ITEMS ۶).
+- روند: تست‌ها ۵۰۳ (بی‌تغییر)؛ کدی تغییر نکرد.
+> **امضا:** `ناظرِ خودکار (Claude Code routine)`
