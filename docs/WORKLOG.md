@@ -872,3 +872,20 @@
 - **[VERIFY]** node ۱۹۲، pytest ۱۱+۶۹، vitest ۲۳۱، build سبز؛ ۵ نما در Chromium بی‌خطای کنسول؛ production: health/SPA ۲۰۰، مسیرهای محافظت‌شده ۴۰۱، live = main = `fbf9175`.
 - **[BLOCKED]** برگه‌ها تا هم‌خوان‌شدنِ رمز (کارِ مالک).
 > **امضا:** `ناظرِ خودکار (Claude Code routine)` · 2026-11-23 · تست‌ها، build، Chromium محلی، GETهای production و deploys.py اجرا شد
+
+## 2026-11-26 — ناظرِ خودکار: ورودِ ناظر باز هم رد شد؛ رفعِ مسابقهٔ عکسِ خودکارِ برگهٔ نظارت
+- **[FINDING]** (P1، تکرار) `whoami` با رمزِ محیطِ روتین ⇒ ۴۰۱ «رمزِ ناظر نادرست است» (دومین دورِ پیاپی از 2026-11-23). کارتابل دیده نشد (نه خالی). OPEN_ITEMS ۱۰ و HANDBOOK §۹ ردیفِ ۹ به‌روز.
+- **[DECISION]** همان تصمیمِ 2026-11-12: رمز از Render API خوانده نشد (دستورِ صریحِ پرامپتِ روتین)، `client.py` دست نخورد، فقط یک تلاشِ ورود. ردشده‌ها: (الف) مسیرِ Render API — خلافِ دستور؛
+  (ب) تلاشِ مکرر — خطرِ rate limit؛ (ج) `prod_check` — خودش ورود می‌کند، به‌جایش GETهای ناشناس دستی.
+- **[FINDING]** (P2) `ship.sh` در اجرای اول قرمز شد: vitest «۲۳۱ سبز، ۱ خطای گرفته‌نشده» — `window is not defined` در `InspectionLayer.jsx` (`captureViewportShot(...).then(setAutoShot…)`) پس از
+  برچیده‌شدنِ محیطِ تست. ناپایدار (۹ اجرای پیاپی سبز؛ زیرِ بارِ CPU در اجرای چهارم بازتولید شد). ریشه باگِ واقعی است: نتیجهٔ دیررسِ عکسِ خودکار بی‌بررسی در state نوشته می‌شد ⇒
+  اگر مالک کادر را «انصراف» بزند و کادرِ تازه بکشد، عکسِ کادرِ قبلی می‌تواند روی برگهٔ تازه بنشیند.
+- **[CHANGE]** `frontend/src/inspection/InspectionLayer.jsx`: `aliveRef` (سوار است؟) + `shotSeqRef` (شمارهٔ کادر)؛ نتیجهٔ عکس فقط برای همان کادر و کامپوننتِ زنده پذیرفته می‌شود.
+  `frontend/src/inspection/InspectionShotRace.test.jsx` (تازه، ۲ تست با promise ِ معوق). درس: `experiences/late-async-result-needs-owner-check.md`.
+- **[DECISION]** رفع در کد، نه در تست. ردشده‌ها: (الف) اجرای دوبارهٔ ship تا سبز شود — نشت می‌ماند و دورِ بعد دوباره می‌شکند؛ (ب) mock ِ سراسریِ `captureViewportShot` در تست‌ها — باگِ محصول را پنهان می‌کند؛
+  (ج) `dangerouslyIgnoreUnhandledErrors` در vitest — خاموش‌کردنِ نگهبان.
+- **[VERIFY]** node ۱۹۲، pytest ۱۱+۶۹، vitest ۲۳۳ (تستِ «عکسِ قدیمی جای تازه ننشیند» بدونِ اصلاح قرمز و با آن سبز است)، build سبز؛ ۸ نما در Chromium بی‌خطای کنسول؛
+  production: health/SPA ۲۰۰، مسیرهای محافظت‌شده ۴۰۱، live = main = `0aea068` پیش از این ارسال. فرمِ واقعی روی production (ورودِ گوگل) سنجیده نشد.
+- **[BLOCKED]** برگه‌ها تا هم‌خوان‌شدنِ رمز (کارِ مالک).
+- **[REVERT]** `git revert` همین کامیت.
+> **امضا:** `ناظرِ خودکار (Claude Code routine)` · 2026-11-26 · تست‌ها، build، Chromium محلی، GETهای production و deploys.py اجرا شد

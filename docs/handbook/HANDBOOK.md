@@ -103,4 +103,4 @@
 | 3 | هشدارِ «Payment failed» ِ Render از API دیده نمی‌شود | بررسیِ مالک در داشبورد |
 | 5 | `FIREBASE_PROJECT_ID`، `SUPERVISOR_PASSWORD`، `FIREBASE_SERVICE_ACCOUNT` روی Render (نظارت) | مالک — تنظیم از نشست رد شد |
 | 4 | محدودکردنِ کلیدِ وبِ Firebase به دامنه (`docs/security.md` §۶، TO-DO مالک) | مالک |
-| 9 | رمزِ ناظر در محیطِ روتین با Render یکی نیست — 2026-11-19 حل شد، **2026-11-23 دوباره ۴۰۱** (OPEN_ITEMS ۱۰ بازگشایی شد؛ کارِ مالک: مقدارِ `SUPERVISOR_PASSWORD` را از Render › language در محیطِ روتین کپی کند) | مالک |
+| 9 | رمزِ ناظر در محیطِ روتین با Render یکی نیست — 2026-11-19 حل شد، **2026-11-23 دوباره ۴۰۱، 2026-11-26 باز هم ۴۰۱** (OPEN_ITEMS ۱۰ بازگشایی شد؛ کارِ مالک: مقدارِ `SUPERVISOR_PASSWORD` را از Render › language در محیطِ روتین کپی کند) | مالک |

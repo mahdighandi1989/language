@@ -116,6 +116,11 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
   const [flashId, setFlashId] = useState(null);
   const overlayRef = useRef(null);
   const focusRef = useRef(takeFocus()); // «رفتن به همان‌جا» from the board
+  // The auto-screenshot resolves later (dynamic import + render): its result is
+  // used only while this layer is still mounted AND for the box it was taken for.
+  const aliveRef = useRef(true);
+  const shotSeqRef = useRef(0);
+  useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; }; }, []);
 
   const load = useCallback(async () => {
     try {
@@ -174,7 +179,12 @@ export default function InspectionLayer({ api, isOwner, page, pageLabel, reopen,
     setShotPending(true);
     setDraft({ page, pageLabel, reopen, geometry, env: captureEnv(window), domPath: anchor ? buildSelector(anchor) : '', coveredText: coveredText(anchor) });
     // The screenshot is taken now (the page is exactly as the person saw it).
-    captureViewportShot(rect, window).then((u) => { setAutoShot(u); setShotPending(false); });
+    const seq = ++shotSeqRef.current;
+    captureViewportShot(rect, window).then((u) => {
+      if (!aliveRef.current || seq !== shotSeqRef.current) return; // unmounted, or a newer box was drawn
+      setAutoShot(u);
+      setShotPending(false);
+    });
   };
 
   const submit = async ({ text, files, shot, urgent }) => {

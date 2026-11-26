@@ -86,3 +86,15 @@
   `deploys.py` کدِ ۰، live = main = `fbf9175`. ماندگاریِ ذخیره‌ساز، پشتِ ورودِ ناظر و ورودِ گوگل/Live سنجیده نشد (OPEN_ITEMS ۶).
 - روند: تست‌ها ۵۰۳ (بی‌تغییر)؛ کدی تغییر نکرد.
 > **امضا:** `ناظرِ خودکار (Claude Code routine)`
+
+## 2026-11-26 02:2x UTC — دورِ کامل (روتین)
+- وضعیت: **زرد** — محصول سالم؛ ناظر **وارد کارتابل نشد**: `whoami` کدِ ۳، ۴۰۱ «رمزِ ناظر نادرست است» (رمز از `SUPERVISOR_PASSWORD` ِ محیطِ روتین، نگاشته به
+  `LANG_SUPERVISOR_PASSWORD`؛ مقدار خوش‌شکل: ≥۱۶ نویسه، بی‌فاصله/نقل‌قول/خطِ نو). دومین دورِ پیاپی پس از بازگشاییِ OPEN_ITEMS ۱۰ (کارِ مالک). اعلانِ فوری فرستاده شد.
+- برگه‌ها: **دیده نشد** (نه «صفِ خالی»). فقط یک تلاشِ ورود؛ `file`/`pull`/`urgent`/`answer`/`round` و `prod_check` (که خودش وارد می‌شود) اجرا نشد ⇒ «سرزدن» ثبت نشد.
+- اجرا: node ‏۱۹۲ ✓، backend pytest ‏۱۱ ✓، root pytest ‏۶۹ ✓، vitest ‏۲۳۱ ✓، build ✓ (فقط هشدارِ اندازهٔ chunk).
+- Chromium محلی: dashboard، lessons، settings، inspection، planner، quiz، stats، journal بی‌خطای کنسول؛ dashboard و quiz با چشم دیده شد (RTL سالم، دادهٔ خالی).
+- production (دستی، فقط GET): health ‏۲۰۰، SPA ‏۲۰۰ با CSP/HSTS/X-Frame، `/api/inspection/items|rounds` بی‌توکن ۴۰۱، `/api/gemini/status` با توکنِ جعلی ۴۰۱، `/api/list-models` ناشناس ۴۰۱؛
+  `deploys.py` کدِ ۰، live = main = `0aea068` پیش از این ارسال. ماندگاریِ ذخیره‌ساز، پشتِ ورودِ ناظر و ورودِ گوگل/Live سنجیده نشد (OPEN_ITEMS ۶).
+- یافته (P2، رفع شد): vitest ناپایدار — عکسِ خودکارِ کادر پس از unmount/برای کادرِ قبلی در state نوشته می‌شد (`InspectionLayer.jsx`)؛ نگهبانِ سوار/شمارهٔ کادر + ۲ تست.
+- روند: تست‌ها ۵۰۳ ⇒ ۵۰۵.
+> **امضا:** `ناظرِ خودکار (Claude Code routine)`
